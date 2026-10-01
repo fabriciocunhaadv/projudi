@@ -1,0 +1,30 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+  body { font: 13px system-ui, sans-serif; width: 420px; margin: 0; padding: 10px; }
+  h1 { font-size: 15px; margin: 0 0 6px; }
+  h2 { font-size: 12px; margin: 10px 0 3px; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { border: 1px solid #ccc; padding: 2px 5px; text-align: left; }
+  td.n { text-align: center; width: 70px; }
+  .zero { color: #999; } .alerta { font-weight: 700; color: #b00020; }
+  .msg { padding: 6px; background: #fff3cd; margin: 6px 0; } .erro { color: #b00020; }
+  .cfg { margin-top: 12px; border-top: 1px solid #ddd; padding-top: 8px; }
+  .cfg label { display: block; margin: 4px 0; } input[type=text] { width: 100%; box-sizing: border-box; }
+  a { color: #1a56a0; }
+</style>
+<h1>Conclusões Projudi</h1>
+<div><button id="atualizar">Verificar agora</button> <span id="quando"></span></div>
+<div id="conteudo"></div>
+<div class="cfg">
+  <label>Serventias (parte do nome; separe por ; — vazio = todas)
+    <input type="text" id="filtro"></label>
+  <label>Verificar a cada
+    <select id="intervalo">
+      <option value="0">nunca (só manual)</option><option value="10">10 min</option>
+      <option value="30">30 min</option><option value="60">1 hora</option>
+      <option value="180">3 horas</option>
+    </select></label>
+  <label><input type="checkbox" id="notificar"> Avisar quando chegar conclusão nova</label>
+</div>
+<script src="popup.js"></script>

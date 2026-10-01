@@ -35,3 +35,23 @@ Se o Projudi pedir login de novo, a janela abre e espera você.
 O robô grava o HTML em `debug/`. Me envie esse arquivo para eu ajustar o seletor.
 
 Teste do parser (sem acessar o Projudi): `python tests/test_parse.py`
+
+---
+
+# Extensão do Chrome (recomendada) — pasta `extensao/`
+
+Faz o mesmo, mas dentro do seu Chrome já logado: sem Python e sem login do robô.
+- Confere sozinha a cada X minutos (10 min a 3 h) enquanto o Chrome estiver aberto e você logado.
+- Ícone com o número de conclusões **não analisadas** no total.
+- Notificação do Windows quando chegar conclusão nova.
+- Popup com a tabela por serventia (com link para abrir cada uma) e botão "Verificar agora".
+- Filtro de serventias e intervalo configuráveis no próprio popup.
+
+## Instalar
+1. Baixe/clone o repositório.
+2. No Chrome: `chrome://extensions` → ligue **Modo do desenvolvedor** → **Carregar sem compactação** → escolha a pasta `extensao/`.
+3. Fixe o ícone na barra, entre no Projudi normalmente e clique em **Verificar agora**.
+
+Se a sessão do Projudi expirar, o ícone mostra `!` e o popup avisa para entrar de novo.
+
+Limitações: não envia e-mail (usa notificação e ícone); só confere com o Chrome aberto.
