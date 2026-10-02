@@ -24,6 +24,32 @@ export async function textoDaPagina(page) {
   }, 0);
 }
 
+// Fração da página coberta pela maior imagem (acompanha a matriz de transformação do desenho).
+export async function coberturaDeImagem(page) {
+  const { OPS } = pdfjs, ol = await page.getOperatorList();
+  const [x0, y0, x1, y1] = page.view, area = (x1 - x0) * (y1 - y0) || 1;
+  const mul = (m, n) => [m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1], m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3], m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5]];
+  let m = [1, 0, 0, 1, 0, 0], pilha = [], maior = 0;
+  ol.fnArray.forEach((fn, i) => {
+    if (fn === OPS.save) pilha.push(m);
+    else if (fn === OPS.restore) m = pilha.pop() || m;
+    else if (fn === OPS.transform) m = mul(m, ol.argsArray[i]);
+    else if (fn === OPS.paintImageXObject || fn === OPS.paintInlineImageXObject || fn === OPS.paintJpegXObject || fn === OPS.paintImageMaskXObject)
+      maior = Math.max(maior, Math.abs(m[0] * m[3] - m[1] * m[2]) / area);
+  });
+  return maior;
+}
+
+// A página precisa de OCR se não tem texto de conteúdo, ou se é uma imagem de página inteira com pouquíssimo texto
+// (só o carimbo/cabeçalho que o Projudi coloca por cima do escaneado).
+export async function precisaOcr(page) {
+  const corpo = await textoDaPagina(page);
+  if (corpo < MIN_CHARS) return true;
+  const tc = await page.getTextContent();
+  const total = tc.items.reduce((n, it) => n + (it.str || "").trim().length, 0);
+  return total <= 400 && (await coberturaDeImagem(page)) >= 0.5;
+}
+
 async function criarWorkers(n) {
   const base = new URL("./vendor/", import.meta.url).href;
   const ws = [];
@@ -67,7 +93,7 @@ export async function fazerOcr(bytes, opcoes, ganchos = {}) {
   for (let i = 1; i <= n; i++) {
     if (cancelado()) throw new Error("cancelado");
     const page = await pdf.getPage(i);
-    if (opcoes.forcar || (await textoDaPagina(page)) < MIN_CHARS) alvo.push(i);
+    if (opcoes.forcar || (await precisaOcr(page))) alvo.push(i);
     page.cleanup();
     status(`Conferindo páginas… ${i}/${n}`);
   }
