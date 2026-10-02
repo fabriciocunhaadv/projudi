@@ -80,7 +80,18 @@ def main():
     with sync_playwright() as p:
         ctx = p.chromium.launch_persistent_context(str(tmp / "perfil"), executable_path=exe, headless=False,
             args=["--headless=new", "--no-sandbox", f"--disable-extensions-except={ext}", f"--load-extension={ext}"])
-        aux = ctx.new_page(); gerar_pdf(aux, tmp / "scan.pdf"); aux.close()   # 1 página nativa + 2 escaneadas
+        aux = ctx.new_page(); gerar_pdf(aux, tmp / "scan.pdf"); 
+        # carimba o cabeçalho do Projudi (topo + tarja vertical) em todas as páginas, como o PDF real
+        aux.set_content("<html><body></body></html>"); aux.add_script_tag(path=str(RAIZ / "vendor" / "pdf-lib.min.js"))
+        import base64
+        b64 = aux.evaluate("""async (b64) => { const { PDFDocument, StandardFonts, degrees, rgb } = PDFLib; const d = await PDFDocument.load(Uint8Array.from(atob(b64), c => c.charCodeAt(0)));
+          const f = await d.embedFont(StandardFonts.HelveticaBold);
+          for (const p of d.getPages()) { const { width, height } = p.getSize();
+            p.drawText('Processo: 5293296-60.2026.8.09.0166 Movimentacao 1 : Peticao Enviada Arquivo 1: acao.pdf - Pag.1/1', { x: 20, y: height - 14, size: 8, font: f, color: rgb(1, 0, 0) });
+            p.drawText('Usuario: FULANO 02/10/2026 17:36 PROJUDI', { x: width - 12, y: height - 60, size: 8, font: f, color: rgb(1, 0, 0), rotate: degrees(-90) }); }
+          const b = await d.save(); let s = ''; for (const x of b) s += String.fromCharCode(x); return btoa(s); }""", base64.b64encode((tmp / "scan.pdf").read_bytes()).decode())
+        (tmp / "scan.pdf").write_bytes(base64.b64decode(b64))
+        aux.close()   # 1 página nativa + 2 escaneadas
         PDF["b"] = (tmp / "scan.pdf").read_bytes()
         def parte(bx):  # só acao.pdf (mov 1) e anexo.pdf (mov 3)
             bx.check("#arvore input[data-o='0']"); bx.check("#arvore input[data-o='4']")

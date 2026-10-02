@@ -9,9 +9,19 @@ export { pdfjs };
 export const MIN_CHARS = 25; // página com menos texto que isto é tratada como imagem
 export const fmt = (s) => (s < 90 ? `${Math.round(s)} s` : `${Math.round(s / 60)} min`);
 
+// Conta o texto do CONTEÚDO da página. O PDF gerado pelo Projudi carimba em toda página um cabeçalho ("Processo / Movimentação / Arquivo")
+// no topo e uma tarja vertical na lateral; esse carimbo não conta, senão páginas escaneadas pareceriam "com texto".
 export async function textoDaPagina(page) {
   const tc = await page.getTextContent();
-  return tc.items.reduce((n, it) => n + (it.str || "").trim().length, 0);
+  const [x0, y0, x1, y1] = page.view, alto = y1 - y0, largo = x1 - x0;
+  return tc.items.reduce((n, it) => {
+    const t = (it.str || "").trim();
+    if (!t) return n;
+    const [a, b, , , e, f] = it.transform;
+    if (Math.abs(b) > 0.1 * Math.abs(a || 1)) return n;              // texto girado (tarja lateral)
+    if (f - y0 > alto * 0.88 || e - x0 > largo * 0.93) return n;     // faixa do cabeçalho / margem direita
+    return n + t.length;
+  }, 0);
 }
 
 async function criarWorkers(n) {
