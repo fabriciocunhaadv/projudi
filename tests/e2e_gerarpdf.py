@@ -1,8 +1,10 @@
 """Download pelo PDF do próprio Projudi: Navegação (simulada) -> seleção -> a extensão abre a janela "Gerar PDF",
 marca só os arquivos escolhidos e aperta Gerar. Também confere o caso "todos"."""
-import glob, http.server, os, shutil, sys, tempfile, threading
+import glob, http.server, os, shutil, subprocess, sys, tempfile, threading
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent))
 from playwright.sync_api import sync_playwright
+from test_ocr import gerar_pdf   # noqa: E402
 
 RAIZ = Path(__file__).parent.parent / "extensao"
 NAV = """<html><head><meta charset="utf-8"><title>Navegação</title></head><body>
@@ -24,12 +26,19 @@ GERAR = """<html><head><meta charset="utf-8"><title>Gerar PDF</title></head><bod
  <li><input type="checkbox" name="chk2" pai="13" value="104"> <strong>decisao.pdf</strong></li>
  <li><input type="checkbox" name="chk2" pai="13" value="105"> <strong>anexo.pdf</strong></li></ul></li>
 </ul></li></ul><div id="Volumes"><input type="radio" name="myradio" onclick="document.getElementById('divGerarPdf').style.display='block'" value="1">Volume 1</div></div>
-<div id="divGerarPdf" style="display:none"><form onsubmit="return false">
+<div id="divGerarPdf" style="display:none"><form id="formListaArquivos" method="POST" action="GerarPDF" onsubmit="return false"><input type="hidden" name="PaginaAtual" value="1"><input type="hidden" name="codigosArquivos" value="x"><input type="hidden" name="codigosMovimentacoes" value="y">
 <button type="submit" id="operacao" name="operacao" value="GerarPDF" onclick="document.title='GEROU:'+[...document.querySelectorAll('input[name=chk1]:checked,input[name=chk2]:checked')].map(c=>c.parentElement.querySelector('strong').textContent).join('|')"> Gerar Processo em PDF </button>
 <button type="submit" id="operacao" name="operacao" value="GerarRelatorio"> Gerar Minuta </button></form></div></body></html>"""
 
 
+PDF = {}
+CORPOS = []
+
+
 class H(http.server.BaseHTTPRequestHandler):
+    def do_POST(s):
+        CORPOS.append(s.rfile.read(int(s.headers["Content-Length"])).decode())
+        s.send_response(200); s.send_header("Content-Type", "application/pdf"); s.send_header("Content-Length", str(len(PDF["b"]))); s.end_headers(); s.wfile.write(PDF["b"])
     def do_GET(s):
         corpo = (NAV if s.path == "/nav" else GERAR if s.path.startswith("/PdfServico/GerarPDF") else "").encode()
         s.send_response(200 if corpo else 404); s.send_header("Content-Type", "text/html; charset=utf-8"); s.end_headers(); s.wfile.write(corpo)
@@ -37,6 +46,8 @@ class H(http.server.BaseHTTPRequestHandler):
 
 
 def ciclo(ctx, escolher):
+    for p in list(ctx.pages):
+        if "ocr.html" in p.url: p.close()
     nav = ctx.new_page(); nav.goto("http://localhost:8769/nav")
     nav.wait_for_selector("[data-projudi-ext=baixador]", state="attached", timeout=20000)
     with ctx.expect_page() as nova:
@@ -47,8 +58,15 @@ def ciclo(ctx, escolher):
     with ctx.expect_page() as popup:
         bx.click("#baixar")
     pop = popup.value
-    pop.wait_for_function("document.title.startsWith('GEROU:')", timeout=20000)
-    return bx, pop.title()
+    pop.wait_for_timeout(1500)
+    ocr = next((p for p in ctx.pages if "ocr.html" in p.url), None)
+    if ocr is None:
+        with ctx.expect_page(lambda p: "ocr.html" in p.url, timeout=30000) as o:
+            pass
+        ocr = o.value
+    ocr.wait_for_selector("body[data-pronto='1'], body[data-erro]", timeout=300000)
+    assert ocr.evaluate("document.body.dataset.erro") is None, ocr.evaluate("document.body.dataset.erro")
+    return bx, ocr.evaluate("document.body.dataset.salvo")
 
 
 def main():
@@ -62,13 +80,20 @@ def main():
     with sync_playwright() as p:
         ctx = p.chromium.launch_persistent_context(str(tmp / "perfil"), executable_path=exe, headless=False,
             args=["--headless=new", "--no-sandbox", f"--disable-extensions-except={ext}", f"--load-extension={ext}"])
+        aux = ctx.new_page(); gerar_pdf(aux, tmp / "scan.pdf"); aux.close()   # 1 página nativa + 2 escaneadas
+        PDF["b"] = (tmp / "scan.pdf").read_bytes()
         def parte(bx):  # só acao.pdf (mov 1) e anexo.pdf (mov 3)
             bx.check("#arvore input[data-o='0']"); bx.check("#arvore input[data-o='4']")
-        bx, t = ciclo(ctx, parte); print(t)
-        assert t == "GEROU:Petição Enviada|acao.pdf|Decisão|anexo.pdf", t
-        assert "Abri a janela" in bx.inner_text("#status")
-        bx, t = ciclo(ctx, lambda b: b.check("#todos")); print(t)
-        assert t.startswith("GEROU:Petição Enviada|acao.pdf|docs.pdf|Juntada") and t.endswith("anexo.pdf"), t
+        bx, salvo = ciclo(ctx, parte); print(salvo)
+        assert "acao.pdf" in CORPOS[-1] or "101" in CORPOS[-1]
+        from urllib.parse import parse_qs
+        q = parse_qs(CORPOS[-1]); print(q)
+        assert q["codigosArquivos"] == ["101;104;"] or q["codigosArquivos"] == ["101;105;"], q   # acao.pdf e anexo.pdf
+        assert q["codigosMovimentacoes"] == ["11;13;"] and q["operacao"] == ["GerarPDF"]
+        txt = " ".join(subprocess.run(["pdftotext", "-layout", salvo, "-"], capture_output=True, text=True).stdout.lower().split())
+        print(txt[:300]); assert "pensão alimentícia" in txt and "guarda compartilhada" in txt
+        bx, salvo = ciclo(ctx, lambda b: b.check("#todos"))
+        print(CORPOS); assert parse_qs(CORPOS[-1])["codigosArquivos"] == ["101;102;103;104;105;"]
         print("OK")
         ctx.close()
 

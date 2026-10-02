@@ -39,6 +39,20 @@
     await esperar(400);
     const b = botaoGerar();
     if (!b) return { erro: "botão Gerar não encontrado" };
+    // Intercepta: em vez de deixar o Projudi entregar o PDF (páginas em imagem), a extensão faz o mesmo pedido, recebe o PDF,
+    // aplica o OCR e só então salva. Se a extensão não conseguir, o envio normal do Projudi continua valendo (b.click()).
+    const form = b.form || document.getElementById("formListaArquivos");
+    if (form && pedido.interceptar !== false) {
+      const campos = new URLSearchParams();
+      new FormData(form).forEach((v, k) => { if (typeof v === "string") campos.append(k, v); });
+      const ids = (nome) => [...document.querySelectorAll(`input[name=${nome}]:checked`)].map((c) => c.value).join(";") + ";";
+      campos.set("codigosArquivos", ids("chk2")); campos.set("codigosMovimentacoes", ids("chk1"));
+      campos.set("PaginaAtual", "1"); campos.set("operacao", "GerarPDF");
+      try {
+        const resp = await chrome.runtime.sendMessage({ acao: "gerar-pdf-interceptar", url: form.action, corpo: campos.toString(), nome: pedido.processo || "" });
+        if (resp && resp.ok) return { ok: true, marcadas: r.marcadas, interceptado: true };
+      } catch (e) { /* cai no envio normal */ }
+    }
     b.click();
     return { ok: true, marcadas: r.marcadas };
   }
@@ -55,7 +69,7 @@
       <div class="w"><div class="m"></div><button data-a="todos">⬇ Gerar e baixar tudo (extensão)</button><button class="s" data-a="diag">Copiar diagnóstico</button></div>`;
     const msg = (t) => { const m = sh.querySelector(".m"); m.textContent = t; m.style.display = "block"; };
     window.__projudiMsg = msg;
-    sh.querySelector('[data-a="todos"]').onclick = async () => { const r = await executar({ todos: true }); msg(r.erro ? "✖ " + r.erro : "Gerando o PDF do Projudi… ele será baixado sozinho."); };
+    sh.querySelector('[data-a="todos"]').onclick = async () => { const r = await executar({ todos: true }); msg(r.erro ? "✖ " + r.erro : r.interceptado ? "PDF pedido; a extensão faz o OCR e salva em Downloads." : "Gerando o PDF do Projudi…"); };
     sh.querySelector('[data-a="diag"]').onclick = async () => {
       const c = document.documentElement.cloneNode(true);
       c.querySelectorAll("script,style,link,svg,[data-projudi-ext]").forEach((e) => e.remove());
@@ -73,7 +87,7 @@
     window.__projudiAplicado = true;
     await chrome.storage.local.remove("gerarpdf_pedido");
     const r = await executar(p);
-    if (window.__projudiMsg) window.__projudiMsg(r.erro ? "✖ " + r.erro : `Gerando o PDF do Projudi com ${p.todos ? "todos os arquivos" : r.marcadas + " arquivo(s)"}… ele será baixado sozinho.`);
+    if (window.__projudiMsg) window.__projudiMsg(r.erro ? "✖ " + r.erro : `${r.interceptado ? "PDF pedido ao Projudi; a extensão faz o OCR e salva em Downloads (acompanhe na aba da extensão)." : "Gerando o PDF do Projudi…"} (${p.todos ? "todos os arquivos" : r.marcadas + " arquivo(s)"})`);
     document.documentElement.dataset.projudiGerar = r.erro ? "erro:" + r.erro : "ok:" + r.marcadas;
   }
 

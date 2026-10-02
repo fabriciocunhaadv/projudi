@@ -105,6 +105,39 @@ async function automatico(idDownload) {
   }
 }
 
+// PDF pedido ao Projudi pela janela "Gerar PDF": a extensão recebe o PDF antes de ir para Downloads, faz o OCR e salva só o pesquisável.
+async function interceptado(idJob) {
+  document.body.dataset.modo = "auto";
+  const chave = "gerar_" + idJob, job = (await chrome.storage.local.get(chave))[chave];
+  if (!job) { log("Pedido não encontrado."); return; }
+  rodando = true; cancelado = false; $("cancelar").disabled = false;
+  $("status").textContent = "Pedindo o PDF ao Projudi (pode demorar)…";
+  try {
+    const r = await fetch(job.url, { method: "POST", credentials: "include", cache: "no-store", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: job.corpo });
+    const bytes = new Uint8Array(await r.arrayBuffer());
+    if (!r.ok || !ehPdf(bytes)) throw new Error(`o Projudi não devolveu um PDF (HTTP ${r.status}). Use o botão Gerar normal da janela: o OCR automático cuida do arquivo baixado.`);
+    log(`PDF recebido do Projudi: ${(bytes.length / 1048576).toFixed(1)} MB`);
+    const base = ((job.nome || "").replace(/[^\w.\-]+/g, "_") || "processo") + "-completo";
+    const res = await processar(new File([bytes], base + ".pdf", { type: "application/pdf" }), { escala: +$("escala").value, paralelo: +$("paralelo").value, forcar: false });
+    const nome = base + (res.ocr ? "-OCR" : "") + ".pdf";
+    const url = URL.createObjectURL(new Blob([res.bytes], { type: "application/pdf" }));
+    const id = await chrome.downloads.download({ url, filename: nome, conflictAction: "uniquify", saveAs: false });
+    const salvo = await esperarDownload(id), [item] = await chrome.downloads.search({ id });
+    $("status").textContent = salvo ? `Pronto: ${item.filename}` : "Não foi possível salvar o arquivo.";
+    document.body.dataset.salvo = item ? item.filename : "";
+    if (salvo) avisar("PDF do processo pronto", `${nome} salvo em Downloads (${res.ocr} de ${res.total} páginas com OCR).`);
+    URL.revokeObjectURL(url);
+    await chrome.storage.local.remove(chave);
+    document.body.dataset.pronto = "1";
+    setTimeout(() => window.close(), 5000);
+  } catch (e) {
+    log("✖ " + e.message);
+    $("status").innerHTML = `<span class="erro">${e.message}</span>`;
+    avisar("PDF do processo", e.message);
+    document.body.dataset.erro = e.message;
+  } finally { rodando = false; $("cancelar").disabled = true; $("barra").hidden = true; }
+}
+
 async function iniciar() {
   rodando = true; cancelado = false;
   $("iniciar").disabled = true; $("cancelar").disabled = false; $("resultados").textContent = "";
@@ -140,5 +173,7 @@ async function iniciar() {
   $("iniciar").onclick = iniciar;
   const auto = new URLSearchParams(location.search).get("auto");
   if (auto) automatico(+auto);
+  const ger = new URLSearchParams(location.search).get("gerar");
+  if (ger) interceptado(ger);
   $("cancelar").onclick = () => { cancelado = true; $("status").textContent = "Cancelando…"; };
 })();

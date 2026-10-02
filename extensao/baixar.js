@@ -318,7 +318,7 @@ async function executar(sel, op) {
 async function pedirProjudi(sel) {
   const total = job.movimentos.reduce((s, m) => s + m.arquivos.length, 0);
   const idxEm = new Map(job.movimentos.flatMap((m) => m.arquivos.map((a, i) => [a.ordem, i])));
-  const pedido = sel.length === total ? { todos: true } : { arquivos: sel.map((f) => ({ mov: f.mov, idx: idxEm.get(f.ordem), nome: f.nome })) };
+  const pedido = { processo: job.processo, ...(sel.length === total ? { todos: true } : { arquivos: sel.map((f) => ({ mov: f.mov, idx: idxEm.get(f.ordem), nome: f.nome })) }) };
   const r = await chrome.runtime.sendMessage({ acao: "gerar-pdf-projudi", tabId: job.tabId, pedido });
   $("status").innerHTML = r.erro ? `<span class="erro">${esc(r.erro)}</span>`
     : r.abriu ? "Abri a janela “Gerar PDF” do Projudi. Ela marca os arquivos e gera sozinha; o PDF será baixado automaticamente."
