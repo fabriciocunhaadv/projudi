@@ -62,6 +62,15 @@
       "match_about_blank": true,
       "match_origin_as_fallback": true,
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.ai.studio/*"
+      ],
+      "js": [
+        "studio-diag.js"
+      ],
+      "run_at": "document_idle"
     }
   ],
   "content_security_policy": {

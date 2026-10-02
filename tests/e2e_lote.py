@@ -72,6 +72,7 @@ def main():
         fins = [sw.evaluate("(k) => chrome.storage.local.get(k)", f"lote_fim_t1:{i}")[f"lote_fim_t1:{i}"] for i in (0, 1)]
         print(fins)
         txt = Path(fins[0]["txt"]).read_text(encoding="utf-8")
+        pdf = subprocess.run(["pdftotext", fins[0]["pdf"], "-"], capture_output=True, text=True).stdout.lower()
         ctx.close()
     print(txt[:1800])
     flat = " ".join(txt.lower().split())
@@ -81,7 +82,6 @@ def main():
     assert "pensão alimentícia" in flat and "guarda compartilhada" in flat          # texto das páginas-imagem, com OCR
     assert "pagina um com texto nativo" in flat                                       # texto nativo preservado
     assert flat.count("movimentacao 8 : juntada") == 2        # uma por página (2 e 3): o OCR não duplicou o carimbo
-    pdf = subprocess.run(["pdftotext", fins[0]["pdf"], "-"], capture_output=True, text=True).stdout.lower()
     assert "pensão alimentícia" in pdf
     print("OK")
 
