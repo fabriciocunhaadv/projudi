@@ -1,0 +1,19 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>PDFs dos processos selecionados — Conclusões Projudi</title>
+<style>
+  body { font: 14px system-ui, sans-serif; margin: 0; padding: 16px 24px; max-width: 980px; color: #222; }
+  h1 { font-size: 18px; margin: 0 0 4px; } .dica { color: #666; font-size: 12px; }
+  ol { padding-left: 22px; } li { padding: 2px 0; } .ok { color: #1a7a1a; } .erro { color: #b00020; } .fila { color: #888; }
+  button { padding: 6px 14px; font-size: 14px; cursor: pointer; } progress { width: 100%; height: 14px; } #status { margin: 8px 0; font-weight: 600; }
+  @media (prefers-color-scheme: dark) { body { background: #1c1d21; color: #e6e6e6; } .dica { color: #aaa; } }
+</style>
+<h1>PDFs dos processos selecionados</h1>
+<p class="dica">Cada processo é aberto em uma aba em segundo plano, o PDF completo é pedido ao Projudi, as páginas em imagem passam por OCR e são salvos
+<b>número-OCR.pdf</b> e <b>número-OCR.txt</b> (texto de todas as páginas, com a origem de cada trecho). Um processo por vez. Mantenha o Chrome aberto e logado no Projudi.</p>
+<div id="status">Preparando…</div>
+<progress id="barra" value="0" max="1"></progress>
+<ol id="lista"></ol>
+<p><button id="cancelar">Cancelar</button></p>
+<script src="gerar-util.js"></script>
+<script src="lote.js"></script>

@@ -5,6 +5,8 @@ const BASE = "https://projudi.tjgo.jus.br/";
 const link = (p) => (p.url ? new URL(p.url, BASE).href : "");
 const ROTULO = { naoAnalisadas: "Não analisadas", preAnalisadas: "Pré-analisadas" };
 let estado = null, aberto = false;
+const selCls = new Set(), selSit = new Set(["naoAnalisadas", "preAnalisadas"]), marcados = new Set();   // seleção para baixar PDFs
+const nomeCls = (p) => p.classificador || "(sem classificador)";
 
 const todos = (s) => ["naoAnalisadas", "preAnalisadas"].flatMap((tipo) =>
   (s.processos?.[tipo] || []).map((p) => ({ ...p, situacao: ROTULO[tipo], tipo })));
@@ -12,6 +14,8 @@ const todos = (s) => ["naoAnalisadas", "preAnalisadas"].flatMap((tipo) =>
 function casa(p, q) {
   return !q || sa([p.processo, p.classificador, p.usuarioPreAnalise, p.tipoConclusao, p.tipoMovimento, p.tipoAcao, p.urgenciaTexto].join(" ")).includes(q);
 }
+
+const dias0 = (p) => RenderProjudi.diasDe(p, Date.now());
 
 function desenhar() {
   const el = $("conteudo"), q = sa($("busca").value.trim());
@@ -46,6 +50,23 @@ function desenhar() {
     [...porCls].sort((a, b) => (b[1].naoAnalisadas + b[1].preAnalisadas) - (a[1].naoAnalisadas + a[1].preAnalisadas))
       .forEach(([k, o]) => (h += `<tr><td class="cls">${esc(k)}</td><td class="n">${o.naoAnalisadas}</td><td class="n">${o.preAnalisadas}</td></tr>`));
     h += "</table>";
+  }
+
+  // 3a) Baixar PDFs para análise: o assessor escolhe o(s) classificador(es) e a extensão baixa o PDF (OCR + texto) de cada processo
+  {
+    const todosP = estado.serventias.flatMap((s) => todos(s).map((p) => ({ ...p, serventia: s.serventia })));
+    const clsLista = [...new Set(todosP.map(nomeCls))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+    const cand = todosP.filter((p) => selCls.has(nomeCls(p)) && selSit.has(p.tipo) && p.url).sort(Ordenar.comparador($("modo").value));
+    const n = cand.filter((p) => marcados.has(p.processo)).length;
+    h += `<h2>Baixar PDFs para análise</h2><div class="baixar"><div>Classificador: ` +
+      clsLista.map((c) => `<label class="chip"><input type="checkbox" data-cls="${esc(c)}" ${selCls.has(c) ? "checked" : ""}> ${esc(c)} <small>(${todosP.filter((p) => nomeCls(p) === c).length})</small></label>`).join(" ") + `</div>` +
+      `<div>Situação: <label><input type="checkbox" data-sit="naoAnalisadas" ${selSit.has("naoAnalisadas") ? "checked" : ""}> Não analisadas</label> <label><input type="checkbox" data-sit="preAnalisadas" ${selSit.has("preAnalisadas") ? "checked" : ""}> Pré-analisadas</label></div>`;
+    if (cand.length) {
+      h += `<table class="tp"><thead><tr><th><input type="checkbox" id="marcarTodos" ${n === cand.length ? "checked" : ""}></th><th>Processo</th><th>Classificador</th><th>Urgência</th><th>Início</th><th class="n">Dias</th></tr></thead><tbody>` +
+        cand.map((p) => `<tr class="tp-linha"><td><input type="checkbox" data-proc="${esc(p.processo)}" ${marcados.has(p.processo) ? "checked" : ""}></td><td><b>${esc(p.processo)}</b></td><td class="cls">${esc(nomeCls(p))}</td><td>${esc(p.urgenciaTexto)}</td><td>${esc(p.dataInicio)}</td><td class="n">${dias0(p)}</td></tr>`).join("") + `</tbody></table>`;
+    } else h += `<p class="zero">${selCls.size ? "Nenhum processo com esse filtro." : "Marque um ou mais classificadores acima."}</p>`;
+    h += `<p><button id="baixarLote" ${n ? "" : "disabled"}>⬇ Baixar PDFs dos selecionados (${n})</button> <small>A fila segue a ordem escolhida em “${esc(Ordenar.MODOS[$("modo").value])}”. Cada processo gera <b>número-OCR.pdf</b> e <b>número-OCR.txt</b>.</small></p></div>`;
+    window.__candidatos = cand;
   }
 
   // 3) Detalhe: tabelas no formato do Projudi (ou fila única na ordem de trabalho)
@@ -103,6 +124,27 @@ function csv() {
   for (const id of ["modo", "visao"]) $(id).onchange = () => { try { localStorage.setItem(id, $(id).value); } catch {} desenhar(); };
   $("busca").oninput = desenhar;
   RenderProjudi.ligarCopiar($("conteudo"));
+  $("conteudo").addEventListener("change", (e) => {
+    const t = e.target, dado = t.dataset || {};
+    const procsDe = (c) => estado.serventias.flatMap((s) => todos(s)).filter((p) => nomeCls(p) === c && p.url);
+    if (dado.cls !== undefined) { // marcar o classificador marca todos os processos dele (dá para desmarcar um a um)
+      if (t.checked) { selCls.add(dado.cls); procsDe(dado.cls).forEach((p) => selSit.has(p.tipo) && marcados.add(p.processo)); }
+      else { selCls.delete(dado.cls); procsDe(dado.cls).forEach((p) => marcados.delete(p.processo)); }
+    } else if (dado.sit !== undefined) { t.checked ? selSit.add(dado.sit) : selSit.delete(dado.sit); }
+    else if (dado.proc !== undefined) { t.checked ? marcados.add(dado.proc) : marcados.delete(dado.proc); }
+    else if (t.id === "marcarTodos") { (window.__candidatos || []).forEach((p) => (t.checked ? marcados.add(p.processo) : marcados.delete(p.processo))); }
+    else return;
+    desenhar();
+  });
+  $("conteudo").addEventListener("click", async (e) => {
+    if (!e.target.closest || !e.target.closest("#baixarLote")) return;
+    const fila = (window.__candidatos || []).filter((p) => marcados.has(p.processo));   // já está na ordem de trabalho
+    if (!fila.length) return;
+    const hoje = new Date().toISOString().slice(0, 10), id = String(Date.now());
+    const itens = fila.map((p) => ({ processo: p.processo, url: p.url, classificador: nomeCls(p), pasta: `Projudi/${hoje}/${nomeCls(p).replace(/[\\/:*?"<>|]+/g, "_")}` }));
+    await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/" + hoje } });
+    chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + id) });
+  });
   $("csv").onclick = csv;
   $("abrir").onclick = () => { aberto = !aberto; $("abrir").textContent = aberto ? "Recolher tudo" : "Expandir tudo"; desenhar(); };
   $("atualizar").onclick = () => chrome.runtime.sendMessage({ acao: "verificar" });

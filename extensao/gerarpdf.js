@@ -49,8 +49,8 @@
       campos.set("codigosArquivos", ids("chk2")); campos.set("codigosMovimentacoes", ids("chk1"));
       campos.set("PaginaAtual", "1"); campos.set("operacao", "GerarPDF");
       try {
-        const resp = await chrome.runtime.sendMessage({ acao: "gerar-pdf-interceptar", url: form.action, corpo: campos.toString(), nome: pedido.processo || "" });
-        if (resp && resp.ok) return { ok: true, marcadas: r.marcadas, interceptado: true };
+        const resp = await chrome.runtime.sendMessage({ acao: "gerar-pdf-interceptar", url: form.action, corpo: campos.toString(), nome: pedido.processo || "", pasta: pedido.pasta || "", lote: pedido.lote || "" });
+        if (resp && resp.ok) { if (pedido.lote) setTimeout(() => window.close(), 800); return { ok: true, marcadas: r.marcadas, interceptado: true }; }
       } catch (e) { /* cai no envio normal */ }
     }
     b.click();
@@ -85,8 +85,9 @@
     const { gerarpdf_pedido: p } = await chrome.storage.local.get("gerarpdf_pedido");
     if (!p || Date.now() - p.ts > 10 * 60000 || window.__projudiAplicado) return;
     window.__projudiAplicado = true;
-    await chrome.storage.local.remove("gerarpdf_pedido");
     const r = await executar(p);
+    if (r.erro && p.lote) await chrome.storage.local.set({ ["lote_fim_" + p.lote]: { ok: false, erro: "janela Gerar PDF: " + r.erro } });
+    await chrome.storage.local.remove("gerarpdf_pedido");     // só agora: é o sinal, para a fila, de que o pedido já foi entregue
     if (window.__projudiMsg) window.__projudiMsg(r.erro ? "✖ " + r.erro : `${r.interceptado ? "PDF pedido ao Projudi; a extensão faz o OCR e salva em Downloads (acompanhe na aba da extensão)." : "Gerando o PDF do Projudi…"} (${p.todos ? "todos os arquivos" : r.marcadas + " arquivo(s)"})`);
     document.documentElement.dataset.projudiGerar = r.erro ? "erro:" + r.erro : "ok:" + r.marcadas;
   }

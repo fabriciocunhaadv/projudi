@@ -1,5 +1,6 @@
 // Página de OCR: tela, arrastar/soltar e OCR automático dos PDFs baixados do Projudi. O trabalho pesado está em ocr-motor.js.
 import { fazerOcr, fmt } from "./ocr-motor.js";
+import { textoComOrigem } from "./texto-origem.js";
 
 const $ = (id) => document.getElementById(id);
 let arquivos = [], cancelado = false, rodando = false;
@@ -117,16 +118,26 @@ async function interceptado(idJob) {
     const bytes = new Uint8Array(await r.arrayBuffer());
     if (!r.ok || !ehPdf(bytes)) throw new Error(`o Projudi não devolveu um PDF (HTTP ${r.status}). Use o botão Gerar normal da janela: o OCR automático cuida do arquivo baixado.`);
     log(`PDF recebido do Projudi: ${(bytes.length / 1048576).toFixed(1)} MB`);
-    const base = ((job.nome || "").replace(/[^\w.\-]+/g, "_") || "processo") + "-completo";
-    const res = await processar(new File([bytes], base + ".pdf", { type: "application/pdf" }), { escala: +$("escala").value, paralelo: +$("paralelo").value, forcar: false });
-    const nome = base + (res.ocr ? "-OCR" : "") + ".pdf";
-    const url = URL.createObjectURL(new Blob([res.bytes], { type: "application/pdf" }));
-    const id = await chrome.downloads.download({ url, filename: nome, conflictAction: "uniquify", saveAs: false });
-    const salvo = await esperarDownload(id), [item] = await chrome.downloads.search({ id });
-    $("status").textContent = salvo ? `Pronto: ${item.filename}` : "Não foi possível salvar o arquivo.";
-    document.body.dataset.salvo = item ? item.filename : "";
-    if (salvo) avisar("PDF do processo pronto", `${nome} salvo em Downloads (${res.ocr} de ${res.total} páginas com OCR).`);
-    URL.revokeObjectURL(url);
+    const num = (job.nome || "").replace(/[^\w.\-]+/g, "_") || "processo", pasta = job.pasta ? job.pasta.replace(/[<>:"|?*\\]+/g, "_").replace(/^\/+|\/+$/g, "") + "/" : "";
+    const res = await processar(new File([bytes], num + ".pdf", { type: "application/pdf" }), { escala: +$("escala").value, paralelo: +$("paralelo").value, forcar: false });
+    const salvar = async (blob, nome) => {
+      const url = URL.createObjectURL(blob);
+      const id = await chrome.downloads.download({ url, filename: pasta + nome, conflictAction: "uniquify", saveAs: false });
+      const ok = await esperarDownload(id), [item] = await chrome.downloads.search({ id });
+      URL.revokeObjectURL(url);
+      if (!ok) throw new Error("não foi possível salvar " + nome);
+      return item.filename;
+    };
+    $("status").textContent = "Salvando o PDF…";
+    const arqPdf = await salvar(new Blob([res.bytes], { type: "application/pdf" }), num + "-OCR.pdf");
+    $("status").textContent = "Gerando o texto com a origem de cada trecho…";
+    const t = await textoComOrigem(res.bytes, { processo: job.nome, paginasOcr: res.paginasOcr || [] });
+    const arqTxt = await salvar(new Blob([t.texto], { type: "text/plain;charset=utf-8" }), num + "-OCR.txt");
+    log(`Texto: ${t.paginas} páginas, ${t.comOrigem} com origem identificada.`);
+    $("status").textContent = `Pronto: ${arqPdf} e ${arqTxt}`;
+    document.body.dataset.salvo = arqPdf + "|" + arqTxt;
+    avisar("PDF do processo pronto", `${num}-OCR.pdf e .txt salvos (${res.ocr} de ${res.total} páginas com OCR).`);
+    if (job.lote) await chrome.storage.local.set({ ["lote_fim_" + job.lote]: { ok: true, pdf: arqPdf, txt: arqTxt, paginas: res.total, ocr: res.ocr } });
     await chrome.storage.local.remove(chave);
     document.body.dataset.pronto = "1";
     setTimeout(() => window.close(), 5000);
@@ -135,6 +146,7 @@ async function interceptado(idJob) {
     $("status").innerHTML = `<span class="erro">${e.message}</span>`;
     avisar("PDF do processo", e.message);
     document.body.dataset.erro = e.message;
+    if (job.lote) await chrome.storage.local.set({ ["lote_fim_" + job.lote]: { ok: false, erro: e.message } });
   } finally { rodando = false; $("cancelar").disabled = true; $("barra").hidden = true; }
 }
 

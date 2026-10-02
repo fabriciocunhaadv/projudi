@@ -106,6 +106,21 @@ export function melhorarParaOcr(ctx, w, h) {
   ctx.putImageData(img, 0, 0);
 }
 
+// Retângulos (em pixels do viewport) do texto que a página JÁ tem: serve para o OCR não recriar o carimbo/cabeçalho como texto duplicado.
+async function retangulosDeTexto(page, viewport) {
+  const tc = await page.getTextContent(), out = [];
+  for (const it of tc.items) {
+    if (!(it.str || "").trim()) continue;
+    const [a, b, c, d, e, f] = it.transform, u = Math.hypot(a, b) || 1, v = Math.hypot(c, d) || 1;
+    const w = it.width || 0, h = it.height || v;
+    const pts = [[e, f], [e + (a / u) * w, f + (b / u) * w], [e + (c / v) * h, f + (d / v) * h], [e + (a / u) * w + (c / v) * h, f + (b / u) * w + (d / v) * h]]
+      .map(([x, y]) => pdfjs.Util.applyTransform([x, y], viewport.transform));
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+    out.push({ x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) });
+  }
+  return out;
+}
+
 // ganchos: { log(t), status(t), progresso(feitas, total), cancelado() }
 // opcoes:  { escala, paralelo, forcar }
 export async function fazerOcr(bytes, opcoes, ganchos = {}) {
@@ -124,7 +139,7 @@ export async function fazerOcr(bytes, opcoes, ganchos = {}) {
     status(`Conferindo páginas… ${i}/${n}`);
   }
   log(`  ${n - alvo.length} página(s) já têm texto; ${alvo.length} precisam de OCR.`);
-  if (!alvo.length) return { bytes, ocr: 0, total: n, palavras: 0 };
+  if (!alvo.length) return { bytes, ocr: 0, total: n, palavras: 0, paginasOcr: [] };
 
   // 2) OCR das páginas-imagem
   const ws = await criarWorkers(Math.min(opcoes.paralelo || 2, alvo.length));
@@ -145,7 +160,12 @@ export async function fazerOcr(bytes, opcoes, ganchos = {}) {
         await page.render({ canvasContext: ctx, canvas, viewport }).promise;
         melhorarParaOcr(ctx, canvas.width, canvas.height);
         const { data } = await w.recognize(canvas, {}, { blocks: true });
-        resultados.set(i, { palavras: palavrasDe(data), viewport });
+        const ja = await retangulosDeTexto(page, viewport);
+        const novas = palavrasDe(data).filter((p) => {
+          const cx = (p.bbox.x0 + p.bbox.x1) / 2, cy = (p.bbox.y0 + p.bbox.y1) / 2;
+          return !ja.some((r) => cx >= r.x0 && cx <= r.x1 && cy >= r.y0 && cy <= r.y1);   // já existe como texto: não duplica
+        });
+        resultados.set(i, { palavras: novas, viewport });
         canvas.width = canvas.height = 0; page.cleanup();
         feitas++;
         progresso(feitas, alvo.length);
@@ -186,5 +206,5 @@ export async function fazerOcr(bytes, opcoes, ganchos = {}) {
   let ok = 0;
   for (const i of alvo.slice(0, 5)) { const p = await novo.getPage(i); if ((await textoDaPagina(p)) >= MIN_CHARS) ok++; }
   log(`  Conferência: ${ok}/${Math.min(5, alvo.length)} páginas testadas já têm texto selecionável.`);
-  return { bytes: saida, ocr: alvo.length, total: n, palavras };
+  return { bytes: saida, ocr: alvo.length, total: n, palavras, paginasOcr: alvo };
 }

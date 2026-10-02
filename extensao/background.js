@@ -198,21 +198,19 @@ async function capturarEAbrir(tabId) {
 chrome.commands.onCommand.addListener((c) => c === "capturar-tela" && capturarEAbrir().catch(console.error));
 
 // Pede ao Projudi (aba "Navegação de Arquivos") para abrir a janela "Gerar PDF"; lá o gerarpdf.js marca os arquivos e gera.
+importScripts("gerar-util.js");
 async function abrirGerarPdf(tabId) {
   if (!tabId) return false;
-  const r = await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, func: () => {
-    const alvo = [...document.querySelectorAll("a,button,input[type=button],input[type=submit],img[onclick],span[onclick],div[onclick]")]
-      .find((e) => /gerar\s*pdf/i.test((e.value || e.textContent || e.title || e.alt || "") + " " + (e.getAttribute("onclick") || "")));
-    if (!alvo) return false; alvo.click(); return true;
-  } });
-  return r.some((x) => x.result);
+  const r = await GerarUtil.capturarGerar(tabId);
+  if (r.url) { await chrome.tabs.create({ url: r.url, active: true }); return true; }
+  return r.achou;    // achou e clicou, mas a página abriu a janela por conta própria
 }
 
 chrome.runtime.onMessage.addListener((m, s, responder) => {
   if (m?.acao === "gerar-pdf-interceptar") { // a janela "Gerar PDF" entregou o pedido: a extensão busca o PDF, faz OCR e salva
     const id = String(Date.now());
-    chrome.storage.local.set({ ["gerar_" + id]: { url: m.url, corpo: m.corpo, nome: m.nome } })
-      .then(() => chrome.tabs.create({ url: chrome.runtime.getURL("ocr.html?gerar=" + id), active: true }))
+    chrome.storage.local.set({ ["gerar_" + id]: { url: m.url, corpo: m.corpo, nome: m.nome, pasta: m.pasta, lote: m.lote } })
+      .then(() => chrome.tabs.create({ url: chrome.runtime.getURL("ocr.html?gerar=" + id), active: !m.lote }))
       .then(() => responder({ ok: true }), (e) => responder({ erro: String(e.message || e) }));
     return true;
   }
