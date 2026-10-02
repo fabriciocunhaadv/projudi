@@ -13,14 +13,20 @@ NAV = """<html><head><meta charset="utf-8"><title>Navegação</title></head><bod
 <li><b>2 - Juntada de Documento</b><ul><li><a href="/arq/c.pdf">laudo.pdf</a></li></ul></li>
 <li><b>3 - Decisão</b><ul><li><a href="/arq/d.pdf">decisao.pdf</a></li><li><a href="/arq/e.pdf">anexo.pdf</a></li></ul></li>
 </ul></li></ul></body></html>"""
-GERAR = """<html><head><meta charset="utf-8"><title>Gerar PDF</title></head><body>
-<form onsubmit="return false"><label><input type="checkbox" id="t"> Todos os Arquivos</label>
-<div><label><input type="checkbox"> 1 - Petição Enviada -</label>
- <div><label><input type="checkbox"> acao.pdf (120 KB)</label> <label><input type="checkbox"> docs.pdf (300 KB)</label></div></div>
-<div><label><input type="checkbox"> 2 - Juntada de Documento</label><div><label><input type="checkbox"> laudo.pdf (50 KB)</label></div></div>
-<div><label><input type="checkbox"> 3 - Decisão</label><div><label><input type="checkbox"> decisao.pdf (10 KB)</label> <label><input type="checkbox"> anexo.pdf (20 KB)</label></div></div>
-<input type="button" id="g" value="Gerar PDF" onclick="document.title='GEROU:'+[...document.querySelectorAll('input[type=checkbox]:checked')].map(c=>c.parentElement.textContent.trim()).join('|')">
-</form></body></html>"""
+GERAR = """<html><head><meta charset="utf-8"><title>Gerar PDF</title></head><body><div id="ListaCheckBox"><ul id="a0">
+<li><input type="checkbox" name="chk0" id="todos" class="chk0" value="0" onclick="document.querySelectorAll('input[name=chk1],input[name=chk2]').forEach(c=>c.checked=this.checked)"><strong>Todos os Arquivos</strong><ul>
+<li>1<input type="checkbox" id="m1" name="chk1" selecao="nivel1" value="11"><strong>Petição Enviada</strong><ul>
+ <li><input type="checkbox" name="chk2" pai="11" value="101"> <strong>acao.pdf</strong> <span>(Tamanho arquivo: 120 kbytes)</span></li>
+ <li><input type="checkbox" name="chk2" pai="11" value="102"> <strong>docs.pdf</strong></li></ul></li>
+<li>2<input type="checkbox" name="chk1" selecao="nivel2" value="12"><strong>Juntada de Documento</strong><ul>
+ <li><input type="checkbox" name="chk2" pai="12" value="103"> <strong>laudo.pdf</strong></li></ul></li>
+<li>3<input type="checkbox" name="chk1" selecao="nivel3" value="13"><strong>Decisão</strong><ul>
+ <li><input type="checkbox" name="chk2" pai="13" value="104"> <strong>decisao.pdf</strong></li>
+ <li><input type="checkbox" name="chk2" pai="13" value="105"> <strong>anexo.pdf</strong></li></ul></li>
+</ul></li></ul><div id="Volumes"><input type="radio" name="myradio" onclick="document.getElementById('divGerarPdf').style.display='block'" value="1">Volume 1</div></div>
+<div id="divGerarPdf" style="display:none"><form onsubmit="return false">
+<button type="submit" id="operacao" name="operacao" value="GerarPDF" onclick="document.title='GEROU:'+[...document.querySelectorAll('input[name=chk1]:checked,input[name=chk2]:checked')].map(c=>c.parentElement.querySelector('strong').textContent).join('|')"> Gerar Processo em PDF </button>
+<button type="submit" id="operacao" name="operacao" value="GerarRelatorio"> Gerar Minuta </button></form></div></body></html>"""
 
 
 class H(http.server.BaseHTTPRequestHandler):
@@ -59,10 +65,10 @@ def main():
         def parte(bx):  # só acao.pdf (mov 1) e anexo.pdf (mov 3)
             bx.check("#arvore input[data-o='0']"); bx.check("#arvore input[data-o='4']")
         bx, t = ciclo(ctx, parte); print(t)
-        assert t == "GEROU:acao.pdf (120 KB)|anexo.pdf (20 KB)", t
+        assert t == "GEROU:Petição Enviada|acao.pdf|Decisão|anexo.pdf", t
         assert "Abri a janela" in bx.inner_text("#status")
         bx, t = ciclo(ctx, lambda b: b.check("#todos")); print(t)
-        assert t.startswith("GEROU:Todos os Arquivos"), t
+        assert t.startswith("GEROU:Petição Enviada|acao.pdf|docs.pdf|Juntada") and t.endswith("anexo.pdf"), t
         print("OK")
         ctx.close()
 

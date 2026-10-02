@@ -4,43 +4,39 @@
   if (window.__projudiGerarPdf) return;
   const sem = (s) => (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
   const caixas = () => [...document.querySelectorAll("input[type=checkbox]")].filter((c) => !c.disabled);
-  const textoDe = (c) => {
-    const l = (c.id && document.querySelector(`label[for="${CSS.escape(c.id)}"]`)) || c.closest("label");
-    if (l) return l.textContent;
-    let t = "", n = c.nextSibling;                      // texto solto logo depois da caixa
-    while (n && !(n.nodeType === 1 && /^(INPUT|BR|DIV|LI|TR|UL)$/.test(n.tagName)) && t.length < 400) { t += n.textContent; n = n.nextSibling; }
-    return t.trim() || (c.closest("td,li,div") ? c.closest("td,li,div").textContent.slice(0, 300) : "");
-  };
-  const ehGerar = (el) => /gerar/i.test(el.value || el.textContent || "") && !/todos/i.test(el.value || el.textContent || "");
-  const botaoGerar = () => [...document.querySelectorAll("input[type=submit],input[type=button],button,a.botao,a[onclick]")].find(ehGerar);
+  // Estrutura real da janela (vista no diagnóstico): #todos; chk1 = movimentação (selecao="nivelN", texto "N<input><strong>título"),
+  // chk2 = arquivo (pai = id da movimentação, <strong>nome</strong>); radio "Volume N" revela o botão "Gerar Processo em PDF".
+  const nomeDe = (c) => (c.parentElement.querySelector("strong") || c.nextElementSibling || {}).textContent || "";
+  const botaoGerar = () => document.querySelector('button[name=operacao][value=GerarPDF]') ||
+    [...document.querySelectorAll("button,input[type=submit],input[type=button]")].find((e) => /gerar/i.test(e.value || e.textContent || "") && !/minuta|relat/i.test(e.value || e.textContent || ""));
   const pronta = () => caixas().length >= 2 && !!botaoGerar();
   const marcar = (c, v) => { if (c.checked !== v) c.click(); };
+  const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
 
-  function aplicar(pedido) {
-    const todas = caixas();
-    const cxTodos = todas.find((c) => /todos\s+os\s+arquivos/.test(sem(textoDe(c))));
-    if (pedido.todos) { if (cxTodos) marcar(cxTodos, true); else todas.forEach((c) => marcar(c, true)); return { marcadas: todas.filter((c) => c.checked).length }; }
-    todas.forEach((c) => marcar(c, false));
-    if (cxTodos) marcar(cxTodos, false);
-    const chaves = new Set(pedido.arquivos.map((a) => a.mov + ":" + a.idx)), nomes = new Set(pedido.arquivos.map((a) => a.mov + ":" + sem(a.nome)));
-    let mov = null, idx = 0, n = 0;
-    for (const c of todas) {
-      if (c === cxTodos) continue;
-      const t = textoDe(c).replace(/\s+/g, " ").trim(), m = t.match(/^(\d{1,5})\s*[-–]\s*\S/);
-      if (m) { mov = +m[1]; idx = 0; continue; }           // caixa da movimentação: os arquivos abaixo é que contam
-      if (mov === null) continue;
-      const nome = sem(t).replace(/\s*\(?[\d.,]+\s*(kb|mb|bytes?)\)?\s*$/, "").replace(/\s+/g, "");
-      const certo = chaves.has(mov + ":" + idx) || [...nomes].some((k) => k.startsWith(mov + ":") && nome.includes(k.slice(String(mov).length + 1).replace(/\s+/g, "")));
-      idx++;
-      if (certo) { marcar(c, true); n++; }
+  async function aplicar(pedido) {
+    const todas = caixas(), cxTodos = document.getElementById("todos");
+    if (cxTodos) { marcar(cxTodos, false); if (cxTodos.checked) cxTodos.checked = false; }
+    todas.filter((c) => c !== cxTodos).forEach((c) => marcar(c, false));
+    if (pedido.todos) { if (cxTodos) marcar(cxTodos, true); else todas.forEach((c) => marcar(c, true)); return { marcadas: caixas().filter((c) => c.checked && c !== cxTodos).length }; }
+    const nomes = new Set(pedido.arquivos.map((a) => a.mov + ":" + sem(a.nome)));
+    let n = 0;
+    for (const c of document.querySelectorAll("input[name=chk2]")) {
+      const pai = c.getAttribute("pai"), li = document.querySelector(`input[name=chk1][value="${pai}"]`);
+      const mov = li ? +((li.getAttribute("selecao") || "").replace(/\D/g, "")) : null;
+      if (mov !== null && nomes.has(mov + ":" + sem(nomeDe(c)))) {
+        marcar(c, true); n++;
+        if (li && !li.checked) marcar(li, true);       // a movimentação junto, para o cabeçalho dela entrar no PDF
+      }
     }
     return { marcadas: n };
   }
 
   async function executar(pedido) {
-    const r = aplicar(pedido);
+    const r = await aplicar(pedido);
     if (!r.marcadas) return { erro: "não achei os arquivos pedidos na lista" };
-    await new Promise((ok) => setTimeout(ok, 400));
+    const vol = document.querySelector("input[name=myradio]");      // escolher o volume revela o botão de gerar
+    if (vol && !vol.checked) vol.click();
+    await esperar(400);
     const b = botaoGerar();
     if (!b) return { erro: "botão Gerar não encontrado" };
     b.click();
