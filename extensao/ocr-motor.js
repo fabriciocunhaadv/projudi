@@ -43,7 +43,7 @@ export async function precisaOcr(page) {
   if (!grandes.length) return false;
   const tc = await page.getTextContent();
   const itens = tc.items.filter((it) => (it.str || "").trim());
-  return grandes.some((r) => itens.reduce((n, it) => (it.transform[4] >= r.x0 && it.transform[4] <= r.x1 && it.transform[5] >= r.y0 && it.transform[5] <= r.y1 ? n + it.str.trim().length : n), 0) < MIN_CHARS);
+  return grandes.some((r) => itens.reduce((n, it) => (it.transform[4] >= r.x0 && it.transform[4] <= r.x1 && it.transform[5] >= r.y0 && it.transform[5] <= r.y1 ? n + it.str.trim().length : n), 0) < 150);   // alguns carimbos podem cair sobre a imagem: poucos caracteres não bastam para dizer que há texto do documento
 }
 
 async function criarWorkers(n) {
