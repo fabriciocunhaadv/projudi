@@ -112,3 +112,14 @@ Os modos "PDF único com índice próprio" e "um PDF por arquivo" continuam disp
 Na janela "Gerar PDF" também há o botão **Gerar e baixar tudo (extensão)** e **Copiar diagnóstico** (para ajustar se o Projudi mudar a tela).
 
 Testes: `python tests/e2e_baixar.py`, `python tests/e2e_gerarpdf.py`.
+
+
+## Baixar os processos para análise (fila automática)
+No painel, em **Baixar PDFs para análise**:
+1. Marque as **serventias (varas)** em que você trabalha (a escolha fica gravada na sua conta do Chrome) e, se quiser, digite o nome do **prompt** do app de IA de cada serventia.
+2. Opcionalmente restrinja por classificador e por situação (não analisadas / pré-analisadas) e desmarque processos específicos.
+3. **Baixar PDFs dos N processos**: a fila, na ordem do painel (urgência → prioridade → mais antigo), abre cada processo, pede o PDF completo ao Projudi,
+   faz OCR nas páginas-imagem (qualidade alta) e salva em `Downloads/Projudi/<data>/<serventia>/<classificador>/`:
+   - `número-OCR.pdf` — o PDF completo do Projudi, agora pesquisável;
+   - `número-OCR.txt` — texto integral de todas as páginas, com a origem de cada trecho (movimentação, arquivo, página do arquivo e do PDF; `[OCR]` marca o que veio de OCR) e um índice no início.
+Testes: `python tests/e2e_lote.py`, `python tests/e2e_extensao.py`.

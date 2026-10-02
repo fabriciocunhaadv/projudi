@@ -85,6 +85,17 @@ def main():
         if os.environ.get("CAPTURAS"):
             pn.set_viewport_size({"width": 1300, "height": 900}); pn.click("#abrir"); pn.wait_for_timeout(300)
             pn.screenshot(path=os.environ["CAPTURAS"] + "/painel.png", full_page=True); pn.click("#abrir")
+        # seleção das serventias para baixar PDFs: nada marcado = nada na fila; marcar a serventia traz os processos dela; o prompt fica gravado
+        assert pn.locator("input[data-serv]").count() >= 1 and pn.locator("input[data-proc]").count() == 0
+        assert "Marque ao menos uma serventia" in pn.inner_text("body")
+        pn.locator("input[data-serv]").first.check(); pn.wait_for_timeout(300)
+        n_cand = pn.locator("input[data-proc]").count(); assert n_cand >= 1, n_cand
+        pn.fill("input[data-prompt]", "Prompt Família"); pn.locator("input[data-prompt]").first.dispatch_event("change"); pn.wait_for_timeout(300)
+        assert f"Baixar PDFs dos {n_cand} processo(s)" in pn.inner_text("body")
+        pn.locator("input[data-proc]").first.uncheck(); pn.wait_for_timeout(200)
+        assert f"Baixar PDFs dos {n_cand - 1} processo(s)" in pn.inner_text("body")
+        sw0 = ctx.service_workers[0]
+        assert sw0.evaluate("chrome.storage.sync.get('automacao')")["automacao"][pn.locator("input[data-serv]").first.get_attribute("data-serv")]["prompt"] == "Prompt Família"
         pn.select_option("#visao", "fila"); pn.wait_for_timeout(300)
         fila = pn.inner_text("body"); print(fila[:1800])
         # ordem de trabalho: urgência do processo > prioridade do classificador > mais antigo
