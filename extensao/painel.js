@@ -48,39 +48,32 @@ function desenhar() {
     h += "</table>";
   }
 
-  // 3) Detalhe
-  const cmp = Ordenar.comparador($("modo").value), fila = $("visao").value === "fila";
-  const agora = Date.now();
-  const dias = (p) => { const t = Ordenar.ms(p.dataInicio || p.dataPreAnalise); return Number.isFinite(t) ? Math.max(0, Math.floor((agora - t) / 86400000)) : ""; };
-  const linha = (p, comCls) => {
+  // 3) Detalhe: tabelas no formato do Projudi (ou fila única na ordem de trabalho)
+  const modo = $("modo").value, fila = $("visao").value === "fila", agora = Date.now();
+  const cmp = Ordenar.comparador(modo);
+  const dias = (p) => RenderProjudi.diasDe(p, agora);
+  const linha = (p) => {
     const num = link(p) ? `<a href="${esc(link(p))}" target="_blank"><b>${esc(p.processo)}</b></a>` : `<b>${esc(p.processo)}</b>`;
-    const urg = p.urgencia && p.urgencia < 3 ? `<span class="tag urg${p.urgencia}">${esc(p.urgenciaTexto || "urgente")}</span>` : "";
-    return `<tr><td class="n">${p.prioridade ?? ""}</td><td>${num}${urg}</td>` +
-      (comCls ? `<td class="cls">${esc(p.classificador)}</td><td>${esc(p.situacao)}</td>` : "") +
-      `<td>${esc(p.dataInicio)}</td><td class="n ${dias(p) >= 30 ? "alerta" : ""}" title="dias desde o início">${dias(p)}</td><td>${esc(p.dataPreAnalise)}${p.origem === "multipla" ? ' <span class="tag">múltipla</span>' : ""}</td><td>${esc(p.tipoConclusao)}</td><td>${esc(p.tipoAcao)}</td><td>${esc(p.usuarioPreAnalise)}</td><td>${esc(p.tipoMovimento)}</td></tr>`;
+    const urg = p.urgencia && p.urgencia < 3 ? `<span class="dot u${p.urgencia}" title="${esc(p.urgenciaTexto)}"></span>` : "";
+    return `<tr class="tp-linha"><td class="n">${p.prioridade ?? ""}</td><td class="proc">${urg}${num} <button class="copiar" data-num="${esc(p.processo)}" title="Copiar número do processo">📋</button>${urg ? `<span class="urgtxt">${esc(p.urgenciaTexto)}</span>` : ""}</td>` +
+      `<td class="cls">${esc(p.classificador) || '<i>sem classificador</i>'}</td><td>${esc(p.situacao)}${p.origem === "multipla" ? ' <span class="multipla">múltipla</span>' : ""}</td>` +
+      `<td>${esc(p.dataInicio)}</td><td class="n ${dias(p) >= 30 ? "velho" : ""}" title="dias desde o início">${dias(p)}</td><td>${esc(p.dataPreAnalise)}</td><td>${esc(p.tipoConclusao)}</td><td>${esc(p.tipoAcao)}</td><td>${esc(p.usuarioPreAnalise)}</td><td>${esc(p.tipoMovimento)}</td></tr>`;
   };
-  const cabecalho = (comCls) => `<table><tr><th title="Prioridade do classificador">Prior.</th><th>Processo</th>${comCls ? "<th>Classificador</th><th>Situação</th>" : ""}<th>Início (data e hora)</th><th title="Dias desde o início">Dias</th><th>Pré-análise</th><th>Conclusão</th><th>Tipo da ação</th><th>Usuário</th><th>Movimento</th></tr>`;
   h += "<h2>Processos</h2>";
   let achou = false;
   for (const s of estado.serventias) {
-    const procs = todos(s).filter((p) => casa(p, q)).sort(cmp);
+    const procs = todos(s).filter((p) => casa(p, q));
     if (!procs.length) continue;
     achou = true;
     h += `<details ${aberto || q || fila ? "open" : ""}><summary>${esc(s.serventia)} <span class="qtd">— ${procs.length} processo(s)</span></summary>`;
     if (fila) {
-      h += cabecalho(true) + procs.map((p) => linha(p, true)).join("") + "</table>";
+      h += `<table class="tp"><thead><tr><th class="n" title="Prioridade do classificador">Prior.</th><th>Processo</th><th>Classificador</th><th>Situação</th><th>Início (data e hora)</th><th class="n" title="Dias desde o início">Dias</th><th>Pré-análise</th><th>Conclusão</th><th>Tipo da ação</th><th>Usuário</th><th>Movimento</th></tr></thead><tbody>` +
+        [...procs].sort(cmp).map(linha).join("") + "</tbody></table>";
     } else {
-      for (const sit of Object.values(ROTULO)) {
-        const dessa = procs.filter((p) => p.situacao === sit);
+      for (const tipo of ["naoAnalisadas", "preAnalisadas"]) {
+        const dessa = procs.filter((p) => p.tipo === tipo);
         if (!dessa.length) continue;
-        h += `<details open><summary>${sit} <span class="qtd">(${dessa.length})</span></summary>`;
-        const grupos = new Map();
-        dessa.forEach((p) => { const k = p.classificador || "(sem classificador)"; (grupos.get(k) || grupos.set(k, []).get(k)).push(p); });
-        for (const [cls, ps] of [...grupos].sort((a, b) => cmp(a[1][0], b[1][0]))) {
-          h += `<details open><summary class="cls">${esc(cls)} <span class="qtd">(${ps.length}${ps[0].prioridade != null ? `, prioridade ${ps[0].prioridade}` : ""})</span></summary>` +
-            cabecalho(false) + ps.map((p) => linha(p, false)).join("") + "</table></details>";
-        }
-        h += "</details>";
+        h += `<details open><summary>${ROTULO[tipo]} <span class="qtd">(${dessa.length})</span></summary>${RenderProjudi.tabela(dessa, { tipo, modo, dias: true, agora })}</details>`;
       }
     }
     h += "</details>";
@@ -106,9 +99,10 @@ function csv() {
   chrome.storage.onChanged.addListener((c, area) => { if (area === "local" && c.estado) { estado = c.estado.newValue; desenhar(); } });
   const guardado = (k, d) => { try { return localStorage.getItem(k) || d; } catch { return d; } };
   $("modo").innerHTML = Object.entries(Ordenar.MODOS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
-  $("modo").value = guardado("modo", "trabalho"); $("visao").value = guardado("visao", "classificador");
+  $("modo").value = guardado("modo", "trabalho"); $("visao").value = guardado("visao", "tabela");
   for (const id of ["modo", "visao"]) $(id).onchange = () => { try { localStorage.setItem(id, $(id).value); } catch {} desenhar(); };
   $("busca").oninput = desenhar;
+  RenderProjudi.ligarCopiar($("conteudo"));
   $("csv").onclick = csv;
   $("abrir").onclick = () => { aberto = !aberto; $("abrir").textContent = aberto ? "Recolher tudo" : "Expandir tudo"; desenhar(); };
   $("atualizar").onclick = () => chrome.runtime.sendMessage({ acao: "verificar" });

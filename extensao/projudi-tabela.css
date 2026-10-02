@@ -1,0 +1,23 @@
+/* Tabelas no estilo do Projudi: faixa azul do tipo de conclusão, faixa do classificador, linhas dos processos */
+.tp { border-collapse: collapse; width: 100%; font-size: 12px; margin: 4px 0 10px; }
+.tp th, .tp td { border: 1px solid #c3cfdf; padding: 3px 6px; text-align: left; vertical-align: middle; }
+.tp thead th { background: #e6edf6; color: #1b3a63; font-weight: 700; }
+.tp .tp-titulo th { background: #1f4e8c; color: #fff; text-align: center; font-weight: 700; border-color: #1f4e8c; }
+.tp .tp-sub th { background: #cfe0f3; color: #12345f; text-align: center; font-weight: 700; }
+.tp .tp-sub.sem th { color: #6b7d95; font-weight: 400; font-style: italic; }
+.tp tbody tr.tp-linha:hover td { background: #f1f6fc; }
+.tp td.n, .tp th.n { text-align: center; width: 1%; white-space: nowrap; }
+.tp td.proc, .tp td.dt { white-space: nowrap; }
+.tp td.proc a { font-weight: 700; color: #1a56a0; text-decoration: none; } .tp td.proc a:hover { text-decoration: underline; }
+.tp .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+.tp .dot.u1 { background: #d32f2f; } .tp .dot.u2 { background: #f6a800; }
+.tp .copiar { border: 0; background: none; cursor: pointer; padding: 0 2px; font-size: 12px; opacity: .55; } .tp .copiar:hover { opacity: 1; }
+.tp .copiado { color: #1a7a1a; font-size: 11px; margin-left: 3px; }
+.tp .urgtxt { display: block; font-size: 10px; color: #8a2a00; }
+.tp .multipla { font-size: 10px; background: #e8eef8; border-radius: 6px; padding: 0 5px; margin-left: 4px; }
+.tp td.velho { color: #b00020; font-weight: 700; }
+@media (prefers-color-scheme: dark) {
+  .tp th, .tp td { border-color: #3d4a5e; } .tp thead th { background: #26364f; color: #cfe0f6; }
+  .tp .tp-sub th { background: #2c3f5c; color: #cfe0f6; } .tp tbody tr.tp-linha:hover td { background: #26303f; }
+  .tp td.proc a { color: #8ab4f8; } .tp .urgtxt { color: #f0a070; }
+}

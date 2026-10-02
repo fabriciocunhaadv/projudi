@@ -74,9 +74,17 @@ def main():
         ext_id = sw.url.split("/")[2]
         pg = ctx.new_page(); pg.goto(f"chrome-extension://{ext_id}/popup.html"); pg.wait_for_timeout(500)
         txt = pg.inner_text("body"); print(txt[:700])
-        assert "Fulano - minutando" in txt and "1000002-22.2026.8.09.0166" in txt and "Gicrana - lote" in txt
+        assert "Fulano - minutando - (Prioridade: 10)" in txt and "1000002-22.2026.8.09.0166" in txt and "Gicrana - lote - (Prioridade: 3)" in txt
+        assert "Concluso - Genérico" in txt and "Data/Hora" in txt and "Tipo da Ação" in txt        # colunas e faixas como no Projudi
+        assert pg.locator("table.tp .dot.u1").count() >= 1 and pg.locator("table.tp .dot.u2").count() >= 1   # bolinhas de urgência
+        assert pg.locator("table.tp .tp-titulo").count() == 2 and pg.locator("table.tp button.copiar").count() >= 9
 
+        if os.environ.get("CAPTURAS"):   # python: CAPTURAS=/pasta python tests/e2e_extensao.py
+            pg.set_viewport_size({"width": 720, "height": 900}); pg.screenshot(path=os.environ["CAPTURAS"] + "/popup.png", full_page=True)
         pn = ctx.new_page(); pn.goto(f"chrome-extension://{ext_id}/painel.html"); pn.wait_for_timeout(500)
+        if os.environ.get("CAPTURAS"):
+            pn.set_viewport_size({"width": 1300, "height": 900}); pn.click("#abrir"); pn.wait_for_timeout(300)
+            pn.screenshot(path=os.environ["CAPTURAS"] + "/painel.png", full_page=True); pn.click("#abrir")
         pn.select_option("#visao", "fila"); pn.wait_for_timeout(300)
         fila = pn.inner_text("body"); print(fila[:1800])
         # ordem de trabalho: urgência do processo > prioridade do classificador > mais antigo
@@ -87,7 +95,7 @@ def main():
         fila = pn.inner_text("body")
         ordem = [fila.index(n) for n in ["2000002.90", "2000001.80", "1000006-66", "1000003-33", "1000004-44", "1000002-22", "1000005-55", "1000001-11"]]
         assert ordem == sorted(ordem), ordem   # só a data: 29/09, 30/09, 01/10 13:28/14:51/15:03/16:58, 02/10 13:33/14:31
-        pn.select_option("#visao", "classificador"); pn.select_option("#modo", "trabalho"); pn.wait_for_timeout(300)
+        pn.select_option("#visao", "tabela"); pn.select_option("#modo", "trabalho"); pn.wait_for_timeout(300)
         pn.click("#abrir"); pn.fill("#busca", "beltrana"); pn.wait_for_timeout(300)
         det = pn.inner_text("body")
         assert "2000002.90" in det and "1000006-66" in det and "1000003-33" not in det.split("Processos")[-1]

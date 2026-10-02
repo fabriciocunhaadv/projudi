@@ -1,7 +1,8 @@
 <!doctype html>
 <meta charset="utf-8">
+<link rel="stylesheet" href="projudi-tabela.css">
 <style>
-  body { font: 13px system-ui, sans-serif; width: 420px; margin: 0; padding: 10px; }
+  body { font: 13px system-ui, sans-serif; width: 700px; margin: 0; padding: 10px; }
   h1 { font-size: 15px; margin: 0 0 6px; }
   h2 { font-size: 12px; margin: 10px 0 3px; }
   table { border-collapse: collapse; width: 100%; }
@@ -11,8 +12,7 @@
   .msg { padding: 6px; background: #fff3cd; margin: 6px 0; } .erro { color: #b00020; }
   .cfg { margin-top: 12px; border-top: 1px solid #ddd; padding-top: 8px; }
   .cfg label { display: block; margin: 4px 0; } input[type=text] { width: 100%; box-sizing: border-box; }
-  h3 { font-size: 12px; margin: 8px 0 2px; } .cls { font-weight: 700; margin-top: 4px; color: #1a56a0; }
-  ul { margin: 2px 0 0; padding-left: 18px; } small { color: #555; }
+  details { margin: 4px 0; } summary { cursor: pointer; font-weight: 600; margin: 3px 0; } summary .zero { font-weight: 400; } small { color: #555; }
   a { color: #1a56a0; }
 </style>
 <h1>Conclusões Projudi</h1>
@@ -31,4 +31,5 @@
   <label><input type="checkbox" id="notificar"> Avisar quando chegar conclusão nova</label>
 </div>
 <script src="ordenar.js"></script>
+<script src="render.js"></script>
 <script src="popup.js"></script>

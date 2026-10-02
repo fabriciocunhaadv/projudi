@@ -2,20 +2,9 @@ const $ = (id) => document.getElementById(id);
 const PADRAO = { filtro: "Montes Claros", intervalo: 30, notificar: true };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-function listaProcessos(titulo, procs) {
+function listaProcessos(titulo, procs, tipo, aberto) {
   if (!procs?.length) return "";
-  const grupos = new Map();
-  [...procs].sort(Ordenar.comparador("trabalho")).forEach((p) => { const k = p.classificador || "(sem classificador)"; (grupos.get(k) || grupos.set(k, []).get(k)).push(p); });
-  let h = `<h3>${titulo} (${procs.length})</h3>`;
-  for (const [cls, ps] of grupos) {
-    h += `<div class="cls">${esc(cls)} <span class="zero">(${ps.length})</span></div><ul>`;
-    for (const p of ps) {
-      const extra = [p.dataInicio && "início " + p.dataInicio, p.prioridade != null && "prior. " + p.prioridade, p.tipoConclusao, p.dataPreAnalise && "pré-análise " + p.dataPreAnalise, p.usuarioPreAnalise, p.tipoMovimento].filter(Boolean).join(" · ");
-      h += `<li>${p.url ? `<a href="https://projudi.tjgo.jus.br/${esc(p.url)}" target="_blank"><b>${esc(p.processo)}</b></a>` : `<b>${esc(p.processo)}</b>`}${p.marcadores?.length ? ` <span class="zero">⚠ ${esc(p.marcadores.join(", "))}</span>` : ""}${extra ? `<br><small>${esc(extra)}</small>` : ""}</li>`;
-    }
-    h += "</ul>";
-  }
-  return h;
+  return `<details ${aberto ? "open" : ""}><summary>${titulo} <span class="zero">(${procs.length})</span></summary>${RenderProjudi.tabela(procs, { tipo })}</details>`;
 }
 
 function desenhar(estado) {
@@ -38,12 +27,13 @@ function desenhar(estado) {
       const c = (n) => `<td class="n ${n ? "alerta" : "zero"}">${n}</td>`;
       h += `<tr><td>${esc(l.tipo)}</td>${c(l.naoAnalisadas)}${c(l.preAnalisadas)}</tr>`;
     }
-    h += "</table>" + listaProcessos("Não analisadas", s.processos?.naoAnalisadas) + listaProcessos("Pré-analisadas", s.processos?.preAnalisadas);
+    h += "</table>" + listaProcessos("Não analisadas", s.processos?.naoAnalisadas, "naoAnalisadas", true) + listaProcessos("Pré-analisadas", s.processos?.preAnalisadas, "preAnalisadas", true);
   }
   el.innerHTML = `<p><b>${total}</b> não analisadas no total</p>` + h;
 }
 
 (async () => {
+  RenderProjudi.ligarCopiar($("conteudo"));
   const cfg = { ...PADRAO, ...(await chrome.storage.sync.get(PADRAO)) };
   $("filtro").value = cfg.filtro; $("intervalo").value = String(cfg.intervalo); $("notificar").checked = cfg.notificar;
   const salvar = () => chrome.storage.sync.set({

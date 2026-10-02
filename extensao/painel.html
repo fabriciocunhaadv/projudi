@@ -1,6 +1,7 @@
 <!doctype html>
 <meta charset="utf-8">
 <title>Conclusões Projudi — Painel</title>
+<link rel="stylesheet" href="projudi-tabela.css">
 <style>
   body { font: 14px system-ui, sans-serif; margin: 0; padding: 16px 24px; color: #222; }
   header { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
@@ -17,7 +18,7 @@
   <h1>Conclusões Projudi</h1>
   <button id="atualizar">Verificar agora</button>
   <select id="modo"></select>
-  <select id="visao"><option value="classificador">Por classificador</option><option value="fila">Fila única (ordem de trabalho)</option></select>
+  <select id="visao"><option value="tabela">Tabelas do Projudi</option><option value="fila">Fila única (ordem de trabalho)</option></select>
   <input type="search" id="busca" placeholder="Filtrar por processo, classificador, usuário…">
   <button id="csv">Exportar CSV</button>
   <button id="abrir">Expandir tudo</button>
@@ -25,4 +26,5 @@
 </header>
 <div id="conteudo"></div>
 <script src="ordenar.js"></script>
+<script src="render.js"></script>
 <script src="painel.js"></script>

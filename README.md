@@ -86,3 +86,13 @@ PDF com o texto invisível embutido (as imagens não são recomprimidas). Roda 1
 Teste: `python tests/test_ocr.py` (usa o `pdftotext` para conferir).
 
 Testes: `test_parser`, `test_formatacao`, `test_ocr`, `e2e_extensao`, `e2e_formatacao` (todos em `tests/`).
+
+## Tabelas no formato do Projudi
+No popup e no painel, os processos **não analisados** e **pré-analisados** aparecem em tabelas iguais às do Projudi: faixa azul com o tipo de
+conclusão, faixa do classificador com a prioridade, bolinha de urgência (vermelha/amarela), número com link para o processo e botão 📋 para copiar o número.
+No painel há ainda a coluna *Dias* e a opção "Fila única (ordem de trabalho)".
+
+## OCR automático
+Quando um PDF de `tjgo.jus.br` termina de baixar, a extensão faz o OCR sozinha (aba em segundo plano) e salva `nome-OCR.pdf` em Downloads;
+o original é mantido. Liga/desliga em *Ferramentas*. Para ler o arquivo recém-baixado, ligue "Permitir acesso a URLs de arquivo" nos detalhes da
+extensão; sem isso ela baixa o PDF de novo pelo mesmo endereço. Teste: `python tests/e2e_ocr_auto.py`.
