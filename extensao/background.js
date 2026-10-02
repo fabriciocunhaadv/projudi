@@ -146,4 +146,28 @@ chrome.runtime.onInstalled.addListener(() => { agendar(); verificar(); });
 chrome.runtime.onStartup.addListener(() => { agendar(); verificar(); });
 chrome.alarms.onAlarm.addListener((a) => a.name === "verificar" && verificar());
 chrome.storage.onChanged.addListener((c, area) => area === "sync" && agendar());
-chrome.runtime.onMessage.addListener((m) => { if (m?.acao === "verificar") verificar(); });
+// Captura o HTML da aba (e de todos os iframes), sem scripts/estilos, para diagnóstico/ajustes.
+async function capturarAba(tabId) {
+  const res = await chrome.scripting.executeScript({
+    target: { tabId, allFrames: true },
+    func: () => {
+      const orig = [...document.querySelectorAll("input,textarea,select")];
+      const c = document.documentElement.cloneNode(true);
+      [...c.querySelectorAll("input,textarea,select")].forEach((el, i) => { // grava o estado atual dos campos
+        const o = orig[i];
+        if (!o) return;
+        if (["checkbox", "radio"].includes(o.type)) el.toggleAttribute("checked", o.checked);
+        else if (o.tagName === "INPUT" && !["password", "file"].includes(o.type)) el.setAttribute("value", o.value);
+        else if (o.tagName === "TEXTAREA") el.textContent = o.value;
+      });
+      c.querySelectorAll("script,style,link,svg,noscript,meta,input[type=password]").forEach((e) => e.remove());
+      return { url: location.href, titulo: document.title, html: c.outerHTML.replace(/\s+/g, " ").slice(0, 200000) };
+    },
+  });
+  return res.map((r) => r.result).filter(Boolean);
+}
+
+chrome.runtime.onMessage.addListener((m, _s, responder) => {
+  if (m?.acao === "verificar") verificar();
+  if (m?.acao === "capturar") { capturarAba(m.tabId).then(responder, (e) => responder({ erro: String(e.message || e) })); return true; }
+});

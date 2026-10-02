@@ -55,6 +55,14 @@ function desenhar(estado) {
     await navigator.clipboard.writeText(txt);
     $("diagnostico").textContent = "Copiado! Cole no chat";
   };
+  $("capturar").onclick = async () => {
+    const [aba] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const r = await chrome.runtime.sendMessage({ acao: "capturar", tabId: aba.id });
+    if (r?.erro || !Array.isArray(r)) { $("capturar").textContent = "Erro: " + (r?.erro || "sem resposta"); return; }
+    const txt = r.map((f, i) => `===== FRAME ${i} | ${f.url} | ${f.titulo} =====\n${f.html}`).join("\n\n");
+    await navigator.clipboard.writeText(txt);
+    $("capturar").textContent = `Copiado (${Math.round(txt.length / 1000)} mil caracteres, ${r.length} frame(s))`;
+  };
   $("painel").onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("painel.html") });
   $("atualizar").onclick = async () => { await salvar(); chrome.runtime.sendMessage({ acao: "verificar" }); };
   desenhar((await chrome.storage.local.get("estado")).estado);

@@ -3,9 +3,25 @@
   "name": "Conclusões Projudi",
   "version": "1.0.0",
   "description": "Confere automaticamente as conclusões não analisadas e pré-analisadas de cada serventia no Projudi/TJGO.",
-  "permissions": ["storage", "alarms", "notifications", "offscreen"],
-  "host_permissions": ["https://projudi.tjgo.jus.br/*"],
-  "background": { "service_worker": "background.js" },
-  "icons": { "128": "icone.png" },
-  "action": { "default_popup": "popup.html", "default_title": "Conclusões Projudi" }
+  "permissions": [
+    "activeTab",
+    "alarms",
+    "notifications",
+    "offscreen",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://projudi.tjgo.jus.br/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "128": "icone.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Conclusões Projudi"
+  }
 }

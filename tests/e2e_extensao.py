@@ -36,6 +36,8 @@ class H(http.server.BaseHTTPRequestHandler):
         p = s.path
         if "PaginaAtual=9" in p: s._r(LISTA)
         elif "PaginaAtual=-10" in p: s._r(INICIO)
+        elif p.startswith("/processo"): s._r('<html><body><script>var x=1</script><h1>Capa</h1><iframe src="/movs"></iframe></body></html>')
+        elif p.startswith("/movs"): s._r('<html><body><table><tr><td><input type="checkbox" name="arq" value="77" checked></td><td>Mov. 1 - Petição Inicial</td></tr><tr><td><input type="checkbox" name="arq" value="78"></td><td>Mov. 2</td></tr></table></body></html>')
         elif "PreAnalisarConclusao?PaginaAtual=2" in p: s._r(PENDENTES)
         elif "PreAnalisarConclusao?PaginaAtual=6" in p: s._r(FORM)
         else: s._r(MOLDURA)
@@ -86,6 +88,14 @@ def main():
         assert "Manu minutando" not in pn.inner_text("details") and "5410623.26" in pn.inner_text("details")
         dbg = sw.evaluate("chrome.storage.local.get('debug')")["debug"]
         assert {"amostra inicio", "amostra naoAnalisadas", "amostra preAnalisadas"} <= set(dbg), list(dbg)
+        proc = ctx.new_page(); proc.goto("http://localhost:8765/processo"); proc.wait_for_timeout(800)
+        tab_id = sw.evaluate("chrome.tabs.query({url: 'http://localhost:8765/processo*'}).then(t => t[0].id)")
+        frames = sw.evaluate(f"capturarAba({tab_id})")
+        print([ (f["url"], len(f["html"])) for f in frames ])
+        assert len(frames) == 2 and "<script" not in frames[0]["html"]
+        movs = [f for f in frames if "/movs" in f["url"]][0]["html"]
+        assert 'value="77" checked' in movs.replace('checked=""', 'checked') or 'checked' in movs.split('value="77"')[1].split(">")[0]
+        assert 'checked' not in movs.split('value="78"')[1].split(">")[0]
         ctx.close()
     print("OK")
 
