@@ -261,7 +261,7 @@ async function executar(sel, op) {
   $("baixar").disabled = true; $("cancelar").disabled = false; $("resultados").textContent = "";
   $("andamento").innerHTML = sel.map((f) => `<li data-o="${f.ordem}">• ${esc(f.nome)}</li>`).join("");
   const processo = job.processo || "processo";
-  const ocrOp = { escala: 2.2, paralelo: Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 1)), forcar: false };
+  const ocrOp = { escala: 3, paralelo: Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 1)), forcar: false };
   try {
     if (op.unico) {
       const out = await PDFDocument.create();

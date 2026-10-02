@@ -128,7 +128,7 @@ export async function fazerOcr(bytes, opcoes, ganchos = {}) {
       while (!cancelado() && proximo < alvo.length) {
         const i = alvo[proximo++];
         const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: opcoes.escala || 2.2 });
+        const viewport = page.getViewport({ scale: opcoes.escala || 3 });
         const canvas = document.createElement("canvas");
         canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
         const ctx = canvas.getContext("2d", { willReadFrequently: true });
@@ -154,7 +154,7 @@ export async function fazerOcr(bytes, opcoes, ganchos = {}) {
   const doc = await PDFDocument.load(bytes);
   const font = await doc.embedFont(StandardFonts.Helvetica);
   let palavras = 0;
-  const s = opcoes.escala || 2.2;
+  const s = opcoes.escala || 3;
   for (const [i, { palavras: ps, viewport }] of resultados) {
     const page = doc.getPage(i - 1);
     page.pushOperators(pushGraphicsState(), setTextRenderingMode(TextRenderingMode.Invisible));
