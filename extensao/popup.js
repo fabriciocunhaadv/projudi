@@ -31,6 +31,7 @@ function desenhar(estado) {
   for (const s of estado.serventias) {
     h += `<h2><a href="${esc(s.url)}" target="_blank">${esc(s.serventia)}</a> — ${esc(s.perfil)}</h2>`;
     if (s.erro) { h += `<div class="erro">${esc(s.erro)}</div>`; continue; }
+    (s.avisos || []).forEach((a) => { h += `<div class="zero">⚠ ${a.tipo === "naoAnalisadas" ? "não analisadas" : "pré-analisadas"}: contagem ${a.esperado}, lidas ${a.lido}</div>`; });
     h += "<table><tr><th>Tipo</th><th>Não analis.</th><th>Pré-analis.</th></tr>";
     for (const l of s.linhas) {
       total += l.naoAnalisadas;
@@ -63,6 +64,7 @@ function desenhar(estado) {
     await navigator.clipboard.writeText(txt);
     $("capturar").textContent = `Copiado (${Math.round(txt.length / 1000)} mil caracteres, ${r.length} frame(s))`;
   };
+  $("ferramentas").onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("ferramentas.html") });
   $("painel").onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("painel.html") });
   $("atualizar").onclick = async () => { await salvar(); chrome.runtime.sendMessage({ acao: "verificar" }); };
   desenhar((await chrome.storage.local.get("estado")).estado);

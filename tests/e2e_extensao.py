@@ -28,6 +28,7 @@ class H(http.server.BaseHTTPRequestHandler):
         elif p.startswith("/movs"): s._r('<html><body><table><tr><td><input type="checkbox" name="arq" value="77" checked></td><td>Mov. 1</td></tr><tr><td><input type="checkbox" name="arq" value="78"></td><td>Mov. 2</td></tr></table></body></html>')
         elif "PreAnalisarConclusao?PaginaAtual=2" in p: s._r(fx("nao_analisadas.html"))
         elif "PreAnalisarConclusao?PaginaAtual=6" in p: s._r(FORM_PRE)
+        elif "PreAnalisarConclusao?PaginaAtual=7" in p: s._r(fx("pre_multiplas.html"))
         else: s._r(MOLDURA)
 
     def do_POST(s):
@@ -59,9 +60,11 @@ def main():
         print(*chamadas, sep="\n")
         assert estado["status"] == "ok" and len(estado["serventias"]) == 1, estado   # filtro "Montes Claros" tira Anápolis
         s = estado["serventias"][0]
-        assert not s["erro"] and [(l["naoAnalisadas"], l["preAnalisadas"]) for l in s["linhas"]] == [(6, 1), (0, 1)]
+        assert not s["erro"] and [(l["naoAnalisadas"], l["preAnalisadas"]) for l in s["linhas"]] == [(6, 1), (0, 2)]
         na, pre = s["processos"]["naoAnalisadas"], s["processos"]["preAnalisadas"]
-        assert len(na) == 6 and len(pre) == 2          # a lista bate com a contagem da tela inicial
+        assert len(na) == 6 and len(pre) == 3          # a lista bate com a contagem da tela inicial (2 Simples + 1 Múltipla)
+        assert [p["origem"] for p in pre] == ["simples", "simples", "multipla"] and pre[2]["classificador"] == "Gicrana - lote"
+        assert not s["avisos"], s["avisos"]
         assert na[0]["dataInicio"] == "02/10/2026 14:31:23" and na[0]["urgencia"] == 1
         assert [p["classificador"] for p in na][:3] == ["", "Fulano - minutando", "Fulano - minutando"]
         assert pre[1]["urgenciaTexto"] == "Réu Preso" and pre[0]["classificador"] == "Conclusos- Comunicação de Cessão de créditos"
@@ -71,7 +74,7 @@ def main():
         ext_id = sw.url.split("/")[2]
         pg = ctx.new_page(); pg.goto(f"chrome-extension://{ext_id}/popup.html"); pg.wait_for_timeout(500)
         txt = pg.inner_text("body"); print(txt[:700])
-        assert "Fulano - minutando" in txt and "1000002-22.2026.8.09.0166" in txt
+        assert "Fulano - minutando" in txt and "1000002-22.2026.8.09.0166" in txt and "Gicrana - lote" in txt
 
         pn = ctx.new_page(); pn.goto(f"chrome-extension://{ext_id}/painel.html"); pn.wait_for_timeout(500)
         pn.select_option("#visao", "fila"); pn.wait_for_timeout(300)

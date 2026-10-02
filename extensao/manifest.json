@@ -31,5 +31,20 @@
       },
       "description": "Capturar a tela atual (HTML) para diagnóstico"
     }
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.tjgo.jus.br/*"
+      ],
+      "js": [
+        "formatacao-core.js",
+        "formatador.js"
+      ],
+      "all_frames": true,
+      "match_about_blank": true,
+      "match_origin_as_fallback": true,
+      "run_at": "document_idle"
+    }
+  ]
 }

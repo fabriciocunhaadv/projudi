@@ -25,7 +25,12 @@ const INICIO = BASE + "Usuario?PaginaAtual=-10"; // tela dentro do iframe da mol
 const LISTAS = { // menu Conclusões: "Pendentes" e "Pré-Análises > Simples"
   naoAnalisadas: "PreAnalisarConclusao?PaginaAtual=2&tipo=todas",
   preAnalisadas: "PreAnalisarConclusao?PaginaAtual=6&tipo=todas",
+  // "Pré-Análises > Múltiplas": a contagem da tela inicial soma Simples + Múltiplas
+  preMultiplas: "PreAnalisarConclusao?PaginaAtual=7&tipo=todas",
 };
+
+const chaveProc = (p) => p.idPendencia || `${p.processo}|${p.tipoConclusao}|${p.dataPreAnalise}`;
+const juntar = (a, b) => { const vistos = new Set(a.map(chaveProc)); return a.concat(b.filter((p) => !vistos.has(chaveProc(p)))); };
 
 async function guardarDebug(rotulo, url, html) {
   const limpo = html.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").slice(0, 60000);
@@ -82,8 +87,21 @@ async function verificar() {
         else {
           s.linhas = r.linhas;
           const soma = (k) => r.linhas.reduce((n, l) => n + l[k], 0);
-          if (soma("naoAnalisadas")) s.processos.naoAnalisadas = await lerProcessos(s, "naoAnalisadas");
-          if (soma("preAnalisadas")) s.processos.preAnalisadas = await lerProcessos(s, "preAnalisadas");
+          const nNa = soma("naoAnalisadas"), nPre = soma("preAnalisadas");
+          if (nNa) s.processos.naoAnalisadas = await lerProcessos(s, "naoAnalisadas");
+          if (nPre) {
+            const simples = (await lerProcessos(s, "preAnalisadas")).map((p) => ({ ...p, origem: "simples" }));
+            let todas = simples;
+            if (simples.length < nPre) { // o que falta está nas pré-análises "Múltiplas"
+              await ocioso(800);
+              const multiplas = (await lerProcessos(s, "preMultiplas")).map((p) => ({ ...p, origem: "multipla" }));
+              todas = juntar(simples, multiplas);
+            }
+            s.processos.preAnalisadas = todas;
+          }
+          s.avisos = [["naoAnalisadas", nNa], ["preAnalisadas", nPre]]
+            .map(([k, esperado]) => ({ tipo: k, esperado, lido: s.processos[k].length }))
+            .filter((x) => x.lido !== x.esperado);
         }
       } catch (e) {
         s.erro = String(e.message || e);

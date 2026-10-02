@@ -30,7 +30,7 @@ function desenhar() {
     tNa += na; tPre += pre; tUrg += urg;
     const lis = (k) => (s.processos?.[k] || []).length;
     const c = (n, k) => `<td class="n ${n ? "alerta" : "zero"}">${n}${n !== lis(k) && (n || lis(k)) ? `<br><small>(lista: ${lis(k)})</small>` : ""}</td>`;
-    h += `<tr><td><a href="${esc(s.url)}" target="_blank">${esc(s.serventia)}</a>${s.erro ? `<br><span class="erro">${esc(s.erro)}</span>` : ""}</td><td>${esc(s.perfil)}</td>${c(na, "naoAnalisadas")}${c(pre, "preAnalisadas")}<td class="n ${urg ? "alerta" : "zero"}">${urg}</td></tr>`;
+    h += `<tr><td><a href="${esc(s.url)}" target="_blank">${esc(s.serventia)}</a>${s.erro ? `<br><span class="erro">${esc(s.erro)}</span>` : ""}${(s.avisos || []).map((a) => `<br><span class="aviso">⚠ ${a.tipo === "naoAnalisadas" ? "não analisadas" : "pré-analisadas"}: a tela inicial conta ${a.esperado}, mas só ${a.lido} vieram na lista</span>`).join("")}</td><td>${esc(s.perfil)}</td>${c(na, "naoAnalisadas")}${c(pre, "preAnalisadas")}<td class="n ${urg ? "alerta" : "zero"}">${urg}</td></tr>`;
   }
   h += `<tr><th colspan="2">Total</th><th class="n">${tNa}</th><th class="n">${tPre}</th><th class="n">${tUrg}</th></tr></table>`;
 
@@ -50,14 +50,16 @@ function desenhar() {
 
   // 3) Detalhe
   const cmp = Ordenar.comparador($("modo").value), fila = $("visao").value === "fila";
+  const agora = Date.now();
+  const dias = (p) => { const t = Ordenar.ms(p.dataInicio || p.dataPreAnalise); return Number.isFinite(t) ? Math.max(0, Math.floor((agora - t) / 86400000)) : ""; };
   const linha = (p, comCls) => {
     const num = link(p) ? `<a href="${esc(link(p))}" target="_blank"><b>${esc(p.processo)}</b></a>` : `<b>${esc(p.processo)}</b>`;
     const urg = p.urgencia && p.urgencia < 3 ? `<span class="tag urg${p.urgencia}">${esc(p.urgenciaTexto || "urgente")}</span>` : "";
     return `<tr><td class="n">${p.prioridade ?? ""}</td><td>${num}${urg}</td>` +
       (comCls ? `<td class="cls">${esc(p.classificador)}</td><td>${esc(p.situacao)}</td>` : "") +
-      `<td>${esc(p.dataInicio)}</td><td>${esc(p.dataPreAnalise)}</td><td>${esc(p.tipoConclusao)}</td><td>${esc(p.tipoAcao)}</td><td>${esc(p.usuarioPreAnalise)}</td><td>${esc(p.tipoMovimento)}</td></tr>`;
+      `<td>${esc(p.dataInicio)}</td><td class="n ${dias(p) >= 30 ? "alerta" : ""}" title="dias desde o início">${dias(p)}</td><td>${esc(p.dataPreAnalise)}${p.origem === "multipla" ? ' <span class="tag">múltipla</span>' : ""}</td><td>${esc(p.tipoConclusao)}</td><td>${esc(p.tipoAcao)}</td><td>${esc(p.usuarioPreAnalise)}</td><td>${esc(p.tipoMovimento)}</td></tr>`;
   };
-  const cabecalho = (comCls) => `<table><tr><th title="Prioridade do classificador">Prior.</th><th>Processo</th>${comCls ? "<th>Classificador</th><th>Situação</th>" : ""}<th>Início (data e hora)</th><th>Pré-análise</th><th>Conclusão</th><th>Tipo da ação</th><th>Usuário</th><th>Movimento</th></tr>`;
+  const cabecalho = (comCls) => `<table><tr><th title="Prioridade do classificador">Prior.</th><th>Processo</th>${comCls ? "<th>Classificador</th><th>Situação</th>" : ""}<th>Início (data e hora)</th><th title="Dias desde o início">Dias</th><th>Pré-análise</th><th>Conclusão</th><th>Tipo da ação</th><th>Usuário</th><th>Movimento</th></tr>`;
   h += "<h2>Processos</h2>";
   let achou = false;
   for (const s of estado.serventias) {
