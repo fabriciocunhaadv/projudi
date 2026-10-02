@@ -39,10 +39,11 @@ export async function imagensDaPagina(page) {
 // esse texto fica FORA da imagem, então o que vale é o texto que cai dentro da área da imagem.
 export async function precisaOcr(page) {
   if ((await textoDaPagina(page)) < MIN_CHARS) return true;
-  const grandes = (await imagensDaPagina(page)).filter((r) => r.fracao >= 0.3);
+  const grandes = (await imagensDaPagina(page)).filter((r) => r.fracao >= 0.15);
   if (!grandes.length) return false;
   const tc = await page.getTextContent();
-  const itens = tc.items.filter((it) => (it.str || "").trim());
+  // texto girado = tarja lateral do Projudi (pode invadir a área da imagem): não conta como texto do documento
+  const itens = tc.items.filter((it) => (it.str || "").trim() && Math.abs(it.transform[1]) <= 0.1 * Math.abs(it.transform[0] || 1));
   return grandes.some((r) => itens.reduce((n, it) => (it.transform[4] >= r.x0 && it.transform[4] <= r.x1 && it.transform[5] >= r.y0 && it.transform[5] <= r.y1 ? n + it.str.trim().length : n), 0) < 150);   // alguns carimbos podem cair sobre a imagem: poucos caracteres não bastam para dizer que há texto do documento
 }
 
