@@ -80,7 +80,7 @@ def main():
     assert "movimentação 8 (juntada -> peticao) | arquivo 2: doc2.pdf" in flat and "[ocr]" in flat
     assert "pensão alimentícia" in flat and "guarda compartilhada" in flat          # texto das páginas-imagem, com OCR
     assert "pagina um com texto nativo" in flat                                       # texto nativo preservado
-    assert flat.count("movimentacao 8 : juntada") <= 1                              # carimbo não duplicado pelo OCR
+    assert flat.count("movimentacao 8 : juntada") == 2        # uma por página (2 e 3): o OCR não duplicou o carimbo
     pdf = subprocess.run(["pdftotext", fins[0]["pdf"], "-"], capture_output=True, text=True).stdout.lower()
     assert "pensão alimentícia" in pdf
     print("OK")
