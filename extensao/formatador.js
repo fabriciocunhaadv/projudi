@@ -36,6 +36,27 @@
     else document.execCommand("insertHTML", false, F.montarHtml(blocos, cfg));
   }
 
+  // ---------- ponte com a API do editor (TinyMCE/CKEditor), que roda no mundo da página ----------
+  function ponte(detalhe) {
+    document.documentElement.removeAttribute("data-projudi-ponte");
+    document.dispatchEvent(new CustomEvent("projudi-ext-ponte", { detail: detalhe }));   // síncrono: o editor-ponte.js responde no atributo
+    try { return JSON.parse(document.documentElement.getAttribute("data-projudi-ponte") || "null"); } catch (e) { return null; }
+  }
+  // Fonte e tamanho também em <span> dentro do parágrafo: é o formato que os botões do próprio editor geram e que os filtros dele costumam aceitar.
+  function comSpans(html) {
+    const d = document.createElement("div"); d.innerHTML = html;
+    d.querySelectorAll("p,li,h1,h2,h3,h4,h5,h6,blockquote").forEach((b) => {
+      const fam = b.style.fontFamily, tam = b.style.fontSize;
+      if (!fam && !tam || b.querySelector(":scope > span[data-pe]")) return;
+      const sp = document.createElement("span"); sp.setAttribute("data-pe", "1");
+      if (fam) sp.style.fontFamily = fam; if (tam) sp.style.fontSize = tam;
+      while (b.firstChild) sp.appendChild(b.firstChild);
+      b.appendChild(sp);
+    });
+    d.querySelectorAll("span[data-pe]").forEach((x) => x.removeAttribute("data-pe"));
+    return d.innerHTML;
+  }
+
   // ---------- formatar o trecho selecionado ----------
   // Só mexe no que está selecionado (estendido até o começo/fim dos parágrafos tocados). Sem seleção, formata o parágrafo do cursor.
   const BLOCO = "p,div,li,h1,h2,h3,h4,h5,h6,blockquote,pre,td";
@@ -59,7 +80,9 @@
     caixa.appendChild(alvo.cloneContents());
     const novo = F.formatarHtmlCorpo(caixa.innerHTML, cfg, document);
     sel.removeAllRanges(); sel.addRange(alvo);      // mantém o desfazer (Ctrl+Z) do editor
-    document.execCommand("insertHTML", false, novo);
+    const html = comSpans(novo);
+    const p = ponte({ acao: "inserir", html });      // pela API do editor: passa pelos filtros e pela gravação dele
+    if (!p || !p.ok) document.execCommand("insertHTML", false, html);
     return 1;
   }
 
@@ -89,6 +112,12 @@
       mostrarMsg(r === 1 ? "Trecho selecionado formatado. (Ctrl+Z desfaz)" : r === 0 ? "Selecione o trecho que quer formatar (ou clique no parágrafo)." : "Clique dentro do editor de texto.");
       return r === 1;
     }
+    if (a === "diag") {
+      const r = ponte({ acao: "diag" });
+      const info = JSON.stringify({ ponte: r, frame: location.href.replace(/[?#].*/, ""), body: document.body.innerHTML.slice(0, 1500) }, null, 1);
+      navigator.clipboard.writeText(info).then(() => mostrarMsg("Diagnóstico copiado. Cole no chat."), () => mostrarMsg("Não consegui copiar."));
+      return true;
+    }
     if (a === "aprender-texto" || a === "aprender-citacao") {
       const tipo = a === "aprender-texto" ? "texto" : "citacao";
       const p = aprender(tipo);
@@ -110,7 +139,8 @@
       button:hover{opacity:1;background:#1a56a0;color:#fff} .msg{pointer-events:auto;display:none;order:-1;flex-basis:100%;text-align:right;background:#fffbe6;border:1px solid #e0c36a;border-radius:4px;padding:3px 6px;color:#333}
     </style><div class="w"><button data-a="formatar" title="Aplica o seu padrão de formatação ao trecho selecionado (Alt+Shift+F)">Formatar seleção</button>
       <button data-a="aprender-texto" title="Clique num parágrafo que você já formatou do seu jeito e use este botão: a extensão grava esse padrão para o texto">Aprender texto</button>
-      <button data-a="aprender-citacao" title="Idem, para uma citação">Aprender citação</button><div class="msg"></div></div>`;
+      <button data-a="aprender-citacao" title="Idem, para uma citação">Aprender citação</button>
+      <button data-a="diag" title="Copia informações do editor para diagnóstico">Diagnóstico</button><div class="msg"></div></div>`;
     const evitarFoco = (e) => e.preventDefault(); // não tira a seleção do editor
     sh.addEventListener("mousedown", evitarFoco, true);
     sh.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => acao(b.dataset.a)));

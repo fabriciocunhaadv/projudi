@@ -73,6 +73,15 @@ def main():
         fmt = ed.evaluate("[...document.querySelectorAll('p')].map(p => p.style.fontSize + '|' + p.style.textAlign + '|' + p.textContent)")
         assert fmt == ["9px||Primeiro antigo", "16px|justify|Segundo antigo", "9px||Terceiro antigo"], fmt
 
+        # 3b) com TinyMCE na página, o texto vai pela API do editor (ponte) e leva fonte/tamanho também em <span>
+        ed.evaluate("""() => { window.tinymce = { editors: [{ getWin: () => window, getDoc: () => document, undoManager: { transact: (f) => f() },
+            selection: { setRng() {}, getRng: () => getSelection().getRangeAt(0) }, insertContent(h) { window.__ins = h; }, save() {}, fire() {}, settings: {}, serializer: { serialize: () => 'ok' } }] };
+          document.body.innerHTML = "<p>Alvo antigo</p>"; const r = document.createRange(); r.selectNodeContents(document.querySelector('p')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }""")
+        ed.locator("[data-projudi-ext] button[data-a=formatar]").click(); ed.wait_for_timeout(300)
+        ins = ed.evaluate("window.__ins")
+        assert ins and "<span" in ins and "Times" in ins and "text-align" in ins, ins
+        ed.evaluate("delete window.tinymce")
+
         # 4) "Aprender texto": formato um parágrafo à mão (12pt, recuo 1,25cm) e a extensão grava esse padrão
         ed.evaluate("""() => { document.body.innerHTML = "<p id='x' style=\\"font-family:Georgia;font-size:12pt;text-align:justify;text-indent:1.25cm\\">Meu padrão</p>";
           const r = document.createRange(); r.setStart(document.getElementById('x').firstChild, 3); r.collapse(true); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }""")
