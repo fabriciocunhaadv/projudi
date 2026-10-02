@@ -66,3 +66,23 @@ Botão **Copiar diagnóstico**: se alguma lista vier vazia ou der erro, clique n
 Testes (usam páginas no formato real do Projudi, com dados fictícios, em `tests/fixtures`): `python tests/test_parser.py` (leitor) e `python tests/e2e_extensao.py` (extensão completa num Chromium)
 
 Limitações: lê só "Pendentes" e "Pré-Análises > Simples" (não as Múltiplas/Finalizadas); não envia e-mail (usa notificação e ícone); só confere com o Chrome aberto.
+
+
+---
+
+## Formatação automática da minuta (no editor de texto do Projudi)
+
+No editor aparecem, no canto inferior direito, os botões **Formatar minuta**, **Aprender texto** e **Aprender citação**.
+- **Colar:** ao colar do Word, Google Docs ou de um chat, o texto entra limpo (sem fonte/cor de origem) e já no seu padrão: fonte, tamanho,
+  justificado, recuo da 1ª linha; citações (recuadas, entre aspas longas ou iniciadas por `>`) saem com o padrão de citação; títulos centralizados são preservados.
+- **Formatar minuta (Alt+Shift+F):** reformata tudo o que já está no editor (Ctrl+Z desfaz).
+- **Aprender:** formate um parágrafo e uma citação do seu jeito, clique dentro deles e use *Aprender texto* / *Aprender citação*.
+  A extensão grava fonte, tamanho (com a unidade do editor), recuo, margens e entrelinha. Os valores também podem ser editados em *Ferramentas*.
+- Padrão inicial (até você ensinar): Times New Roman, 16px no texto, 14px nas citações (recuo 4cm), justificado, recuo de 1ª linha 2,5cm.
+
+## PDF com OCR (`ocr.html`, botão "PDF com OCR" no popup)
+Solte o PDF baixado do Projudi. A extensão confere página por página, faz OCR (português) **só nas páginas sem texto** e devolve o mesmo
+PDF com o texto invisível embutido (as imagens não são recomprimidas). Roda 100% no computador (bibliotecas em `extensao/vendor`, licenças em `vendor/licencas`).
+Teste: `python tests/test_ocr.py` (usa o `pdftotext` para conferir).
+
+Testes: `test_parser`, `test_formatacao`, `test_ocr`, `e2e_extensao`, `e2e_formatacao` (todos em `tests/`).

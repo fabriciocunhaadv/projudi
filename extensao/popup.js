@@ -65,6 +65,7 @@ function desenhar(estado) {
     $("capturar").textContent = `Copiado (${Math.round(txt.length / 1000)} mil caracteres, ${r.length} frame(s))`;
   };
   $("ferramentas").onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("ferramentas.html") });
+  $("ocr").onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("ocr.html") });
   $("painel").onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("painel.html") });
   $("atualizar").onclick = async () => { await salvar(); chrome.runtime.sendMessage({ acao: "verificar" }); };
   desenhar((await chrome.storage.local.get("estado")).estado);

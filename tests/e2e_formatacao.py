@@ -86,6 +86,14 @@ def main():
         p = ed.evaluate("(() => { const p = document.querySelector('p'); return p.style.fontSize + '|' + p.style.textIndent; })()")
         assert p == "12pt|1.25cm", p
 
+        # 4b) página de configuração (Ferramentas): edita e salva o padrão
+        cfg_pg = ctx.new_page(); cfg_pg.goto(f"chrome-extension://{sw.url.split('/')[2]}/ferramentas.html"); cfg_pg.wait_for_timeout(500)
+        assert cfg_pg.locator("fieldset").count() == 3
+        assert cfg_pg.input_value("input[data-t=texto][data-k=fontSize]") == "12pt"          # mostra o que foi aprendido
+        cfg_pg.fill("input[data-t=citacao][data-k=fontSize]", "13px"); cfg_pg.click("#salvar"); cfg_pg.wait_for_timeout(300)
+        assert sw.evaluate("chrome.storage.sync.get('formatacao')")["formatacao"]["citacao"]["fontSize"] == "13px"
+        cfg_pg.close()
+
         # 5) fora de editor e em campos de texto a extensão não interfere
         pg.evaluate("document.body.insertAdjacentHTML('beforeend', '<input id=\"campo\"><textarea id=\"area\"></textarea>')")
         pg.fill("#campo", "abc")

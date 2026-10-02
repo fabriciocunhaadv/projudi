@@ -1,0 +1,6 @@
+Bibliotecas de terceiros empacotadas (a extensão não carrega código da internet):
+  pdf-lib 1.17.1 (MIT)            - gerar/alterar PDF
+  pdfjs-dist 4.10.38 (Apache-2.0) - ler PDF e desenhar páginas
+  tesseract.js 7.0.0 + tesseract.js-core 7.0.0 (Apache-2.0) - OCR (motor)
+  por.traineddata.gz (tessdata best_int, Apache-2.0) - dados de português
+As licenças estão em vendor/licencas/.
