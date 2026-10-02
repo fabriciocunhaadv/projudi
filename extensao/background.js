@@ -46,7 +46,9 @@ async function lerProcessos(s, tipo) {
       : await baixar(alvo + (alvo.includes("?") ? "&" : "?") + dados);
     r = await ler("processos", html);
   }
-  if (!r.processos.length) await guardarDebug(`${s.serventia} :: ${tipo}`, url, html);
+  const { debug = {} } = await chrome.storage.local.get("debug");
+  if (!r.processos.length) await guardarDebug(`${s.serventia} :: ${tipo} (SEM PROCESSOS LIDOS)`, url, html);
+  else if (!debug["amostra " + tipo]) await guardarDebug("amostra " + tipo, url, html);
   return r.processos;
 }
 
@@ -75,6 +77,7 @@ async function verificar() {
         await baixar(url); // escolhe a serventia na sessão (devolve só a moldura da página)
         const html = await baixar(INICIO);
         const r = await ler("conclusoes", html);
+        if ((await chrome.storage.local.get("debug")).debug?.["amostra inicio"] === undefined) await guardarDebug("amostra inicio", INICIO, html);
         if (!r.linhas) { guardarDebug(s.serventia + " :: tela inicial", INICIO, html); s.erro = "tabela de conclusões não encontrada"; }
         else {
           s.linhas = r.linhas;

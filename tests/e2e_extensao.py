@@ -12,8 +12,10 @@ MOLDURA = '<html><body data-usuario-id="1"><iframe name="userMainFrame" src="Usu
 INICIO = """<html><body><table><tr><th>Tipo Conclusão</th><th>Não analisadas</th><th>Pré-analisadas</th></tr>
 <tr><td>Concluso - Sentença</td><td>1</td><td>0</td></tr><tr><td>Concluso - Despacho</td><td>1</td><td>2</td></tr></table></body></html>"""
 PENDENTES = """<html><body><table><tr><th>Processo</th><th>Data Início</th></tr>
-<tr><td colspan="2">Concluso - Sentença</td></tr><tr><td colspan="2">Sem classificador - (Prioridade: 0)</td></tr>
-<tr><td>1111111.11</td><td>01/10/2026 08:00:00</td></tr></table></body></html>"""
+<tr><td colspan="2">Concluso - Sentença</td></tr><tr><td colspan="2">AGUARDANDO DECURSO DE PRAZO</td></tr>
+<tr><td>1111111.11</td><td>01/10/2026 08:00:00</td></tr>
+<tr><td colspan="2">Manu minutando - (Prioridade: 0)</td></tr>
+<tr><td>2222222.22</td><td>02/10/2026 08:00:00</td></tr></table></body></html>"""
 FORM = '<html><body><form method="post" action="PreAnalisarConclusao"><input name="PaginaAtual" value="6"><input name="tipo" value="todas"><input type="submit" name="b" value="Consultar"></form></body></html>'
 PRE = """<html><body><form method="post" action="PreAnalisarConclusao"><input type="submit" value="Consultar"></form><table>
 <tr><th>Processo</th><th>Data Início</th><th>Data Pré-Análise</th><th>Usuário Pré-Análise</th><th>Tipo de Movimento</th></tr>
@@ -65,7 +67,8 @@ def main():
         s = estado["serventias"][0]
         assert estado["status"] == "ok" and len(estado["serventias"]) == 1 and not s["erro"]
         assert [l["naoAnalisadas"] for l in s["linhas"]] == [1, 1]
-        assert [p["processo"] for p in s["processos"]["naoAnalisadas"]] == ["1111111.11"]
+        na = s["processos"]["naoAnalisadas"]
+        assert [(p["processo"], p["classificador"]) for p in na] == [("1111111.11", "AGUARDANDO DECURSO DE PRAZO"), ("2222222.22", "Manu minutando")], na
         pre = s["processos"]["preAnalisadas"]
         assert [(p["processo"], p["classificador"]) for p in pre] == [
             ("5879667.38", "AGUARDANDO PUBLICAÇÃO DE EXTRATO"), ("5410623.26", "Emilly - minutando"),
@@ -75,6 +78,14 @@ def main():
         pg = ctx.new_page(); pg.goto(f"chrome-extension://{ext_id}/popup.html"); pg.wait_for_timeout(500)
         txt = pg.inner_text("body"); print(txt[:900])
         assert "Emilly - minutando" in txt and "5410623.26" in txt
+        pn = ctx.new_page(); pn.goto(f"chrome-extension://{ext_id}/painel.html"); pn.wait_for_timeout(500); pn.click("#abrir"); pn.wait_for_timeout(300)
+        ptxt = pn.inner_text("body"); print(ptxt[:1500])
+        for esperado in ["Resumo por serventia", "Por classificador", "Manu minutando", "AGUARDANDO DECURSO DE PRAZO", "Emilly - minutando", "5560928.22"]:
+            assert esperado in ptxt, esperado
+        pn.fill("#busca", "emilly"); pn.wait_for_timeout(300)
+        assert "Manu minutando" not in pn.inner_text("details") and "5410623.26" in pn.inner_text("details")
+        dbg = sw.evaluate("chrome.storage.local.get('debug')")["debug"]
+        assert {"amostra inicio", "amostra naoAnalisadas", "amostra preAnalisadas"} <= set(dbg), list(dbg)
         ctx.close()
     print("OK")
 

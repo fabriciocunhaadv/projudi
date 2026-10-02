@@ -1,0 +1,25 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Conclusões Projudi — Painel</title>
+<style>
+  body { font: 14px system-ui, sans-serif; margin: 0; padding: 16px 24px; color: #222; }
+  header { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
+  h1 { font-size: 18px; margin: 0 12px 0 0; } h2 { font-size: 15px; margin: 18px 0 6px; }
+  input[type=search] { padding: 5px 8px; width: 260px; } button { padding: 5px 10px; cursor: pointer; }
+  table { border-collapse: collapse; margin: 4px 0 8px; } th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; vertical-align: top; }
+  th { background: #f0f3f8; } td.n { text-align: center; min-width: 60px; } .zero { color: #999; } .alerta { color: #b00020; font-weight: 700; }
+  details { margin: 3px 0 3px 12px; } summary { cursor: pointer; font-weight: 600; } summary .qtd { color: #666; font-weight: 400; }
+  .cls { color: #1a56a0; } small { color: #555; } .msg { padding: 8px; background: #fff3cd; } .erro { color: #b00020; }
+  .tag { display: inline-block; font-size: 11px; padding: 0 6px; border-radius: 8px; background: #e8eef8; margin-left: 6px; }
+  @media (prefers-color-scheme: dark) { body { background: #1c1d21; color: #e6e6e6; } th { background: #2a2d36; } td, th { border-color: #444; } .cls { color: #8ab4f8; } .tag { background: #2a3550; } small { color: #aaa; } }
+</style>
+<header>
+  <h1>Conclusões Projudi</h1>
+  <button id="atualizar">Verificar agora</button>
+  <input type="search" id="busca" placeholder="Filtrar por processo, classificador, usuário…">
+  <button id="csv">Exportar CSV</button>
+  <button id="abrir">Expandir tudo</button>
+  <span id="quando"></span>
+</header>
+<div id="conteudo"></div>
+<script src="painel.js"></script>

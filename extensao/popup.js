@@ -55,6 +55,7 @@ function desenhar(estado) {
     await navigator.clipboard.writeText(txt);
     $("diagnostico").textContent = "Copiado! Cole no chat";
   };
+  $("painel").onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("painel.html") });
   $("atualizar").onclick = async () => { await salvar(); chrome.runtime.sendMessage({ acao: "verificar" }); };
   desenhar((await chrome.storage.local.get("estado")).estado);
   chrome.storage.onChanged.addListener((c, area) => area === "local" && c.estado && desenhar(c.estado.newValue));
