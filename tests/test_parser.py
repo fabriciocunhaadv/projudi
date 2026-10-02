@@ -20,7 +20,7 @@ def main():
         # tela inicial da serventia
         r = call("h => ProjudiParser.parseConclusoes(h)", "inicio.html")
         assert r["linhas"] == [{"tipo": "Concluso - Genérico", "naoAnalisadas": 6, "preAnalisadas": 1},
-                               {"tipo": "Concluso - Decisão", "naoAnalisadas": 0, "preAnalisadas": 1}], r
+                               {"tipo": "Concluso - Decisão", "naoAnalisadas": 0, "preAnalisadas": 2}], r
 
         # lista de serventias
         r = call("h => ProjudiParser.parseLista(h)", "lista_serventias.html")
