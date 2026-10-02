@@ -2,8 +2,8 @@
 chrome.runtime.onMessage.addListener((msg, _sender, responder) => {
   if (msg?.alvo !== "offscreen") return;
   try {
-    responder(msg.tipo === "lista" ? ProjudiParser.parseLista(msg.html)
-                                   : ProjudiParser.parseConclusoes(msg.html));
+    const f = { lista: "parseLista", conclusoes: "parseConclusoes", processos: "parseProcessos" }[msg.tipo];
+    responder(ProjudiParser[f](msg.html));
   } catch (e) {
     responder({ erro: String(e) });
   }

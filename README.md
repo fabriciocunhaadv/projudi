@@ -44,6 +44,7 @@ Faz o mesmo, mas dentro do seu Chrome já logado: sem Python e sem login do rob�
 - Confere sozinha a cada X minutos (10 min a 3 h) enquanto o Chrome estiver aberto e você logado.
 - Ícone com o número de conclusões **não analisadas** no total.
 - Notificação do Windows quando chegar conclusão nova.
+- Lista de **processos** não analisados e pré-analisados, agrupados por **classificador** (ex.: "Emilly - minutando"), com data e usuário da pré-análise.
 - Popup com a tabela por serventia (com link para abrir cada uma) e botão "Verificar agora".
 - Filtro de serventias e intervalo configuráveis no próprio popup.
 
@@ -54,4 +55,8 @@ Faz o mesmo, mas dentro do seu Chrome já logado: sem Python e sem login do rob�
 
 Se a sessão do Projudi expirar, o ícone mostra `!` e o popup avisa para entrar de novo.
 
-Limitações: não envia e-mail (usa notificação e ícone); só confere com o Chrome aberto.
+Botão **Copiar diagnóstico**: se alguma lista vier vazia ou der erro, clique nele e cole o resultado no chat; ele leva o HTML da tela que a extensão não conseguiu ler.
+
+Teste ponta a ponta (servidor falso): `python tests/e2e_extensao.py`
+
+Limitações: lê só "Pendentes" e "Pré-Análises > Simples" (não as Múltiplas/Finalizadas); não envia e-mail (usa notificação e ícone); só confere com o Chrome aberto.
