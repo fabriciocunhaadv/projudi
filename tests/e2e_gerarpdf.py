@@ -88,7 +88,6 @@ def main():
           const f = await d.embedFont(StandardFonts.HelveticaBold);
           for (const p of d.getPages()) { const { width, height } = p.getSize();
             p.drawText('Processo: 5293296-60.2026.8.09.0166 Movimentacao 1 : Peticao Enviada Arquivo 1: acao.pdf - Pag.1/1', { x: 20, y: height - 14, size: 8, font: f, color: rgb(1, 0, 0) });
-            p.drawText('Assinado digitalmente codigo 12345', { x: 60, y: 20, size: 8, font: f });
             p.drawText('Usuario: FULANO 02/10/2026 17:36 PROJUDI', { x: width - 12, y: height - 60, size: 8, font: f, color: rgb(1, 0, 0), rotate: degrees(-90) }); }
           const b = await d.save(); let s = ''; for (const x of b) s += String.fromCharCode(x); return btoa(s); }""", base64.b64encode((tmp / "scan.pdf").read_bytes()).decode())
         (tmp / "scan.pdf").write_bytes(base64.b64decode(b64))

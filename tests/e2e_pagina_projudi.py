@@ -25,7 +25,8 @@ def main():
         (tmp / "o.pdf").write_bytes(base64.b64decode(b64)); ctx.close()
     txt = " ".join(subprocess.run(["pdftotext", str(tmp / "o.pdf"), "-"], capture_output=True, text=True).stdout.lower().split())
 
-    assert "taynara" in txt and "joao batista de oliveira" in txt and "território nacional" in txt, "o texto da identidade não foi reconhecido"
+
+    assert "taynara" in txt and "luis de montes belos" in txt and "nascimento" in txt, "o texto da identidade não foi reconhecido"
     print("OK")
 
 
