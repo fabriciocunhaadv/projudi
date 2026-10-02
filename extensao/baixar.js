@@ -314,6 +314,18 @@ async function executar(sel, op) {
   }
 }
 
+// PDF completo gerado pelo próprio Projudi: a janela "Gerar PDF" recebe a seleção e a extensão captura o download.
+async function pedirProjudi(sel) {
+  const total = job.movimentos.reduce((s, m) => s + m.arquivos.length, 0);
+  const idxEm = new Map(job.movimentos.flatMap((m) => m.arquivos.map((a, i) => [a.ordem, i])));
+  const pedido = sel.length === total ? { todos: true } : { arquivos: sel.map((f) => ({ mov: f.mov, idx: idxEm.get(f.ordem), nome: f.nome })) };
+  const r = await chrome.runtime.sendMessage({ acao: "gerar-pdf-projudi", tabId: job.tabId, pedido });
+  $("status").innerHTML = r.erro ? `<span class="erro">${esc(r.erro)}</span>`
+    : r.abriu ? "Abri a janela “Gerar PDF” do Projudi. Ela marca os arquivos e gera sozinha; o PDF será baixado automaticamente."
+    : "Na aba do Projudi, clique em <b>Gerar PDF de processo completo</b>: a janela que abrir já virá com a sua seleção e gera sozinha.";
+  document.body.dataset.pedido = JSON.stringify(pedido);
+}
+
 // ---------- tela de seleção ----------
 function desenharArvore() {
   const movs = job.movimentos.filter((m) => m.arquivos.length);
@@ -347,6 +359,8 @@ function atualizarContagem() {
   $("baixar").onclick = () => {
     const ordens = new Set(marcados()), arquivos = [];
     for (const m of job.movimentos) for (const a of m.arquivos) if (ordens.has(a.ordem)) arquivos.push({ ...a, mov: m.n, movTitulo: m.titulo });
+    const modo = document.querySelector("input[name=modo]:checked").value;
+    if (modo === "projudi") return pedirProjudi(arquivos);
     executar(arquivos, { unico: document.querySelector("input[name=modo]:checked").value === "unico", ocr: $("ocr").checked });
   };
   $("diag").onclick = async () => {

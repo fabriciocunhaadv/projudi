@@ -105,6 +105,7 @@ def main():
         assert bx.locator("#arvore input[data-o]:checked").count() == 6
 
         # --- PDF único com OCR ---
+        bx.check("input[name=modo][value=unico]")
         bx.click("#baixar")
         bx.wait_for_selector("body[data-pronto='1'], body[data-erro]", timeout=300000)
         print(bx.inner_text("#andamento")); print(bx.inner_text("#log")); print(bx.inner_text("#status"))

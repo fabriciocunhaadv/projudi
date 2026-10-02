@@ -105,4 +105,10 @@ arquivos de cada uma, com caixas de seleção e **Marcar todos**. Opções:
 - **OCR** nas páginas sem texto (ligado por padrão).
 Aceita PDF, documentos HTML do sistema (como `online.html`, convertidos em texto), imagens (JPG, PNG, GIF, BMP, WEBP) e páginas "moldura" que só embutem o arquivo.
 Áudio, vídeo e outros tipos não entram no PDF e aparecem no índice como "não incluído". O botão **Copiar diagnóstico** leva a estrutura lida e o HTML do sumário.
-Teste: `python tests/e2e_baixar.py`.
+**Modo padrão — PDF completo do Projudi:** ao baixar, a extensão abre a janela "Gerar PDF" do próprio Projudi (ou, se não achar o botão, basta você
+clicar em *Gerar PDF de processo completo*), marca só os arquivos que você selecionou (ou "Todos os Arquivos") e aperta *Gerar*. O PDF que o Projudi
+devolve (cabeçalho por movimentação/arquivo, já pesquisável) é baixado normalmente; o OCR automático só atua se sobrar página sem texto.
+Os modos "PDF único com índice próprio" e "um PDF por arquivo" continuam disponíveis.
+Na janela "Gerar PDF" também há o botão **Gerar e baixar tudo (extensão)** e **Copiar diagnóstico** (para ajustar se o Projudi mudar a tela).
+
+Testes: `python tests/e2e_baixar.py`, `python tests/e2e_gerarpdf.py`.

@@ -42,7 +42,8 @@
         "formatacao-core.js",
         "formatador.js",
         "arquivos-core.js",
-        "baixador.js"
+        "baixador.js",
+        "gerarpdf.js"
       ],
       "all_frames": true,
       "match_about_blank": true,

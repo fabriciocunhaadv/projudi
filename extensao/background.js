@@ -197,10 +197,27 @@ async function capturarEAbrir(tabId) {
 }
 chrome.commands.onCommand.addListener((c) => c === "capturar-tela" && capturarEAbrir().catch(console.error));
 
-chrome.runtime.onMessage.addListener((m, _s, responder) => {
+// Pede ao Projudi (aba "Navegação de Arquivos") para abrir a janela "Gerar PDF"; lá o gerarpdf.js marca os arquivos e gera.
+async function abrirGerarPdf(tabId) {
+  if (!tabId) return false;
+  const r = await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, func: () => {
+    const alvo = [...document.querySelectorAll("a,button,input[type=button],input[type=submit],img[onclick],span[onclick],div[onclick]")]
+      .find((e) => /gerar\s*pdf/i.test((e.value || e.textContent || e.title || e.alt || "") + " " + (e.getAttribute("onclick") || "")));
+    if (!alvo) return false; alvo.click(); return true;
+  } });
+  return r.some((x) => x.result);
+}
+
+chrome.runtime.onMessage.addListener((m, s, responder) => {
+  if (m?.acao === "gerar-pdf-projudi") { // pedido da página de seleção
+    chrome.storage.local.set({ gerarpdf_pedido: { ...m.pedido, ts: Date.now() } })
+      .then(() => abrirGerarPdf(m.tabId).catch(() => false))
+      .then((abriu) => responder({ ok: true, abriu }), (e) => responder({ erro: String(e.message || e) }));
+    return true;
+  }
   if (m?.acao === "baixar-arquivos") { // vindo do botão na "Navegação de Arquivos": abre a página de seleção
     const id = String(Date.now());
-    chrome.storage.local.set({ ["baixar_" + id]: m.job })
+    chrome.storage.local.set({ ["baixar_" + id]: { ...m.job, tabId: s.tab?.id } })
       .then(() => chrome.tabs.create({ url: chrome.runtime.getURL("baixar.html?job=" + id) }))
       .then(() => responder({ ok: true }), (e) => responder({ erro: String(e.message || e) }));
     return true;
