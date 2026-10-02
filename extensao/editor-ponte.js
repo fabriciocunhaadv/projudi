@@ -45,7 +45,11 @@
         const pega = (k) => (typeof s[k] === "string" || typeof s[k] === "boolean" || typeof s[k] === "number" ? s[k] : s[k] ? JSON.stringify(s[k]).slice(0, 400) : undefined);
         return responder({ ok: true, tipo, versao: (a.w.tinymce || a.w.CKEDITOR || {}).majorVersion || (a.w.CKEDITOR || {}).version, id: ed.id || ed.name,
           config: Object.fromEntries(["valid_styles", "valid_elements", "extended_valid_elements", "invalid_styles", "plugins", "toolbar", "content_style", "paste_as_text", "allowedContent", "extraAllowedContent", "forcePasteAsPlainText", "removeFormatAttributes"].map((k) => [k, pega(k)]).filter(([, v]) => v !== undefined)),
-          sobrevive: sobrevive(ed, tipo), conteudoAtual: String(ed.getContent ? ed.getContent() : ed.getData()).slice(0, 1500) });
+          sobrevive: sobrevive(ed, tipo), textareaAntes: (() => { try { const t = (ed.element && ed.element.$) || ed.getElement(); return String(t.value).replace(/data:[^"\s]{20,}/g, "data:…").slice(0, 700); } catch (e) { return "?"; } })(), conteudoAtual: String(ed.getContent ? ed.getContent() : ed.getData()).replace(/data:[^"\s]{20,}/g, "data:…").slice(0, 1500) });
+      }
+      if (d.acao === "sincronizar") { // o formulário do Projudi lê o <textarea>, que o CKEditor só atualiza em certos momentos
+        if (tipo === "tinymce") ed.save && ed.save(); else ed.updateElement && ed.updateElement();
+        return responder({ ok: true });
       }
       if (d.acao === "inserir") {
         if (tipo === "tinymce") {

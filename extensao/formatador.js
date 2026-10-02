@@ -34,6 +34,7 @@
     const paragrafoVazio = !atual || !atual.textContent.replace(/ /g, " ").trim();
     if (blocos.length === 1 && !paragrafoVazio) document.execCommand("insertHTML", false, blocos[0].html); // trecho no meio de um parágrafo
     else document.execCommand("insertHTML", false, F.montarHtml(blocos, cfg));
+    setTimeout(() => ponte({ acao: "sincronizar" }), 50);
   }
 
   // ---------- ponte com a API do editor (TinyMCE/CKEditor), que roda no mundo da página ----------
@@ -83,6 +84,7 @@
     const html = comSpans(novo);
     const p = ponte({ acao: "inserir", html });      // pela API do editor: passa pelos filtros e pela gravação dele
     if (!p || !p.ok) document.execCommand("insertHTML", false, html);
+    ponte({ acao: "sincronizar" });                   // atualiza o campo que o Projudi lê ao visualizar/salvar
     return 1;
   }
 
