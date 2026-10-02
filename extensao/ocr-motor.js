@@ -24,30 +24,35 @@ export async function textoDaPagina(page) {
   }, 0);
 }
 
-// Fração da página coberta pela maior imagem (acompanha a matriz de transformação do desenho).
-export async function coberturaDeImagem(page) {
+// Retângulos (no espaço do PDF) das imagens desenhadas na página, com a fração da página que cada uma cobre.
+export async function imagensDaPagina(page) {
   const { OPS } = pdfjs, ol = await page.getOperatorList();
   const [x0, y0, x1, y1] = page.view, area = (x1 - x0) * (y1 - y0) || 1;
   const mul = (m, n) => [m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1], m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3], m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5]];
-  let m = [1, 0, 0, 1, 0, 0], pilha = [], maior = 0;
+  let m = [1, 0, 0, 1, 0, 0]; const pilha = [], out = [];
   ol.fnArray.forEach((fn, i) => {
     if (fn === OPS.save) pilha.push(m);
     else if (fn === OPS.restore) m = pilha.pop() || m;
     else if (fn === OPS.transform) m = mul(m, ol.argsArray[i]);
-    else if (fn === OPS.paintImageXObject || fn === OPS.paintInlineImageXObject || fn === OPS.paintJpegXObject || fn === OPS.paintImageMaskXObject)
-      maior = Math.max(maior, Math.abs(m[0] * m[3] - m[1] * m[2]) / area);
+    else if (fn === OPS.paintImageXObject || fn === OPS.paintInlineImageXObject || fn === OPS.paintJpegXObject || fn === OPS.paintImageMaskXObject) {
+      const xs = [m[4], m[4] + m[0], m[4] + m[2], m[4] + m[0] + m[2]], ys = [m[5], m[5] + m[1], m[5] + m[3], m[5] + m[1] + m[3]];
+      const r = { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+      out.push({ ...r, fracao: Math.abs(m[0] * m[3] - m[1] * m[2]) / area });
+    }
   });
-  return maior;
+  return out;
 }
 
-// A página precisa de OCR se não tem texto de conteúdo, ou se é uma imagem de página inteira com pouquíssimo texto
-// (só o carimbo/cabeçalho que o Projudi coloca por cima do escaneado).
+// A página precisa de OCR se: (a) não tem texto de conteúdo; ou (b) tem uma imagem grande (foto/escaneado) SEM texto em cima dela.
+// O Projudi, ao juntar o processo, joga fora o texto dos documentos e carimba cabeçalho, tarja e rodapé (selo digital) ao redor da imagem:
+// esse texto fica FORA da imagem, então o que vale é o texto que cai dentro da área da imagem.
 export async function precisaOcr(page) {
-  const corpo = await textoDaPagina(page);
-  if (corpo < MIN_CHARS) return true;
+  if ((await textoDaPagina(page)) < MIN_CHARS) return true;
+  const grandes = (await imagensDaPagina(page)).filter((r) => r.fracao >= 0.3);
+  if (!grandes.length) return false;
   const tc = await page.getTextContent();
-  const total = tc.items.reduce((n, it) => n + (it.str || "").trim().length, 0);
-  return total <= 400 && (await coberturaDeImagem(page)) >= 0.5;
+  const itens = tc.items.filter((it) => (it.str || "").trim());
+  return grandes.some((r) => itens.reduce((n, it) => (it.transform[4] >= r.x0 && it.transform[4] <= r.x1 && it.transform[5] >= r.y0 && it.transform[5] <= r.y1 ? n + it.str.trim().length : n), 0) < MIN_CHARS);
 }
 
 async function criarWorkers(n) {
@@ -78,6 +83,27 @@ function palavrasDe(data) {
       for (const linha of par.lines || [])
         for (const w of linha.words || []) if (w.text && w.text.trim() && w.bbox) out.push(w);
   return out;
+}
+
+// Fotos de documentos (fundo colorido, sombra, iluminação irregular) confundem o reconhecimento: tons de cinza + limiar local
+// (cada pixel é comparado com a média da vizinhança, via imagem integral) deixam só o texto escuro sobre fundo branco.
+export function melhorarParaOcr(ctx, w, h) {
+  const img = ctx.getImageData(0, 0, w, h), d = img.data, n = w * h, g = new Uint8Array(n);
+  for (let i = 0, j = 0; i < n; i++, j += 4) g[i] = (d[j] * 299 + d[j + 1] * 587 + d[j + 2] * 114) / 1000;
+  const integral = new Float64Array((w + 1) * (h + 1));
+  for (let y = 0; y < h; y++) { let linha = 0; for (let x = 0; x < w; x++) { linha += g[y * w + x]; integral[(y + 1) * (w + 1) + x + 1] = integral[y * (w + 1) + x + 1] + linha; } }
+  const r = Math.max(12, Math.round(Math.min(w, h) / 40));
+  for (let y = 0; y < h; y++) {
+    const ya = Math.max(0, y - r), yb = Math.min(h, y + r + 1);
+    for (let x = 0; x < w; x++) {
+      const xa = Math.max(0, x - r), xb = Math.min(w, x + r + 1);
+      const soma = integral[yb * (w + 1) + xb] - integral[ya * (w + 1) + xb] - integral[yb * (w + 1) + xa] + integral[ya * (w + 1) + xa];
+      const media = soma / ((xb - xa) * (yb - ya)), v = g[y * w + x];
+      const preto = v < media * 0.88 ? 0 : 255;       // bem mais escuro que a vizinhança = tinta
+      const j = (y * w + x) * 4; d[j] = d[j + 1] = d[j + 2] = preto; d[j + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
 }
 
 // ganchos: { log(t), status(t), progresso(feitas, total), cancelado() }
@@ -117,6 +143,7 @@ export async function fazerOcr(bytes, opcoes, ganchos = {}) {
         const ctx = canvas.getContext("2d", { willReadFrequently: true });
         ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
         await page.render({ canvasContext: ctx, canvas, viewport }).promise;
+        melhorarParaOcr(ctx, canvas.width, canvas.height);
         const { data } = await w.recognize(canvas, {}, { blocks: true });
         resultados.set(i, { palavras: palavrasDe(data), viewport });
         canvas.width = canvas.height = 0; page.cleanup();
