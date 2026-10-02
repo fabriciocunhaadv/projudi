@@ -96,3 +96,13 @@ No painel há ainda a coluna *Dias* e a opção "Fila única (ordem de trabalho)
 Quando um PDF de `tjgo.jus.br` termina de baixar, a extensão faz o OCR sozinha (aba em segundo plano) e salva `nome-OCR.pdf` em Downloads;
 o original é mantido. Liga/desliga em *Ferramentas*. Para ler o arquivo recém-baixado, ligue "Permitir acesso a URLs de arquivo" nos detalhes da
 extensão; sem isso ela baixa o PDF de novo pelo mesmo endereço. Teste: `python tests/e2e_ocr_auto.py`.
+
+## Baixar arquivos do processo (seleção por movimentação)
+Na aba **Navegação de Arquivos** de um processo aparece o botão **⬇ Baixar arquivos do processo (N)**. Ele abre uma página com as movimentações e os
+arquivos de cada uma, com caixas de seleção e **Marcar todos**. Opções:
+- **Um PDF único**: reúne os arquivos na ordem das movimentações, com **índice** (nome do arquivo e página) e **marcadores** por movimentação/arquivo;
+- **Um PDF para cada arquivo** (salvos numa pasta "Processo <número>" em Downloads);
+- **OCR** nas páginas sem texto (ligado por padrão).
+Aceita PDF, documentos HTML do sistema (como `online.html`, convertidos em texto), imagens (JPG, PNG, GIF, BMP, WEBP) e páginas "moldura" que só embutem o arquivo.
+Áudio, vídeo e outros tipos não entram no PDF e aparecem no índice como "não incluído". O botão **Copiar diagnóstico** leva a estrutura lida e o HTML do sumário.
+Teste: `python tests/e2e_baixar.py`.

@@ -40,7 +40,9 @@
       ],
       "js": [
         "formatacao-core.js",
-        "formatador.js"
+        "formatador.js",
+        "arquivos-core.js",
+        "baixador.js"
       ],
       "all_frames": true,
       "match_about_blank": true,

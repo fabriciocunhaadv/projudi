@@ -198,6 +198,13 @@ async function capturarEAbrir(tabId) {
 chrome.commands.onCommand.addListener((c) => c === "capturar-tela" && capturarEAbrir().catch(console.error));
 
 chrome.runtime.onMessage.addListener((m, _s, responder) => {
+  if (m?.acao === "baixar-arquivos") { // vindo do botão na "Navegação de Arquivos": abre a página de seleção
+    const id = String(Date.now());
+    chrome.storage.local.set({ ["baixar_" + id]: m.job })
+      .then(() => chrome.tabs.create({ url: chrome.runtime.getURL("baixar.html?job=" + id) }))
+      .then(() => responder({ ok: true }), (e) => responder({ erro: String(e.message || e) }));
+    return true;
+  }
   if (m?.acao === "verificar") verificar();
   if (m?.acao === "capturar") { capturarAba(m.tabId).then(responder, (e) => responder({ erro: String(e.message || e) })); return true; }
 });
