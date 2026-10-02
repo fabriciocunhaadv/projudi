@@ -45,26 +45,34 @@ function desenhar() {
     h += "</table>";
   }
 
-  // 3) Detalhe: serventia > situação > classificador > processos
+  // 3) Detalhe
+  const cmp = Ordenar.comparador($("modo").value), fila = $("visao").value === "fila";
+  const linha = (p, comCls) => `<tr><td class="n">${p.prioridade ?? ""}</td><td><b>${esc(p.processo)}</b>${(p.marcadores || []).map((m) => `<span class="tag">${esc(m)}</span>`).join("")}</td>` +
+    (comCls ? `<td class="cls">${esc(p.classificador)}</td><td>${esc(p.situacao)}</td>` : "") +
+    `<td>${esc(p.dataInicio)}</td><td>${esc(p.dataPreAnalise)}</td><td>${esc(p.tipoConclusao)}</td><td>${esc(p.usuarioPreAnalise)}</td><td>${esc(p.tipoMovimento)}</td></tr>`;
+  const cabecalho = (comCls) => `<table><tr><th>Prior.</th><th>Processo</th>${comCls ? "<th>Classificador</th><th>Situação</th>" : ""}<th>Início (data e hora)</th><th>Pré-análise</th><th>Conclusão</th><th>Usuário</th><th>Movimento</th></tr>`;
   h += "<h2>Processos</h2>";
   let achou = false;
   for (const s of estado.serventias) {
-    const procs = todos(s).filter((p) => casa(p, q));
+    const procs = todos(s).filter((p) => casa(p, q)).sort(cmp);
     if (!procs.length) continue;
     achou = true;
-    h += `<details ${aberto || q ? "open" : ""}><summary>${esc(s.serventia)} <span class="qtd">— ${procs.length} processo(s)</span></summary>`;
-    for (const sit of Object.values(ROTULO)) {
-      const dessa = procs.filter((p) => p.situacao === sit);
-      if (!dessa.length) continue;
-      h += `<details open><summary>${sit} <span class="qtd">(${dessa.length})</span></summary>`;
-      const grupos = new Map();
-      dessa.forEach((p) => { const k = p.classificador || "(sem classificador)"; (grupos.get(k) || grupos.set(k, []).get(k)).push(p); });
-      for (const [cls, ps] of grupos) {
-        h += `<details open><summary class="cls">${esc(cls)} <span class="qtd">(${ps.length})</span></summary><table><tr><th>Processo</th><th>Conclusão</th><th>Início</th><th>Pré-análise</th><th>Usuário</th><th>Movimento</th></tr>`;
-        ps.forEach((p) => (h += `<tr><td><b>${esc(p.processo)}</b></td><td>${esc(p.tipoConclusao)}</td><td>${esc(p.dataInicio)}</td><td>${esc(p.dataPreAnalise)}</td><td>${esc(p.usuarioPreAnalise)}</td><td>${esc(p.tipoMovimento)}</td></tr>`));
-        h += "</table></details>";
+    h += `<details ${aberto || q || fila ? "open" : ""}><summary>${esc(s.serventia)} <span class="qtd">— ${procs.length} processo(s)</span></summary>`;
+    if (fila) {
+      h += cabecalho(true) + procs.map((p) => linha(p, true)).join("") + "</table>";
+    } else {
+      for (const sit of Object.values(ROTULO)) {
+        const dessa = procs.filter((p) => p.situacao === sit);
+        if (!dessa.length) continue;
+        h += `<details open><summary>${sit} <span class="qtd">(${dessa.length})</span></summary>`;
+        const grupos = new Map();
+        dessa.forEach((p) => { const k = p.classificador || "(sem classificador)"; (grupos.get(k) || grupos.set(k, []).get(k)).push(p); });
+        for (const [cls, ps] of [...grupos].sort((a, b) => cmp(a[1][0], b[1][0]))) {
+          h += `<details open><summary class="cls">${esc(cls)} <span class="qtd">(${ps.length}${ps[0].prioridade != null ? `, prioridade ${ps[0].prioridade}` : ""})</span></summary>` +
+            cabecalho(false) + ps.map((p) => linha(p, false)).join("") + "</table></details>";
+        }
+        h += "</details>";
       }
-      h += "</details>";
     }
     h += "</details>";
   }
@@ -73,10 +81,10 @@ function desenhar() {
 }
 
 function csv() {
-  const cab = ["Serventia", "Perfil", "Situação", "Classificador", "Processo", "Conclusão", "Início", "Pré-análise", "Usuário", "Movimento"];
+  const cab = ["Serventia", "Perfil", "Situação", "Classificador", "Prioridade", "Processo", "Conclusão", "Início (data e hora)", "Pré-análise", "Usuário", "Movimento"];
   const lin = [cab];
-  estado?.serventias?.forEach((s) => todos(s).forEach((p) =>
-    lin.push([s.serventia, s.perfil, p.situacao, p.classificador, p.processo, p.tipoConclusao, p.dataInicio, p.dataPreAnalise, p.usuarioPreAnalise, p.tipoMovimento])));
+  estado?.serventias?.forEach((s) => todos(s).sort(Ordenar.comparador($("modo").value)).forEach((p) =>
+    lin.push([s.serventia, s.perfil, p.situacao, p.classificador, p.prioridade, p.processo, p.tipoConclusao, p.dataInicio, p.dataPreAnalise, p.usuarioPreAnalise, p.tipoMovimento])));
   const txt = "﻿" + lin.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(";")).join("\r\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([txt], { type: "text/csv;charset=utf-8" }));
@@ -87,6 +95,10 @@ function csv() {
 (async () => {
   estado = (await chrome.storage.local.get("estado")).estado;
   chrome.storage.onChanged.addListener((c, area) => { if (area === "local" && c.estado) { estado = c.estado.newValue; desenhar(); } });
+  const guardado = (k, d) => { try { return localStorage.getItem(k) || d; } catch { return d; } };
+  $("modo").innerHTML = Object.entries(Ordenar.MODOS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
+  $("modo").value = guardado("modo", "prio-maior"); $("visao").value = guardado("visao", "classificador");
+  for (const id of ["modo", "visao"]) $(id).onchange = () => { try { localStorage.setItem(id, $(id).value); } catch {} desenhar(); };
   $("busca").oninput = desenhar;
   $("csv").onclick = csv;
   $("abrir").onclick = () => { aberto = !aberto; $("abrir").textContent = aberto ? "Recolher tudo" : "Expandir tudo"; desenhar(); };

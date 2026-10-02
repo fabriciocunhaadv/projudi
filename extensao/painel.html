@@ -16,10 +16,13 @@
 <header>
   <h1>Conclusões Projudi</h1>
   <button id="atualizar">Verificar agora</button>
+  <select id="modo"></select>
+  <select id="visao"><option value="classificador">Por classificador</option><option value="fila">Fila única (ordem de trabalho)</option></select>
   <input type="search" id="busca" placeholder="Filtrar por processo, classificador, usuário…">
   <button id="csv">Exportar CSV</button>
   <button id="abrir">Expandir tudo</button>
   <span id="quando"></span>
 </header>
 <div id="conteudo"></div>
+<script src="ordenar.js"></script>
 <script src="painel.js"></script>

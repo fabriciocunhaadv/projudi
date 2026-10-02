@@ -5,12 +5,12 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 function listaProcessos(titulo, procs) {
   if (!procs?.length) return "";
   const grupos = new Map();
-  procs.forEach((p) => { const k = p.classificador || "(sem classificador)"; (grupos.get(k) || grupos.set(k, []).get(k)).push(p); });
+  [...procs].sort(Ordenar.comparador("prio-maior")).forEach((p) => { const k = p.classificador || "(sem classificador)"; (grupos.get(k) || grupos.set(k, []).get(k)).push(p); });
   let h = `<h3>${titulo} (${procs.length})</h3>`;
   for (const [cls, ps] of grupos) {
     h += `<div class="cls">${esc(cls)} <span class="zero">(${ps.length})</span></div><ul>`;
     for (const p of ps) {
-      const extra = [p.tipoConclusao, p.dataPreAnalise && "pré-análise " + p.dataPreAnalise, p.usuarioPreAnalise, p.tipoMovimento].filter(Boolean).join(" · ");
+      const extra = [p.dataInicio && "início " + p.dataInicio, p.prioridade != null && "prior. " + p.prioridade, p.tipoConclusao, p.dataPreAnalise && "pré-análise " + p.dataPreAnalise, p.usuarioPreAnalise, p.tipoMovimento].filter(Boolean).join(" · ");
       h += `<li><b>${esc(p.processo)}</b>${extra ? `<br><small>${esc(extra)}</small>` : ""}</li>`;
     }
     h += "</ul>";

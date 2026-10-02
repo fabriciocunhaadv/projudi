@@ -22,6 +22,8 @@ PRE = """<html><body><form method="post" action="PreAnalisarConclusao"><input ty
 <tr><td colspan="5">Concluso - Despacho</td></tr>
 <tr><td colspan="5">AGUARDANDO PUBLICAÇÃO DE EXTRATO - (Prioridade: 0)</td></tr>
 <tr><td>5879667.38</td><td>31/08/2026 18:08:57</td><td>01/10/2026 15:06:10</td><td>Fabricio Alves da Cunha</td><td>Decisão -> Impugnação</td></tr>
+<tr><td colspan="5">URGENTES - (Prioridade: 2)</td></tr>
+<tr><td><img title="Réu preso" src="x.png"> 9999999.99</td><td>15/09/2026 10:30:00</td><td>01/10/2026 09:00:00</td><td>Fabricio Alves da Cunha</td><td></td></tr>
 <tr><td colspan="5">Emilly - minutando - (Prioridade: 0)</td></tr>
 <tr><td>5410623.26</td><td>28/09/2026 17:59:54</td><td>01/10/2026 14:58:43</td><td>Emilly Martins de Souza</td><td></td></tr>
 <tr><td>5560928.22</td><td>29/09/2026 18:47:41</td><td>02/10/2026 14:15:47</td><td>Emilly Martins de Souza</td><td></td></tr></table></body></html>"""
@@ -72,10 +74,11 @@ def main():
         na = s["processos"]["naoAnalisadas"]
         assert [(p["processo"], p["classificador"]) for p in na] == [("1111111.11", "AGUARDANDO DECURSO DE PRAZO"), ("2222222.22", "Manu minutando")], na
         pre = s["processos"]["preAnalisadas"]
-        assert [(p["processo"], p["classificador"]) for p in pre] == [
-            ("5879667.38", "AGUARDANDO PUBLICAÇÃO DE EXTRATO"), ("5410623.26", "Emilly - minutando"),
-            ("5560928.22", "Emilly - minutando")], pre
-        assert pre[1]["usuarioPreAnalise"] == "Emilly Martins de Souza" and pre[1]["tipoConclusao"] == "Concluso - Despacho"
+        assert [(p["processo"], p["classificador"], p["prioridade"]) for p in pre] == [
+            ("5879667.38", "AGUARDANDO PUBLICAÇÃO DE EXTRATO", 0), ("9999999.99", "URGENTES", 2),
+            ("5410623.26", "Emilly - minutando", 0), ("5560928.22", "Emilly - minutando", 0)], pre
+        assert pre[1]["marcadores"] == ["Réu preso"] and pre[1]["dataInicio"] == "15/09/2026 10:30:00"
+        assert pre[2]["usuarioPreAnalise"] == "Emilly Martins de Souza" and pre[1]["tipoConclusao"] == "Concluso - Despacho"
         ext_id = sw.url.split("/")[2]
         pg = ctx.new_page(); pg.goto(f"chrome-extension://{ext_id}/popup.html"); pg.wait_for_timeout(500)
         txt = pg.inner_text("body"); print(txt[:900])
@@ -84,6 +87,17 @@ def main():
         ptxt = pn.inner_text("body"); print(ptxt[:1500])
         for esperado in ["Resumo por serventia", "Por classificador", "Manu minutando", "AGUARDANDO DECURSO DE PRAZO", "Emilly - minutando", "5560928.22"]:
             assert esperado in ptxt, esperado
+        # ordem de trabalho: fila única, prioridade maior primeiro e, dentro dela, o mais antigo primeiro
+        pn.select_option("#visao", "fila"); pn.wait_for_timeout(300)
+        fila = pn.inner_text("body")
+        ordem = [fila.index(n) for n in ["9999999.99", "5879667.38", "5410623.26", "5560928.22"]]
+        assert ordem == sorted(ordem), ordem
+        assert "15/09/2026 10:30:00" in fila and "Réu preso" in fila
+        pn.select_option("#modo", "data"); pn.wait_for_timeout(300)
+        fila = pn.inner_text("body")  # só data: 31/08, 15/09, 28/09, 29/09
+        ordem = [fila.index(n) for n in ["5879667.38", "9999999.99", "5410623.26", "5560928.22"]]
+        assert ordem == sorted(ordem), ordem
+        pn.select_option("#visao", "classificador"); pn.select_option("#modo", "prio-maior"); pn.wait_for_timeout(300)
         pn.fill("#busca", "emilly"); pn.wait_for_timeout(300)
         assert "Manu minutando" not in pn.inner_text("details") and "5410623.26" in pn.inner_text("details")
         dbg = sw.evaluate("chrome.storage.local.get('debug')")["debug"]

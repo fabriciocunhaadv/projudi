@@ -46,6 +46,7 @@ Faz o mesmo, mas dentro do seu Chrome já logado: sem Python e sem login do rob�
 - Notificação do Windows quando chegar conclusão nova.
 - Lista de **processos** não analisados e pré-analisados, agrupados por **classificador** (ex.: "Emilly - minutando"), com data e usuário da pré-análise.
 - **Painel completo** (botão "Abrir painel completo" no popup): resumo por serventia, totais por classificador em todas as serventias, e o detalhe serventia → situação → classificador → processos, com busca e exportação para CSV (Excel).
+- **Ordem de trabalho:** cada processo mostra data e hora de início e a prioridade do grupo. A lista sai ordenada por prioridade e, dentro dela, do mais antigo para o mais recente. No painel dá para trocar a regra (prioridade maior/menor primeiro, ou só a data) e escolher entre "Por classificador" e "Fila única". O CSV sai nessa mesma ordem.
 - Popup com a tabela por serventia (com link para abrir cada uma) e botão "Verificar agora".
 - Filtro de serventias e intervalo configuráveis no próprio popup.
 

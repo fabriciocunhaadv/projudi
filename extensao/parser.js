@@ -43,10 +43,11 @@
   function parseProcessos(html) {
     const d = doc(html);
     const processos = [];
-    let tipoConclusao = "", classificador = "", colunas = {}, viuCabecalho = false;
+    let tipoConclusao = "", classificador = "", prioridade = null, colunas = {}, viuCabecalho = false;
     d.querySelectorAll("tr").forEach((tr) => {
       if (tr.querySelector("table")) return;
-      const cel = [...tr.children].filter((c) => /^t[dh]$/i.test(c.tagName)).map((c) => norm(c.textContent));
+      const els = [...tr.children].filter((c) => /^t[dh]$/i.test(c.tagName));
+      const cel = els.map((c) => norm(c.textContent));
       const cheias = cel.filter(Boolean);
       if (!cheias.length) return;
       if (cel.some((c) => semAcento(c) === "processo")) { // linha de cabeçalho
@@ -57,13 +58,18 @@
       if (cheias.length === 1) { // faixa de título (só vale depois do cabeçalho da tabela)
         const t = cheias[0];
         if (/^concluso/i.test(t)) tipoConclusao = t;
-        else if (/\(\s*prioridade/i.test(t)) classificador = t.replace(/\s*-?\s*\(\s*prioridade.*$/i, "").trim();
-        else if (viuCabecalho && !/nenhum|n[aã]o (h[aá]|foram|existem)|total|p[aá]gina|^\d+$/i.test(t)) classificador = t;
+        else if (/\(\s*prioridade/i.test(t)) {
+          classificador = t.replace(/\s*-?\s*\(\s*prioridade.*$/i, "").trim();
+          const n = parseInt((t.match(/prioridade\s*:?\s*(\d+)/i) || [])[1], 10);
+          prioridade = Number.isNaN(n) ? null : n;
+        } else if (viuCabecalho && !/nenhum|n[aã]o (h[aá]|foram|existem)|total|p[aá]gina|^\d+$/i.test(t)) { classificador = t; prioridade = null; }
         return;
       }
       const i = cel.findIndex((c) => RE_PROC.test(c));
       if (i < 0) return;
-      const p = { processo: cel[i].match(RE_PROC)[0], classificador, tipoConclusao };
+      const marcadores = [...els[i].querySelectorAll("[title],img[alt]")]
+        .map((e) => norm(e.getAttribute("title") || e.getAttribute("alt"))).filter(Boolean);
+      const p = { processo: cel[i].match(RE_PROC)[0], classificador, prioridade, tipoConclusao, marcadores };
       Object.entries(colunas).forEach(([campo, idx]) => { p[campo] = cel[idx] || ""; });
       processos.push(p);
     });
