@@ -167,6 +167,17 @@ async function capturarAba(tabId) {
   return res.map((r) => r.result).filter(Boolean);
 }
 
+// Atalho Alt+Shift+C: captura a aba/janela em foco (inclusive janelas pop-up sem barra de extensões)
+// e abre uma página com o texto pronto para copiar.
+async function capturarEAbrir(tabId) {
+  if (!tabId) [{ id: tabId } = {}] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  const quadros = await capturarAba(tabId);
+  const txt = quadros.map((f, i) => `===== FRAME ${i} | ${f.url} | ${f.titulo} =====\n${f.html}`).join("\n\n");
+  await chrome.storage.local.set({ captura: txt });
+  await chrome.tabs.create({ url: chrome.runtime.getURL("captura.html") });
+}
+chrome.commands.onCommand.addListener((c) => c === "capturar-tela" && capturarEAbrir().catch(console.error));
+
 chrome.runtime.onMessage.addListener((m, _s, responder) => {
   if (m?.acao === "verificar") verificar();
   if (m?.acao === "capturar") { capturarAba(m.tabId).then(responder, (e) => responder({ erro: String(e.message || e) })); return true; }

@@ -12,7 +12,7 @@
     "storage"
   ],
   "host_permissions": [
-    "https://projudi.tjgo.jus.br/*"
+    "https://*.tjgo.jus.br/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -23,5 +23,13 @@
   "action": {
     "default_popup": "popup.html",
     "default_title": "Conclusões Projudi"
+  },
+  "commands": {
+    "capturar-tela": {
+      "suggested_key": {
+        "default": "Alt+Shift+C"
+      },
+      "description": "Capturar a tela atual (HTML) para diagnóstico"
+    }
   }
 }

@@ -51,7 +51,7 @@ def main():
     tmp = Path(tempfile.mkdtemp()); ext = tmp / "ext"
     shutil.copytree(RAIZ, ext)
     for f, a, b in [("background.js", "https://projudi.tjgo.jus.br/", "http://localhost:8765/"),
-                    ("manifest.json", "https://projudi.tjgo.jus.br/*", "http://localhost:8765/*")]:
+                    ("manifest.json", "https://*.tjgo.jus.br/*", "http://localhost:8765/*")]:
         t = (ext / f).read_text().replace(a, b); (ext / f).write_text(t)
     srv = http.server.HTTPServer(("localhost", 8765), H)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
@@ -93,6 +93,9 @@ def main():
         frames = sw.evaluate(f"capturarAba({tab_id})")
         print([ (f["url"], len(f["html"])) for f in frames ])
         assert len(frames) == 2 and "<script" not in frames[0]["html"]
+        sw.evaluate(f"capturarEAbrir({tab_id})"); proc.wait_for_timeout(1500)
+        cap = [pg for pg in ctx.pages if pg.url.endswith("captura.html")][0]; cap.wait_for_timeout(500)
+        assert 'value="77"' in cap.input_value("#txt") and "FRAME 1" in cap.input_value("#txt")
         movs = [f for f in frames if "/movs" in f["url"]][0]["html"]
         assert 'value="77" checked' in movs.replace('checked=""', 'checked') or 'checked' in movs.split('value="77"')[1].split(">")[0]
         assert 'checked' not in movs.split('value="78"')[1].split(">")[0]

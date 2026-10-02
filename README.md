@@ -56,6 +56,8 @@ Faz o mesmo, mas dentro do seu Chrome já logado: sem Python e sem login do rob�
 
 Se a sessão do Projudi expirar, o ícone mostra `!` e o popup avisa para entrar de novo.
 
+**Atalho Alt+Shift+C** (funciona em qualquer janela, inclusive pop-ups sem barra de extensões, como a do "Gerar PDF"): abre uma aba com o HTML da tela em foco e um botão "Copiar tudo".
+
 Botão **Capturar tela atual**: abra no Projudi a tela que quer me mostrar (ex.: o processo com as movimentações, o editor de texto), clique no ícone da extensão > "Capturar tela atual" e cole aqui. Ele copia o HTML da aba **incluindo os iframes**, sem scripts e sem senhas. Revise antes de colar: o HTML pode conter nomes e números de processos.
 
 Botão **Copiar diagnóstico**: se alguma lista vier vazia ou der erro, clique nele e cole o resultado no chat; ele leva o HTML da tela que a extensão não conseguiu ler.
