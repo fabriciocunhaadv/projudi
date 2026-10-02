@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html><head><meta content="text/html; charset=LATIN1" http-equiv="CONTENT-TYPE"/><title> |Autos Conclusos| Busca de Autos Conclusos </title></head>
+<body data-usuario-id="1"><div id="divCorpo" class="divCorpo">
+<form action="PreAnalisarConclusao" method="post" name="Formulario" id="Formulario">
+<input id="tipo" name="tipo" type="hidden" />
+<input id="btnLocalizar" type="submit" name="Localizar" value="Consultar" />
+<input id="PaginaAtual" name="PaginaAtual" type="hidden" value="2"/>
+<div id="accordion"><h3><a href="#">Conclusões Cível</a></h3><div>
+<table id="field1" class="Tabela"><thead id="CabecalhoTabela"><tr class="TituloColuna">
+<th width="3%"> </th><th width="3%"><input type="checkbox" id="chkSelTodos" value=""/></th>
+<th width="14%" colspan="3">Processo</th><th width="15%">Data/Hora</th><th width="65%">Tipo da Ação</th>
+<th width="8%" colspan="2">Pré-Analisar</th><th width="8%">Classificar</th></tr></thead>
+<tr><th colspan="10" class="linhaDestaqueTitulo"> Concluso - Genérico</th></tr>
+<tr><!-- x --><th colspan="10" class="linhaDestaqueSubTitulo"> </th></tr>
+<tr class='TabelaLinha2Urgente1 Urgente'>
+<td align="center" width="3%"> 1</td>
+<td align="center" width="3%"><input class="formEdicaoCheckBox" name="pendencias" type="checkbox" value="600000001"></td>
+<td align="center"><i class="cor_prioridade_1" alt="Maior de 80 Anos" title="Maior de 80 Anos"/></td>
+<td align="center"><button class="imgIcons" type="button" style="display: inline" title="Retirar Prioridade" onclick="location.href='AnalisarConclusao?PaginaAtual=8&retirarPrioridadePendencia_Id=600000001'"><i class="fa-regular fa-circle-xmark"></i></button></td>
+<td width="14%"><a style="display: inline" href="BuscaProcesso?Id_Processo=9600000001">
+1000001-11</a>
+<img src="./imagens/copy-solid.svg" alt="Copiar" title="Copiar n&uacute;mero do processo" width="15px" onclick="copiarNumeroProcessoFormatado('1000001-11.2025.8.09.0166');" /></td>
+<td width="15%" align="left">02/10/2026 14:31:23</td>
+<td width="65%" align="left">PROCESSO CÍVEL E DO TRABALHO -> Processo de Conhecimento -> Procedimento do Juizado Especial Cível</td>
+<td align="center" colspan="2"><button class="imgIcons" title="Pré-Analisar" onclick="javascript: submeter2('PreAnalisarConclusao', '600000001','4');return false;"><i class="fa-solid fa-magnifying-glass fa-2x"></i></button></td>
+<td align="center"><button class="imgIcons" title="Classificar"><i class="fa-solid fa-tag fa-2x"></i></button></td>
+</tr>
+<tr><th colspan="10" class="linhaDestaqueSubTitulo"> Fulano - minutando - (Prioridade: 10)</th></tr>
+<tr class='TabelaLinha2Urgente2 Urgente'>
+<td align="center" width="3%"> 2</td>
+<td align="center" width="3%"><input class="formEdicaoCheckBox" name="pendencias" type="checkbox" value="600000002"></td>
+<td align="center"><i class="cor_prioridade_2" alt="Maior de 60 Anos" title="Maior de 60 Anos"/></td>
+<td align="center"><button class="imgIcons" type="button" style="display: inline" title="Retirar Prioridade" onclick="location.href='AnalisarConclusao?PaginaAtual=8&retirarPrioridadePendencia_Id=600000002'"><i class="fa-regular fa-circle-xmark"></i></button></td>
+<td width="14%"><a style="display: inline" href="BuscaProcesso?Id_Processo=9600000002">
+1000002-22</a>
+<img src="./imagens/copy-solid.svg" alt="Copiar" title="Copiar n&uacute;mero do processo" width="15px" onclick="copiarNumeroProcessoFormatado('1000002-22.2026.8.09.0166');" /></td>
+<td width="15%" align="left">01/10/2026 16:58:19</td>
+<td width="65%" align="left">PROCESSO CÍVEL E DO TRABALHO -> Processo de Conhecimento -> Procedimento do Juizado Especial Cível</td>
+<td align="center" colspan="2"><button class="imgIcons" title="Pré-Analisar" onclick="javascript: submeter2('PreAnalisarConclusao', '600000002','4');return false;"><i class="fa-solid fa-magnifying-glass fa-2x"></i></button></td>
+<td align="center"><button class="imgIcons" title="Classificar"><i class="fa-solid fa-tag fa-2x"></i></button></td>
+</tr>
+<tr class='TabelaLinha2Urgente3 Urgente'>
+<td align="center" width="3%"> 3</td>
+<td align="center" width="3%"><input class="formEdicaoCheckBox" name="pendencias" type="checkbox" value="600000003"></td>
+<td align="center"><i class="cor_prioridade_3" alt="Normal" title="Normal"/></td>
+<td align="center"></td>
+<td width="14%"><a style="display: inline" href="BuscaProcesso?Id_Processo=9600000003">
+1000003-33</a>
+<img src="./imagens/copy-solid.svg" alt="Copiar" title="Copiar n&uacute;mero do processo" width="15px" onclick="copiarNumeroProcessoFormatado('1000003-33.2026.8.09.0166');" /></td>
+<td width="15%" align="left">01/10/2026 14:51:10</td>
+<td width="65%" align="left">PROCESSO CÍVEL E DO TRABALHO -> Processo de Conhecimento -> Procedimento do Juizado Especial Cível</td>
+<td align="center" colspan="2"><button class="imgIcons" title="Pré-Analisar" onclick="javascript: submeter2('PreAnalisarConclusao', '600000003','4');return false;"><i class="fa-solid fa-magnifying-glass fa-2x"></i></button></td>
+<td align="center"><button class="imgIcons" title="Classificar"><i class="fa-solid fa-tag fa-2x"></i></button></td>
+</tr>
+<tr class='TabelaLinha2Urgente3 Urgente'>
+<td align="center" width="3%"> 4</td>
+<td align="center" width="3%"><input class="formEdicaoCheckBox" name="pendencias" type="checkbox" value="600000004"></td>
+<td align="center"><i class="cor_prioridade_3" alt="Normal" title="Normal"/></td>
+<td align="center"></td>
+<td width="14%"><a style="display: inline" href="BuscaProcesso?Id_Processo=9600000004">
+1000004-44</a>
+<img src="./imagens/copy-solid.svg" alt="Copiar" title="Copiar n&uacute;mero do processo" width="15px" onclick="copiarNumeroProcessoFormatado('1000004-44.2026.8.09.0166');" /></td>
+<td width="15%" align="left">01/10/2026 15:03:38</td>
+<td width="65%" align="left">PROCESSO CÍVEL E DO TRABALHO -> Processo de Conhecimento -> Procedimento do Juizado Especial Cível</td>
+<td align="center" colspan="2"><button class="imgIcons" title="Pré-Analisar" onclick="javascript: submeter2('PreAnalisarConclusao', '600000004','4');return false;"><i class="fa-solid fa-magnifying-glass fa-2x"></i></button></td>
+<td align="center"><button class="imgIcons" title="Classificar"><i class="fa-solid fa-tag fa-2x"></i></button></td>
+</tr>
+<tr><th colspan="10" class="linhaDestaqueSubTitulo"> AUTOS CONCLUSOS - (Prioridade: 0)</th></tr>
+<tr class='TabelaLinha2Urgente3 Urgente'>
+<td align="center" width="3%"> 5</td>
+<td align="center" width="3%"><input class="formEdicaoCheckBox" name="pendencias" type="checkbox" value="600000005"></td>
+<td align="center"><i class="cor_prioridade_3" alt="Normal" title="Normal"/></td>
+<td align="center"></td>
+<td width="14%"><a style="display: inline" href="BuscaProcesso?Id_Processo=9600000005">
+1000005-55</a>
+<img src="./imagens/copy-solid.svg" alt="Copiar" title="Copiar n&uacute;mero do processo" width="15px" onclick="copiarNumeroProcessoFormatado('1000005-55.2026.8.09.0166');" /></td>
+<td width="15%" align="left">02/10/2026 13:33:57</td>
+<td width="65%" align="left">PROCESSO CÍVEL E DO TRABALHO -> Processo de Conhecimento -> Procedimento do Juizado Especial Cível</td>
+<td align="center" colspan="2"><button class="imgIcons" title="Pré-Analisar" onclick="javascript: submeter2('PreAnalisarConclusao', '600000005','4');return false;"><i class="fa-solid fa-magnifying-glass fa-2x"></i></button></td>
+<td align="center"><button class="imgIcons" title="Classificar"><i class="fa-solid fa-tag fa-2x"></i></button></td>
+</tr>
+<tr><th colspan="10" class="linhaDestaqueSubTitulo"> Beltrana - Minutando - (Prioridade: 0)</th></tr>
+<tr class='TabelaLinha2Urgente3 Urgente'>
+<td align="center" width="3%"> 6</td>
+<td align="center" width="3%"><input class="formEdicaoCheckBox" name="pendencias" type="checkbox" value="600000006"></td>
+<td align="center"><i class="cor_prioridade_3" alt="Normal" title="Normal"/></td>
+<td align="center"></td>
+<td width="14%"><a style="display: inline" href="BuscaProcesso?Id_Processo=9600000006">
+1000006-66</a>
+<img src="./imagens/copy-solid.svg" alt="Copiar" title="Copiar n&uacute;mero do processo" width="15px" onclick="copiarNumeroProcessoFormatado('1000006-66.2026.8.09.0166');" /></td>
+<td width="15%" align="left">01/10/2026 13:28:54</td>
+<td width="65%" align="left">PROCESSO CÍVEL E DO TRABALHO -> Processo de Conhecimento -> Procedimento do Juizado Especial Cível</td>
+<td align="center" colspan="2"><button class="imgIcons" title="Pré-Analisar" onclick="javascript: submeter2('PreAnalisarConclusao', '600000006','4');return false;"><i class="fa-solid fa-magnifying-glass fa-2x"></i></button></td>
+<td align="center"><button class="imgIcons" title="Classificar"><i class="fa-solid fa-tag fa-2x"></i></button></td>
+</tr>
+</table></div></div></form></div></body></html>

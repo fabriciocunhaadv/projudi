@@ -5,13 +5,13 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 function listaProcessos(titulo, procs) {
   if (!procs?.length) return "";
   const grupos = new Map();
-  [...procs].sort(Ordenar.comparador("prio-maior")).forEach((p) => { const k = p.classificador || "(sem classificador)"; (grupos.get(k) || grupos.set(k, []).get(k)).push(p); });
+  [...procs].sort(Ordenar.comparador("trabalho")).forEach((p) => { const k = p.classificador || "(sem classificador)"; (grupos.get(k) || grupos.set(k, []).get(k)).push(p); });
   let h = `<h3>${titulo} (${procs.length})</h3>`;
   for (const [cls, ps] of grupos) {
     h += `<div class="cls">${esc(cls)} <span class="zero">(${ps.length})</span></div><ul>`;
     for (const p of ps) {
       const extra = [p.dataInicio && "início " + p.dataInicio, p.prioridade != null && "prior. " + p.prioridade, p.tipoConclusao, p.dataPreAnalise && "pré-análise " + p.dataPreAnalise, p.usuarioPreAnalise, p.tipoMovimento].filter(Boolean).join(" · ");
-      h += `<li><b>${esc(p.processo)}</b>${extra ? `<br><small>${esc(extra)}</small>` : ""}</li>`;
+      h += `<li>${p.url ? `<a href="https://projudi.tjgo.jus.br/${esc(p.url)}" target="_blank"><b>${esc(p.processo)}</b></a>` : `<b>${esc(p.processo)}</b>`}${p.marcadores?.length ? ` <span class="zero">⚠ ${esc(p.marcadores.join(", "))}</span>` : ""}${extra ? `<br><small>${esc(extra)}</small>` : ""}</li>`;
     }
     h += "</ul>";
   }

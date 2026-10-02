@@ -1,60 +1,49 @@
-"""Teste ponta a ponta: carrega a extensão num Chromium contra um servidor que imita o Projudi.
+"""Teste ponta a ponta: carrega a extensão num Chromium contra um servidor que imita o Projudi
+(páginas no formato real, em tests/fixtures; dados fictícios).
 Uso: python tests/e2e_extensao.py   (precisa de playwright + chromium)"""
-import glob, http.server, json, os, re, shutil, sys, tempfile, threading, time
+import glob, http.server, json, os, shutil, tempfile, threading, time
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 RAIZ = Path(__file__).parent.parent / "extensao"
-LISTA = """<html><body data-usuario-id="1"><fieldset><legend> Montes Claros de Goias - Vara de Família e Sucessões - GO</legend>
-<label><a href="Usuario?PaginaAtual=7&amp;a1=3&amp;a2=6">Assessor de Juiz Vara - Y (Juiz)</a></label></fieldset>
-<fieldset><legend> Anápolis - Juizado - GO</legend><label><a href="Usuario?PaginaAtual=7&amp;a1=9">Assessor X</a></label></fieldset></body></html>"""
+FIX = Path(__file__).parent / "fixtures"
+fx = lambda n: (FIX / n).read_text(encoding="utf-8")
 MOLDURA = '<html><body data-usuario-id="1"><iframe name="userMainFrame" src="Usuario?PaginaAtual=-10"></iframe></body></html>'
-INICIO = """<html><body><table><tr><th>Tipo Conclusão</th><th>Não analisadas</th><th>Pré-analisadas</th></tr>
-<tr><td>Concluso - Sentença</td><td>1</td><td>0</td></tr><tr><td>Concluso - Despacho</td><td>1</td><td>2</td></tr></table></body></html>"""
-PENDENTES = """<html><body><table><tr><th>Processo</th><th>Data Início</th></tr>
-<tr><td colspan="2">Concluso - Sentença</td></tr><tr><td colspan="2">AGUARDANDO DECURSO DE PRAZO</td></tr>
-<tr><td>1111111.11</td><td>01/10/2026 08:00:00</td></tr>
-<tr><td colspan="2">Manu minutando - (Prioridade: 0)</td></tr>
-<tr><td>2222222.22</td><td>02/10/2026 08:00:00</td></tr></table></body></html>"""
-FORM = '<html><body><form method="post" action="PreAnalisarConclusao"><input name="PaginaAtual" value="6"><input name="tipo" value="todas"><input type="submit" name="b" value="Consultar"></form></body></html>'
-PRE = """<html><body><form method="post" action="PreAnalisarConclusao"><input type="submit" value="Consultar"></form><table>
-<tr><th>Processo</th><th>Data Início</th><th>Data Pré-Análise</th><th>Usuário Pré-Análise</th><th>Tipo de Movimento</th></tr>
-<tr><td colspan="5">Concluso - Despacho</td></tr>
-<tr><td colspan="5">AGUARDANDO PUBLICAÇÃO DE EXTRATO - (Prioridade: 0)</td></tr>
-<tr><td>5879667.38</td><td>31/08/2026 18:08:57</td><td>01/10/2026 15:06:10</td><td>Fabricio Alves da Cunha</td><td>Decisão -> Impugnação</td></tr>
-<tr><td colspan="5">URGENTES - (Prioridade: 2)</td></tr>
-<tr><td><img title="Réu preso" src="x.png"> 9999999.99</td><td>15/09/2026 10:30:00</td><td>01/10/2026 09:00:00</td><td>Fabricio Alves da Cunha</td><td></td></tr>
-<tr><td colspan="5">Emilly - minutando - (Prioridade: 0)</td></tr>
-<tr><td>5410623.26</td><td>28/09/2026 17:59:54</td><td>01/10/2026 14:58:43</td><td>Emilly Martins de Souza</td><td></td></tr>
-<tr><td>5560928.22</td><td>29/09/2026 18:47:41</td><td>02/10/2026 14:15:47</td><td>Emilly Martins de Souza</td><td></td></tr></table></body></html>"""
+# Pré-análises: a lista só aparece depois de "Consultar" (testa o envio automático do formulário)
+FORM_PRE = '<html><body><form method="post" action="PreAnalisarConclusao"><input name="PaginaAtual" value="6"><input name="tipo" value="todas"><input type="submit" name="b" value="Consultar"></form></body></html>'
 chamadas = []
+
 
 class H(http.server.BaseHTTPRequestHandler):
     def _r(s, html):
         s.send_response(200); s.send_header("Content-Type", "text/html; charset=ISO-8859-1"); s.end_headers()
-        s.wfile.write(html.encode("latin-1"))
+        s.wfile.write(html.encode("latin-1", "replace"))
+
     def do_GET(s):
         chamadas.append("GET " + s.path)
         p = s.path
-        if "PaginaAtual=9" in p: s._r(LISTA)
-        elif "PaginaAtual=-10" in p: s._r(INICIO)
+        if "Usuario?PaginaAtual=9" in p: s._r(fx("lista_serventias.html"))
+        elif "PaginaAtual=-10" in p: s._r(fx("inicio.html"))
         elif p.startswith("/processo"): s._r('<html><body><script>var x=1</script><h1>Capa</h1><iframe src="/movs"></iframe></body></html>')
-        elif p.startswith("/movs"): s._r('<html><body><table><tr><td><input type="checkbox" name="arq" value="77" checked></td><td>Mov. 1 - Petição Inicial</td></tr><tr><td><input type="checkbox" name="arq" value="78"></td><td>Mov. 2</td></tr></table></body></html>')
-        elif "PreAnalisarConclusao?PaginaAtual=2" in p: s._r(PENDENTES)
-        elif "PreAnalisarConclusao?PaginaAtual=6" in p: s._r(FORM)
+        elif p.startswith("/movs"): s._r('<html><body><table><tr><td><input type="checkbox" name="arq" value="77" checked></td><td>Mov. 1</td></tr><tr><td><input type="checkbox" name="arq" value="78"></td><td>Mov. 2</td></tr></table></body></html>')
+        elif "PreAnalisarConclusao?PaginaAtual=2" in p: s._r(fx("nao_analisadas.html"))
+        elif "PreAnalisarConclusao?PaginaAtual=6" in p: s._r(FORM_PRE)
         else: s._r(MOLDURA)
+
     def do_POST(s):
         corpo = s.rfile.read(int(s.headers.get("Content-Length", 0))).decode()
         chamadas.append("POST " + s.path + " " + corpo)
-        s._r(PRE)
+        s._r(fx("pre_analisadas.html"))
+
     def log_message(*a): pass
+
 
 def main():
     tmp = Path(tempfile.mkdtemp()); ext = tmp / "ext"
     shutil.copytree(RAIZ, ext)
     for f, a, b in [("background.js", "https://projudi.tjgo.jus.br/", "http://localhost:8765/"),
                     ("manifest.json", "https://*.tjgo.jus.br/*", "http://localhost:8765/*")]:
-        t = (ext / f).read_text().replace(a, b); (ext / f).write_text(t)
+        (ext / f).write_text((ext / f).read_text().replace(a, b))
     srv = http.server.HTTPServer(("localhost", 8765), H)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     exe = os.environ.get("CHROMIUM_PATH") or glob.glob("/opt/pw-browsers/chromium-*/chrome-linux*/chrome")[0]
@@ -67,54 +56,54 @@ def main():
             estado = sw.evaluate("chrome.storage.local.get('estado')").get("estado")
             if estado and estado["status"] in ("ok", "erro", "deslogado"): break
             time.sleep(1)
-        print(json.dumps(estado, ensure_ascii=False, indent=1)); print(*chamadas, sep="\n")
+        print(*chamadas, sep="\n")
+        assert estado["status"] == "ok" and len(estado["serventias"]) == 1, estado   # filtro "Montes Claros" tira Anápolis
         s = estado["serventias"][0]
-        assert estado["status"] == "ok" and len(estado["serventias"]) == 1 and not s["erro"]
-        assert [l["naoAnalisadas"] for l in s["linhas"]] == [1, 1]
-        na = s["processos"]["naoAnalisadas"]
-        assert [(p["processo"], p["classificador"]) for p in na] == [("1111111.11", "AGUARDANDO DECURSO DE PRAZO"), ("2222222.22", "Manu minutando")], na
-        pre = s["processos"]["preAnalisadas"]
-        assert [(p["processo"], p["classificador"], p["prioridade"]) for p in pre] == [
-            ("5879667.38", "AGUARDANDO PUBLICAÇÃO DE EXTRATO", 0), ("9999999.99", "URGENTES", 2),
-            ("5410623.26", "Emilly - minutando", 0), ("5560928.22", "Emilly - minutando", 0)], pre
-        assert pre[1]["marcadores"] == ["Réu preso"] and pre[1]["dataInicio"] == "15/09/2026 10:30:00"
-        assert pre[2]["usuarioPreAnalise"] == "Emilly Martins de Souza" and pre[1]["tipoConclusao"] == "Concluso - Despacho"
-        ext_id = sw.url.split("/")[2]
-        pg = ctx.new_page(); pg.goto(f"chrome-extension://{ext_id}/popup.html"); pg.wait_for_timeout(500)
-        txt = pg.inner_text("body"); print(txt[:900])
-        assert "Emilly - minutando" in txt and "5410623.26" in txt
-        pn = ctx.new_page(); pn.goto(f"chrome-extension://{ext_id}/painel.html"); pn.wait_for_timeout(500); pn.click("#abrir"); pn.wait_for_timeout(300)
-        ptxt = pn.inner_text("body"); print(ptxt[:1500])
-        for esperado in ["Resumo por serventia", "Por classificador", "Manu minutando", "AGUARDANDO DECURSO DE PRAZO", "Emilly - minutando", "5560928.22"]:
-            assert esperado in ptxt, esperado
-        # ordem de trabalho: fila única, prioridade maior primeiro e, dentro dela, o mais antigo primeiro
-        pn.select_option("#visao", "fila"); pn.wait_for_timeout(300)
-        fila = pn.inner_text("body")
-        ordem = [fila.index(n) for n in ["9999999.99", "5879667.38", "5410623.26", "5560928.22"]]
-        assert ordem == sorted(ordem), ordem
-        assert "15/09/2026 10:30:00" in fila and "Réu preso" in fila
-        pn.select_option("#modo", "data"); pn.wait_for_timeout(300)
-        fila = pn.inner_text("body")  # só data: 31/08, 15/09, 28/09, 29/09
-        ordem = [fila.index(n) for n in ["5879667.38", "9999999.99", "5410623.26", "5560928.22"]]
-        assert ordem == sorted(ordem), ordem
-        pn.select_option("#visao", "classificador"); pn.select_option("#modo", "prio-maior"); pn.wait_for_timeout(300)
-        pn.fill("#busca", "emilly"); pn.wait_for_timeout(300)
-        assert "Manu minutando" not in pn.inner_text("details") and "5410623.26" in pn.inner_text("details")
+        assert not s["erro"] and [(l["naoAnalisadas"], l["preAnalisadas"]) for l in s["linhas"]] == [(6, 1), (0, 1)]
+        na, pre = s["processos"]["naoAnalisadas"], s["processos"]["preAnalisadas"]
+        assert len(na) == 6 and len(pre) == 2          # a lista bate com a contagem da tela inicial
+        assert na[0]["dataInicio"] == "02/10/2026 14:31:23" and na[0]["urgencia"] == 1
+        assert [p["classificador"] for p in na][:3] == ["", "Fulano - minutando", "Fulano - minutando"]
+        assert pre[1]["urgenciaTexto"] == "Réu Preso" and pre[0]["classificador"] == "Conclusos- Comunicação de Cessão de créditos"
         dbg = sw.evaluate("chrome.storage.local.get('debug')")["debug"]
         assert {"amostra inicio", "amostra naoAnalisadas", "amostra preAnalisadas"} <= set(dbg), list(dbg)
+
+        ext_id = sw.url.split("/")[2]
+        pg = ctx.new_page(); pg.goto(f"chrome-extension://{ext_id}/popup.html"); pg.wait_for_timeout(500)
+        txt = pg.inner_text("body"); print(txt[:700])
+        assert "Fulano - minutando" in txt and "1000002-22.2026.8.09.0166" in txt
+
+        pn = ctx.new_page(); pn.goto(f"chrome-extension://{ext_id}/painel.html"); pn.wait_for_timeout(500)
+        pn.select_option("#visao", "fila"); pn.wait_for_timeout(300)
+        fila = pn.inner_text("body"); print(fila[:1800])
+        # ordem de trabalho: urgência do processo > prioridade do classificador > mais antigo
+        ordem = [fila.index(n) for n in ["2000002.90", "1000001-11", "1000002-22", "1000003-33", "1000004-44", "2000001.80", "1000006-66", "1000005-55"]]
+        assert ordem == sorted(ordem), ordem
+        assert "02/10/2026 14:31:23" in fila and "Maior de 80 Anos" in fila and "Réu Preso" in fila
+        pn.select_option("#modo", "data"); pn.wait_for_timeout(300)
+        fila = pn.inner_text("body")
+        ordem = [fila.index(n) for n in ["2000002.90", "2000001.80", "1000006-66", "1000003-33", "1000004-44", "1000002-22", "1000005-55", "1000001-11"]]
+        assert ordem == sorted(ordem), ordem   # só a data: 29/09, 30/09, 01/10 13:28/14:51/15:03/16:58, 02/10 13:33/14:31
+        pn.select_option("#visao", "classificador"); pn.select_option("#modo", "trabalho"); pn.wait_for_timeout(300)
+        pn.click("#abrir"); pn.fill("#busca", "beltrana"); pn.wait_for_timeout(300)
+        det = pn.inner_text("body")
+        assert "2000002.90" in det and "1000006-66" in det and "1000003-33" not in det.split("Processos")[-1]
+        hrefs = pn.eval_on_selector_all("a[href*='Id_Processo']", "els => els.map(e => e.href)")
+        assert hrefs and all(h.startswith("https://projudi.tjgo.jus.br/BuscaProcesso?Id_Processo=") for h in hrefs), hrefs
+
+        # captura da aba (com iframes) e atalho
         proc = ctx.new_page(); proc.goto("http://localhost:8765/processo"); proc.wait_for_timeout(800)
         tab_id = sw.evaluate("chrome.tabs.query({url: 'http://localhost:8765/processo*'}).then(t => t[0].id)")
         frames = sw.evaluate(f"capturarAba({tab_id})")
-        print([ (f["url"], len(f["html"])) for f in frames ])
         assert len(frames) == 2 and "<script" not in frames[0]["html"]
-        sw.evaluate(f"capturarEAbrir({tab_id})"); proc.wait_for_timeout(1500)
-        cap = [pg for pg in ctx.pages if pg.url.endswith("captura.html")][0]; cap.wait_for_timeout(500)
-        assert 'value="77"' in cap.input_value("#txt") and "FRAME 1" in cap.input_value("#txt")
         movs = [f for f in frames if "/movs" in f["url"]][0]["html"]
-        assert 'value="77" checked' in movs.replace('checked=""', 'checked') or 'checked' in movs.split('value="77"')[1].split(">")[0]
-        assert 'checked' not in movs.split('value="78"')[1].split(">")[0]
+        assert "checked" in movs.split('value="77"')[1].split(">")[0] and "checked" not in movs.split('value="78"')[1].split(">")[0]
+        sw.evaluate(f"capturarEAbrir({tab_id})"); proc.wait_for_timeout(1500)
+        cap = [q for q in ctx.pages if q.url.endswith("captura.html")][0]; cap.wait_for_timeout(500)
+        assert 'value="77"' in cap.input_value("#txt") and "FRAME 1" in cap.input_value("#txt")
         ctx.close()
     print("OK")
+
 
 if __name__ == "__main__":
     main()

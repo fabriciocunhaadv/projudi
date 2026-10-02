@@ -1,6 +1,8 @@
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const sa = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const BASE = "https://projudi.tjgo.jus.br/";
+const link = (p) => (p.url ? new URL(p.url, BASE).href : "");
 const ROTULO = { naoAnalisadas: "Não analisadas", preAnalisadas: "Pré-analisadas" };
 let estado = null, aberto = false;
 
@@ -8,7 +10,7 @@ const todos = (s) => ["naoAnalisadas", "preAnalisadas"].flatMap((tipo) =>
   (s.processos?.[tipo] || []).map((p) => ({ ...p, situacao: ROTULO[tipo], tipo })));
 
 function casa(p, q) {
-  return !q || sa([p.processo, p.classificador, p.usuarioPreAnalise, p.tipoConclusao, p.tipoMovimento].join(" ")).includes(q);
+  return !q || sa([p.processo, p.classificador, p.usuarioPreAnalise, p.tipoConclusao, p.tipoMovimento, p.tipoAcao, p.urgenciaTexto].join(" ")).includes(q);
 }
 
 function desenhar() {
@@ -20,16 +22,17 @@ function desenhar() {
   if (estado.status === "erro") return (el.innerHTML = `<div class="msg erro">Erro: ${esc(estado.mensagem)}</div>`);
 
   // 1) Resumo: uma linha por serventia
-  let h = "<h2>Resumo por serventia</h2><table><tr><th>Serventia</th><th>Perfil</th><th>Não analisadas</th><th>Pré-analisadas</th></tr>";
-  let tNa = 0, tPre = 0;
+  let h = "<h2>Resumo por serventia</h2><table><tr><th>Serventia</th><th>Perfil</th><th>Não analisadas</th><th>Pré-analisadas</th><th>Urgentes</th></tr>";
+  let tNa = 0, tPre = 0, tUrg = 0;
   for (const s of estado.serventias) {
     const na = s.linhas.reduce((n, l) => n + l.naoAnalisadas, 0), pre = s.linhas.reduce((n, l) => n + l.preAnalisadas, 0);
-    tNa += na; tPre += pre;
+    const urg = todos(s).filter((p) => p.urgencia && p.urgencia < 3).length;
+    tNa += na; tPre += pre; tUrg += urg;
     const lis = (k) => (s.processos?.[k] || []).length;
     const c = (n, k) => `<td class="n ${n ? "alerta" : "zero"}">${n}${n !== lis(k) && (n || lis(k)) ? `<br><small>(lista: ${lis(k)})</small>` : ""}</td>`;
-    h += `<tr><td><a href="${esc(s.url)}" target="_blank">${esc(s.serventia)}</a>${s.erro ? `<br><span class="erro">${esc(s.erro)}</span>` : ""}</td><td>${esc(s.perfil)}</td>${c(na, "naoAnalisadas")}${c(pre, "preAnalisadas")}</tr>`;
+    h += `<tr><td><a href="${esc(s.url)}" target="_blank">${esc(s.serventia)}</a>${s.erro ? `<br><span class="erro">${esc(s.erro)}</span>` : ""}</td><td>${esc(s.perfil)}</td>${c(na, "naoAnalisadas")}${c(pre, "preAnalisadas")}<td class="n ${urg ? "alerta" : "zero"}">${urg}</td></tr>`;
   }
-  h += `<tr><th colspan="2">Total</th><th class="n">${tNa}</th><th class="n">${tPre}</th></tr></table>`;
+  h += `<tr><th colspan="2">Total</th><th class="n">${tNa}</th><th class="n">${tPre}</th><th class="n">${tUrg}</th></tr></table>`;
 
   // 2) Por classificador (todas as serventias juntas)
   const porCls = new Map();
@@ -47,10 +50,14 @@ function desenhar() {
 
   // 3) Detalhe
   const cmp = Ordenar.comparador($("modo").value), fila = $("visao").value === "fila";
-  const linha = (p, comCls) => `<tr><td class="n">${p.prioridade ?? ""}</td><td><b>${esc(p.processo)}</b>${(p.marcadores || []).map((m) => `<span class="tag">${esc(m)}</span>`).join("")}</td>` +
-    (comCls ? `<td class="cls">${esc(p.classificador)}</td><td>${esc(p.situacao)}</td>` : "") +
-    `<td>${esc(p.dataInicio)}</td><td>${esc(p.dataPreAnalise)}</td><td>${esc(p.tipoConclusao)}</td><td>${esc(p.usuarioPreAnalise)}</td><td>${esc(p.tipoMovimento)}</td></tr>`;
-  const cabecalho = (comCls) => `<table><tr><th>Prior.</th><th>Processo</th>${comCls ? "<th>Classificador</th><th>Situação</th>" : ""}<th>Início (data e hora)</th><th>Pré-análise</th><th>Conclusão</th><th>Usuário</th><th>Movimento</th></tr>`;
+  const linha = (p, comCls) => {
+    const num = link(p) ? `<a href="${esc(link(p))}" target="_blank"><b>${esc(p.processo)}</b></a>` : `<b>${esc(p.processo)}</b>`;
+    const urg = p.urgencia && p.urgencia < 3 ? `<span class="tag urg${p.urgencia}">${esc(p.urgenciaTexto || "urgente")}</span>` : "";
+    return `<tr><td class="n">${p.prioridade ?? ""}</td><td>${num}${urg}</td>` +
+      (comCls ? `<td class="cls">${esc(p.classificador)}</td><td>${esc(p.situacao)}</td>` : "") +
+      `<td>${esc(p.dataInicio)}</td><td>${esc(p.dataPreAnalise)}</td><td>${esc(p.tipoConclusao)}</td><td>${esc(p.tipoAcao)}</td><td>${esc(p.usuarioPreAnalise)}</td><td>${esc(p.tipoMovimento)}</td></tr>`;
+  };
+  const cabecalho = (comCls) => `<table><tr><th title="Prioridade do classificador">Prior.</th><th>Processo</th>${comCls ? "<th>Classificador</th><th>Situação</th>" : ""}<th>Início (data e hora)</th><th>Pré-análise</th><th>Conclusão</th><th>Tipo da ação</th><th>Usuário</th><th>Movimento</th></tr>`;
   h += "<h2>Processos</h2>";
   let achou = false;
   for (const s of estado.serventias) {
@@ -81,10 +88,10 @@ function desenhar() {
 }
 
 function csv() {
-  const cab = ["Serventia", "Perfil", "Situação", "Classificador", "Prioridade", "Processo", "Conclusão", "Início (data e hora)", "Pré-análise", "Usuário", "Movimento"];
+  const cab = ["Serventia", "Perfil", "Situação", "Classificador", "Prioridade do classificador", "Urgência", "Processo", "Link", "Conclusão", "Início (data e hora)", "Pré-análise", "Tipo da ação", "Usuário", "Movimento"];
   const lin = [cab];
   estado?.serventias?.forEach((s) => todos(s).sort(Ordenar.comparador($("modo").value)).forEach((p) =>
-    lin.push([s.serventia, s.perfil, p.situacao, p.classificador, p.prioridade, p.processo, p.tipoConclusao, p.dataInicio, p.dataPreAnalise, p.usuarioPreAnalise, p.tipoMovimento])));
+    lin.push([s.serventia, s.perfil, p.situacao, p.classificador, p.prioridade, p.urgenciaTexto, p.processo, link(p), p.tipoConclusao, p.dataInicio, p.dataPreAnalise, p.tipoAcao, p.usuarioPreAnalise, p.tipoMovimento])));
   const txt = "﻿" + lin.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(";")).join("\r\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([txt], { type: "text/csv;charset=utf-8" }));
@@ -97,7 +104,7 @@ function csv() {
   chrome.storage.onChanged.addListener((c, area) => { if (area === "local" && c.estado) { estado = c.estado.newValue; desenhar(); } });
   const guardado = (k, d) => { try { return localStorage.getItem(k) || d; } catch { return d; } };
   $("modo").innerHTML = Object.entries(Ordenar.MODOS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
-  $("modo").value = guardado("modo", "prio-maior"); $("visao").value = guardado("visao", "classificador");
+  $("modo").value = guardado("modo", "trabalho"); $("visao").value = guardado("visao", "classificador");
   for (const id of ["modo", "visao"]) $(id).onchange = () => { try { localStorage.setItem(id, $(id).value); } catch {} desenhar(); };
   $("busca").oninput = desenhar;
   $("csv").onclick = csv;
