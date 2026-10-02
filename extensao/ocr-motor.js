@@ -44,7 +44,15 @@ export async function precisaOcr(page) {
   const tc = await page.getTextContent();
   // texto girado = tarja lateral do Projudi (pode invadir a área da imagem): não conta como texto do documento
   const itens = tc.items.filter((it) => (it.str || "").trim() && Math.abs(it.transform[1]) <= 0.1 * Math.abs(it.transform[0] || 1));
-  return grandes.some((r) => itens.reduce((n, it) => (it.transform[4] >= r.x0 && it.transform[4] <= r.x1 && it.transform[5] >= r.y0 && it.transform[5] <= r.y1 ? n + it.str.trim().length : n), 0) < 150);   // alguns carimbos podem cair sobre a imagem: poucos caracteres não bastam para dizer que há texto do documento
+  // Só vale o texto na parte CENTRAL da imagem: cabeçalho, rodapé (selo digital) e tarja do Projudi ficam nas bordas.
+  return grandes.some((r) => {
+    const dx = (r.x1 - r.x0) * 0.08, dy = (r.y1 - r.y0) * 0.12;
+    const dentro = itens.reduce((n, it) => {
+      const x = it.transform[4], y = it.transform[5];
+      return x >= r.x0 + dx && x <= r.x1 - dx && y >= r.y0 + dy && y <= r.y1 - dy ? n + it.str.trim().length : n;
+    }, 0);
+    return dentro < MIN_CHARS;
+  });
 }
 
 async function criarWorkers(n) {
