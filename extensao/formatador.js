@@ -36,14 +36,31 @@
     else document.execCommand("insertHTML", false, F.montarHtml(blocos, cfg));
   }
 
-  // ---------- formatar tudo ----------
-  function formatarTudo() {
-    if (!corpoEditavel()) return false;
-    const novo = F.formatarHtmlCorpo(document.body.innerHTML, cfg, document);
-    if (novo === document.body.innerHTML) return true;
-    document.execCommand("selectAll", false, null);          // mantém o desfazer (Ctrl+Z) do editor
+  // ---------- formatar o trecho selecionado ----------
+  // Só mexe no que está selecionado (estendido até o começo/fim dos parágrafos tocados). Sem seleção, formata o parágrafo do cursor.
+  const BLOCO = "p,div,li,h1,h2,h3,h4,h5,h6,blockquote,pre,td";
+  function formatarSelecao() {
+    if (!corpoEditavel()) return null;
+    const sel = document.getSelection();
+    if (!sel || !sel.rangeCount) return null;
+    const r = sel.getRangeAt(0);
+    if (!document.body.contains(r.commonAncestorContainer)) return null;
+    const bloco = (no) => {
+      let el = no.nodeType === 1 ? no : no.parentElement;
+      const b = el && el.closest(BLOCO);
+      return b && b !== document.body && document.body.contains(b) ? b : null;
+    };
+    const ini = bloco(r.startContainer), fim = bloco(r.endContainer);
+    const alvo = document.createRange();
+    if (ini && fim) { alvo.setStart(ini, 0); alvo.setEnd(fim, fim.childNodes.length); }
+    else { alvo.setStart(r.startContainer, r.startOffset); alvo.setEnd(r.endContainer, r.endOffset); }
+    if (alvo.collapsed || !alvo.toString().trim() && !alvo.cloneContents().querySelector("img,table")) return 0;
+    const caixa = document.createElement("div");
+    caixa.appendChild(alvo.cloneContents());
+    const novo = F.formatarHtmlCorpo(caixa.innerHTML, cfg, document);
+    sel.removeAllRanges(); sel.addRange(alvo);      // mantém o desfazer (Ctrl+Z) do editor
     document.execCommand("insertHTML", false, novo);
-    return true;
+    return 1;
   }
 
   // ---------- aprender o padrão ----------
@@ -67,7 +84,11 @@
     mostrarMsg.t = setTimeout(() => (m.style.display = "none"), 6000);
   }
   function acao(a) {
-    if (a === "formatar") { mostrarMsg(formatarTudo() ? "Minuta formatada. (Ctrl+Z desfaz)" : "Clique dentro do editor de texto."); return true; }
+    if (a === "formatar") {
+      const r = formatarSelecao();
+      mostrarMsg(r === 1 ? "Trecho selecionado formatado. (Ctrl+Z desfaz)" : r === 0 ? "Selecione o trecho que quer formatar (ou clique no parágrafo)." : "Clique dentro do editor de texto.");
+      return r === 1;
+    }
     if (a === "aprender-texto" || a === "aprender-citacao") {
       const tipo = a === "aprender-texto" ? "texto" : "citacao";
       const p = aprender(tipo);
@@ -87,7 +108,7 @@
       .w{position:fixed;bottom:6px;right:22px;z-index:2147483647;font:12px system-ui,sans-serif;display:flex;gap:4px;align-items:flex-end;flex-wrap:wrap;justify-content:flex-end;max-width:70%;pointer-events:none}
       button{pointer-events:auto;font:12px system-ui,sans-serif;padding:3px 8px;border:1px solid #1a56a0;background:#fff;color:#1a56a0;border-radius:4px;cursor:pointer;opacity:.78}
       button:hover{opacity:1;background:#1a56a0;color:#fff} .msg{pointer-events:auto;display:none;order:-1;flex-basis:100%;text-align:right;background:#fffbe6;border:1px solid #e0c36a;border-radius:4px;padding:3px 6px;color:#333}
-    </style><div class="w"><button data-a="formatar" title="Aplica o seu padrão de formatação em toda a minuta (Alt+Shift+F)">Formatar minuta</button>
+    </style><div class="w"><button data-a="formatar" title="Aplica o seu padrão de formatação ao trecho selecionado (Alt+Shift+F)">Formatar seleção</button>
       <button data-a="aprender-texto" title="Clique num parágrafo que você já formatou do seu jeito e use este botão: a extensão grava esse padrão para o texto">Aprender texto</button>
       <button data-a="aprender-citacao" title="Idem, para uma citação">Aprender citação</button><div class="msg"></div></div>`;
     const evitarFoco = (e) => e.preventDefault(); // não tira a seleção do editor

@@ -66,11 +66,12 @@ def main():
         colar(ed, "", "XYZ"); ed.wait_for_timeout(200)
         assert ed.evaluate("document.querySelectorAll('p').length") == antes and "XYZ" in ed.evaluate("document.body.textContent")
 
-        # 3) botão "Formatar minuta" reformata o que já está no editor
-        ed.evaluate("""() => { document.body.innerHTML = "<p style='font-family:Arial;font-size:9px;color:red'>Texto solto antigo</p><p>Outro</p>"; }""")
-        ed.click("body"); ed.locator("[data-projudi-ext] button[data-a=formatar]").click(); ed.wait_for_timeout(300)
-        fmt = ed.evaluate("[...document.querySelectorAll('p')].map(p => p.style.fontSize + '|' + p.style.textAlign + '|' + p.style.color)")
-        assert fmt == ["16px|justify|", "16px|justify|"], fmt
+        # 3) botão "Formatar seleção" formata SÓ o trecho selecionado (parágrafos tocados) e não mexe no resto
+        ed.evaluate("""() => { document.body.innerHTML = "<p style='font-family:Arial;font-size:9px;color:red'>Primeiro antigo</p><p style='font-family:Arial;font-size:9px'>Segundo antigo</p><p style='font-family:Arial;font-size:9px'>Terceiro antigo</p>";
+          const ps = document.querySelectorAll('p'); const r = document.createRange(); r.setStart(ps[1].firstChild, 3); r.setEnd(ps[1].firstChild, 8); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }""")
+        ed.locator("[data-projudi-ext] button[data-a=formatar]").click(); ed.wait_for_timeout(300)
+        fmt = ed.evaluate("[...document.querySelectorAll('p')].map(p => p.style.fontSize + '|' + p.style.textAlign + '|' + p.textContent)")
+        assert fmt == ["9px||Primeiro antigo", "16px|justify|Segundo antigo", "9px||Terceiro antigo"], fmt
 
         # 4) "Aprender texto": formato um parágrafo à mão (12pt, recuo 1,25cm) e a extensão grava esse padrão
         ed.evaluate("""() => { document.body.innerHTML = "<p id='x' style=\\"font-family:Georgia;font-size:12pt;text-align:justify;text-indent:1.25cm\\">Meu padrão</p>";

@@ -72,10 +72,10 @@ Limitações: lê só "Pendentes" e "Pré-Análises > Simples" (não as Múltipl
 
 ## Formatação automática da minuta (no editor de texto do Projudi)
 
-No editor aparecem, no canto inferior direito, os botões **Formatar minuta**, **Aprender texto** e **Aprender citação**.
+No editor aparecem, no canto inferior direito, os botões **Formatar seleção**, **Aprender texto** e **Aprender citação**.
 - **Colar:** ao colar do Word, Google Docs ou de um chat, o texto entra limpo (sem fonte/cor de origem) e já no seu padrão: fonte, tamanho,
   justificado, recuo da 1ª linha; citações (recuadas, entre aspas longas ou iniciadas por `>`) saem com o padrão de citação; títulos centralizados são preservados.
-- **Formatar minuta (Alt+Shift+F):** reformata tudo o que já está no editor (Ctrl+Z desfaz).
+- **Formatar seleção (Alt+Shift+F):** reformata só o trecho selecionado (ou o parágrafo do cursor, se nada estiver selecionado); o resto da minuta não é tocado (Ctrl+Z desfaz).
 - **Aprender:** formate um parágrafo e uma citação do seu jeito, clique dentro deles e use *Aprender texto* / *Aprender citação*.
   A extensão grava fonte, tamanho (com a unidade do editor), recuo, margens e entrelinha. Os valores também podem ser editados em *Ferramentas*.
 - Padrão inicial (até você ensinar): Times New Roman, 16px no texto, 14px nas citações (recuo 4cm), justificado, recuo de 1ª linha 2,5cm.
