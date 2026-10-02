@@ -27,5 +27,14 @@ Também dá para ajustar os valores à mão abaixo.</p>
 <div id="perfis"></div>
 <p><button id="salvar">Salvar</button> <button id="restaurar">Restaurar padrão inicial</button><span id="ok"></span></p>
 <p class="dica">Atalho no editor: <b>Alt+Shift+F</b> formata a minuta inteira. O Ctrl+Z desfaz. A extensão só mexe no texto do campo; nada é salvo, assinado ou enviado por ela.</p>
+<h2>OCR automático dos PDFs do Projudi</h2>
+<p class="dica">Quando um PDF de <b>tjgo.jus.br</b> (por exemplo o “PDF completo do processo”) termina de baixar, a extensão abre a página de OCR em segundo plano,
+faz o OCR só nas páginas que são imagem e salva ao lado o arquivo <b>nome-OCR.pdf</b> na pasta Downloads. O PDF original continua intacto.</p>
+<div class="linha">
+  <label style="font-size:13px"><input type="checkbox" id="ocrAutomatico" style="display:inline;width:auto"> Fazer OCR automaticamente nos PDFs baixados do Projudi</label><br>
+  <label style="font-size:13px"><input type="checkbox" id="apagarOriginal" style="display:inline;width:auto"> Apagar o PDF original depois de gerar o PDF com OCR</label>
+</div>
+<p id="acessoArquivos" class="dica"></p>
+<p><button id="salvarOcr">Salvar</button> <button id="abrirDetalhes">Abrir detalhes da extensão</button> <span id="okOcr" style="color:#1a7a1a"></span></p>
 <script src="formatacao-core.js"></script>
 <script src="ferramentas.js"></script>

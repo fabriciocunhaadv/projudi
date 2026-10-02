@@ -1,3 +1,4 @@
+const DOMINIO = "tjgo.jus.br";
 const BASE = "https://projudi.tjgo.jus.br/";
 const LISTA = BASE + "Usuario?PaginaAtual=9";
 const PADRAO = { filtro: "Montes Claros", intervalo: 30, notificar: true };
@@ -199,4 +200,26 @@ chrome.commands.onCommand.addListener((c) => c === "capturar-tela" && capturarEA
 chrome.runtime.onMessage.addListener((m, _s, responder) => {
   if (m?.acao === "verificar") verificar();
   if (m?.acao === "capturar") { capturarAba(m.tabId).then(responder, (e) => responder({ erro: String(e.message || e) })); return true; }
+});
+
+
+// ---------- OCR automático dos PDFs baixados do Projudi ----------
+// Quando um PDF de *.tjgo.jus.br termina de baixar, abre a página de OCR em segundo plano.
+// Ela lê o arquivo, faz OCR só nas páginas-imagem e salva "<nome>-OCR.pdf" em Downloads.
+const tratados = new Set();
+const hostProjudi = (u) => { try { return new URL(u).hostname.endsWith(DOMINIO); } catch { return false; } };
+const parecePdf = (it) => /pdf/i.test(it.mime || "") || /\.pdf$/i.test(it.filename || "") || /\.pdf(\?|$)|GerarPDF/i.test(it.finalUrl || it.url || "");
+
+chrome.downloads.onChanged.addListener(async (delta) => {
+  if (!delta.state || delta.state.current !== "complete") return;
+  try {
+    const [it] = await chrome.downloads.search({ id: delta.id });
+    if (!it || tratados.has(it.id) || it.byExtensionId === chrome.runtime.id) return; // não refaz o que a própria extensão baixou
+    if (!hostProjudi(it.finalUrl || it.url) || !parecePdf(it)) return;
+    const { ocr } = await chrome.storage.sync.get("ocr");
+    if ({ ocrAutomatico: true, ...ocr }.ocrAutomatico === false) return;
+    tratados.add(it.id);
+    await chrome.storage.local.set({ ["ocr_" + it.id]: { id: it.id, url: it.finalUrl || it.url, filename: it.filename } });
+    await chrome.tabs.create({ url: chrome.runtime.getURL("ocr.html?auto=" + it.id), active: false });
+  } catch (e) { console.error("OCR automático:", e); }
 });
