@@ -97,6 +97,17 @@
       ],
       "run_at": "document_start",
       "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://*.tjgo.jus.br/*",
+        "https://docs.google.com/document/*"
+      ],
+      "js": [
+        "esteira-barra.js"
+      ],
+      "all_frames": false,
+      "run_at": "document_idle"
     }
   ],
   "content_security_policy": {

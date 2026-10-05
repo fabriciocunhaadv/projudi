@@ -1,0 +1,79 @@
+import { todos, atualizar, lerPdf, remover, ROTULO, ATIVOS } from "./esteira-banco.js";
+import { analisarNoStudio } from "./studio-cliente.js";
+import { criarDocumento, abrirLadoALado, lerDocumento, tipoDaMinuta, nomeDoc } from "./docs-api.js";
+
+const $ = (id) => document.getElementById(id), esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let dono = false, ocupado = false;
+
+async function analisar(it) {
+  await atualizar(it.id, { estado: "analisando", erro: "" });
+  try {
+    const bytes = await lerPdf(it.id);
+    if (!bytes) throw new Error("o PDF deste processo não está mais guardado");
+    const r = await analisarNoStudio(bytes, { nome: it.pdfNome, prompt: it.prompt, modo: it.modo, tipo: "", processo: it.processo, minuta: it.minutaAssessor });
+    if (it.modo === "lupa" || !it.docs) return atualizar(it.id, { estado: it.modo === "lupa" ? "concluido" : "conferindo", minuta: r.minuta || "", tipo: tipoDaMinuta(r.minuta), aviso: r.mensagem });
+    if (!r.minuta) throw new Error("o Studio concluiu, mas não consegui ler a minuta gerada");
+    const tipo = tipoDaMinuta(r.minuta), titulo = nomeDoc(it.processo, tipo), doc = await criarDocumento(titulo, r.minuta);
+    const urlPdf = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+    await abrirLadoALado(doc.url, urlPdf);
+    const aviso = doc.via === "colar" ? (doc.copiou ? "Login do Google não configurado: cole (Ctrl+V) a minuta, já copiada, no documento em branco." : "Login do Google não configurado: use o botão Copiar do Studio e cole no documento.") : "";
+    await atualizar(it.id, { estado: "conferindo", minuta: r.minuta, tipo, titulo, docUrl: doc.url, via: doc.via, aviso });
+  } catch (e) { await atualizar(it.id, { estado: "erro", erro: e.message }); }
+}
+
+async function cadastrar(it) {         // conferência terminada: pega o texto final e leva ao Projudi
+  let texto = it.minuta, aviso = it.aviso || "";
+  try { const lido = it.docUrl && it.via === "api" ? await lerDocumento(it.docUrl.match(/\/d\/([\w-]+)/)?.[1]) : null; if (lido) texto = lido; else if (it.docUrl) aviso = "Sem o login do Google não dá para ler as suas correções: será usada a minuta original do Studio."; }
+  catch (e) { aviso = "Não consegui ler o Google Docs (" + e.message + "): será usada a minuta original do Studio."; }
+  await chrome.tabs.create({ url: it.urlPre || it.url, active: true });
+  await atualizar(it.id, { estado: "cadastrando", textoFinal: texto, aviso });
+}
+
+async function passo() {
+  if (!dono || ocupado) return;
+  ocupado = true;
+  try {
+    const lista = await todos();
+    const conf = lista.find((i) => i.estado === "conferido");
+    if (conf) { await cadastrar(conf); return; }
+    if (lista.some((i) => ATIVOS.includes(i.estado))) return;          // só um por vez nesta esteira
+    const prox = lista.find((i) => i.estado === "aguardando");
+    if (prox) await analisar(prox);
+  } finally { ocupado = false; desenhar(); }
+}
+
+async function desenhar() {
+  const lista = await todos();
+  $("linhas").innerHTML = lista.length ? lista.map((it, n) => {
+    const b = [];
+    if (it.estado === "aguardando") b.push(`<button data-a="pular" data-id="${it.id}">Pular</button>`);
+    if (it.estado === "erro") b.push(`<button data-a="repetir" data-id="${it.id}">Tentar de novo</button>`);
+    if (it.estado === "conferindo") { if (it.docUrl) b.push(`<a href="${esc(it.docUrl)}" target="_blank">Abrir Docs</a>`); b.push(`<button data-a="conferido" data-id="${it.id}">✔ Terminei a conferência — cadastrar no Projudi</button>`); }
+    if (it.estado === "cadastrando") { b.push(`<button data-a="projudi" data-id="${it.id}">Abrir o processo</button>`, `<button data-a="concluir" data-id="${it.id}">✔ Lancei no Projudi — próximo processo</button>`); }
+    return `<tr><td>${n + 1}</td><td>${esc(it.processo)}<br><small>${esc(it.tipo || "")}</small></td><td class="e-${it.estado}">${esc(ROTULO[it.estado] || it.estado)}${it.erro ? "<br>" + esc(it.erro) : ""}${it.aviso ? `<br><small>${esc(it.aviso)}</small>` : ""}</td><td>${b.join(" ")}</td></tr>`;
+  }).join("") : '<tr><td colspan="4">Fila vazia.</td></tr>';
+  $("status").textContent = dono ? "" : "Outra aba da esteira já está em execução; esta mostra apenas o andamento.";
+}
+
+$("linhas").addEventListener("click", async (ev) => {
+  const b = ev.target.closest("button[data-a]"); if (!b) return;
+  const id = b.dataset.id, a = b.dataset.a;
+  if (a === "pular") await atualizar(id, { estado: "pulado" });
+  if (a === "repetir") await atualizar(id, { estado: "aguardando", erro: "" });
+  if (a === "conferido") await atualizar(id, { estado: "conferido" });
+  if (a === "concluir") await atualizar(id, { estado: "concluido" });
+  if (a === "projudi") { const it = (await todos()).find((x) => x.id === id); chrome.tabs.create({ url: it.urlPre || it.url }); }
+  passo();
+});
+$("limpar").onclick = async () => { await remover((await todos()).filter((i) => ["concluido", "pulado"].includes(i.estado)).map((i) => i.id)); desenhar(); };
+chrome.storage.onChanged.addListener((c, area) => { if (area === "local" && Object.keys(c).some((k) => k.startsWith("esteira_"))) { desenhar(); passo(); } });
+setInterval(passo, 3000);
+
+navigator.locks.request("esteira-executor", { ifAvailable: true }, async (lock) => {
+  if (!lock) { desenhar(); return; }
+  dono = true;
+  for (const it of await todos()) if (it.estado === "analisando") await atualizar(it.id, { estado: "aguardando" });     // a aba anterior foi fechada no meio da análise
+  document.body.dataset.executor = "1";
+  await desenhar(); passo();
+  await new Promise(() => {});      // segura o bloqueio enquanto a aba existir
+});

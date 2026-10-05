@@ -1,0 +1,18 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Esteira de minutas — Conclusões Projudi</title>
+<style>
+  body { font: 14px system-ui, sans-serif; margin: 0; padding: 16px 24px; max-width: 1100px; color: #222; }
+  h1 { font-size: 18px; margin: 0 0 4px; } .dica { color: #666; font-size: 12px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; } th, td { border: 1px solid #cfd6df; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #eef2f7; } .e-erro { color: #b00020; } .e-concluido { color: #1a7a1a; } .e-conferindo, .e-cadastrando { color: #0b57b0; font-weight: 600; }
+  button { padding: 4px 10px; font-size: 13px; cursor: pointer; margin: 1px; }
+  @media (prefers-color-scheme: dark) { body { background: #1c1d21; color: #e6e6e6; } th { background: #2a2d33; } th, td { border-color: #444; } .dica { color: #aaa; } }
+</style>
+<h1>Esteira de minutas</h1>
+<p class="dica">Um processo por vez: <b>Studio gera a minuta → Google Docs para conferência → botão “cadastrar no Projudi” → lançamento no editor</b>. Só depois de concluir (ou de dar erro) o próximo da fila vai para o Studio.
+Os downloads dos PDFs seguem em paralelo, sem esperar esta fila. Mantenha esta aba aberta.</p>
+<div id="status"></div>
+<table><thead><tr><th>#</th><th>Processo</th><th>Situação</th><th>Ações</th></tr></thead><tbody id="linhas"></tbody></table>
+<p><button id="limpar">Limpar concluídos e pulados</button></p>
+<script type="module" src="esteira.js"></script>

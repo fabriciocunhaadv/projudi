@@ -128,3 +128,26 @@ Página **Modelos do Projudi** (link no painel): para cada serventia gera **um P
 com **Enviar ao Studio**, cadastra o PDF na *Base de Conhecimento do Gabinete* do app **substituindo** o documento de mesmo nome (apaga o antigo e envia o novo; não duplica).
 O nome do arquivo é editável e fica gravado no painel (coluna "Arquivo de modelos na base do Studio"). A captura automática dos modelos no Projudi ainda depende das telas do cadastro de modelos.
 Teste: `python tests/e2e_studio_base.py`.
+
+## Minuta no Google Docs, ao lado do PDF
+Na fila ("Baixar PDFs para análise"), marque **Iniciar a análise no Studio** e, depois, **abrir no Google Docs**. Quando o Studio termina a minuta, a extensão:
+1. lê a minuta gerada (botão "Copiar" do app; se falhar, o painel de resultado);
+2. identifica o tipo (sentença, decisão interlocutória, decisão saneadora, despacho) e cria o documento **"número do processo – tipo"**;
+3. formata em padrão monografia: A4, margens 3/2 cm, Times New Roman 12, justificado, espaçamento 1,5, recuo de 1,25 cm, títulos em MAIÚSCULAS centralizados em negrito;
+4. abre o Google Docs na metade esquerda da tela e o PDF baixado (com OCR) na metade direita.
+
+**Configuração única (login do Google).** Sem ela, a extensão abre um Google Docs em branco com o título certo e deixa a minuta copiada (formatada) para você dar Ctrl+V.
+1. Em console.cloud.google.com crie um projeto e ative a **Google Docs API**.
+2. Tela de consentimento OAuth: tipo *Externo*, adicione você como usuário de teste.
+3. Credenciais → *ID do cliente OAuth* → tipo **Extensão do Chrome**, com o ID da extensão `lolomaglbjcmoohjkcibpjlbkgdlgldm` (o `key` do manifest mantém esse ID em qualquer computador).
+4. Copie o ID do cliente para `oauth2.client_id` no `manifest.json` e recarregue a extensão. Na primeira minuta o Google pede a autorização.
+Obs.: a Lupa do Magistrado não gera o documento (ela audita, não minuta). Testado só com páginas simuladas.
+
+## Esteira de minutas (Studio → Google Docs → Projudi)
+Os downloads dos PDFs continuam todos em paralelo à esteira. Cada PDF pronto entra na **esteira** (página `esteira.html`, aberta sozinha em segundo plano; também há o link na tela da fila), que trabalha **um processo por vez**:
+1. **Studio** gera a minuta (se der erro, o processo fica marcado com o erro e a esteira segue para o próximo; há “Tentar de novo”).
+2. **Google Docs** abre com a minuta “número – tipo” ao lado do PDF. Uma barra azul no rodapé do Docs traz o botão **“✔ Terminei a conferência — cadastrar no Projudi”**.
+3. Ao clicar, a extensão lê de volta o texto corrigido no Docs (precisa do login do Google acima; sem ele usa a minuta original do Studio) e abre o processo no Projudi. A barra do Projudi traz **“Inserir a minuta no editor (formatada)”** — usa a formatação cadastrada na extensão (Aprender texto/citação) — e **“✔ Lancei no Projudi — próximo processo”**.
+4. Só então o próximo processo da fila vai ao Studio.
+
+Limite atual: a extensão abre a tela do processo (ou a pré-análise, quando conhecida); você abre o editor de texto da minuta e clica em “Inserir”. Para chegar sozinha ao editor preciso do HTML da tela da lupa/“minutar” do Projudi.

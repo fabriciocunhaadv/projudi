@@ -130,7 +130,21 @@
       if (Date.now() - t0 > 20 * 60000) throw new Error("a análise demorou mais de 20 minutos");
       await dorme(1000);
     }
-    return { ok: true, mensagem: "análise concluída" };
+    return { ok: true, mensagem: "análise concluída", minuta: await lerMinuta() };
+  }
+
+  // Texto da minuta gerada: pelo botão "Copiar" do app; se falhar, lê o painel de resultado.
+  async function lerMinuta() {
+    try {
+      const h = painelResultado(), barra = h?.parentElement.parentElement.lastElementChild;
+      const copiar = barra && [...barra.querySelectorAll("button")].find((b) => /Copiar/i.test(texto(b) + " " + (b.title || "")));
+      document.documentElement.dataset.projudiCopiado = "";
+      if (copiar) { copiar.click(); await esperar(() => document.documentElement.dataset.projudiCopiado, 3000); }
+      const t = document.documentElement.dataset.projudiCopiado;
+      if (t && t.trim().length > 20) return t;
+      const corpo = h?.closest("div.border") || h?.parentElement.parentElement.parentElement;
+      return corpo ? (corpo.innerText || "").replace(/^[\s\S]*?Resultado\s*&\s*An[aá]lise\s*/i, "").trim() : "";
+    } catch (e) { return ""; }
   }
 
   async function lupa({ arquivoId, nome, prompt, processo, minuta }) {

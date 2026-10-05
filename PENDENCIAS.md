@@ -27,3 +27,7 @@
 - **Captura dos modelos do Projudi** (`modelos-projudi.js`, botão "Atualizar modelos do Projudi" em `modelos.html`): a extensão conduz a própria tela (Cadastros -> Modelo -> Localizar -> Consultar), lê todas as páginas e o texto de cada modelo no editor, grava em `chrome.storage.local.modelos` e mostra novos / alterados / excluídos. Testada com uma cópia simulada da moldura do Projudi; falta validar no Projudi real (seletores da linha e do clique no modelo).
 - **Base do Studio não edita**: a extensão NÃO exclui sozinha. Se o documento já existe, avisa para excluir o antigo (lixeira do app) e envia o novo; há o botão "Excluir o antigo e enviar agora" na página de modelos. Na fila, só avisa e segue.
 - **Lupa do Magistrado**: para pré-analisadas, lê a minuta do editor da pré-análise (CKEditor/TinyMCE) e lança no campo "Minuta Elaborada pelo Assessor". Depende de a lista de pré-análises ter o link da tela de edição (campo `urlPre` do parser): falta o HTML da linha da lista / tela da pré-análise.
+
+## Atualização (Google Docs)
+- Implementado: minuta do Studio → Google Docs "número – tipo" (padrão monografia) + PDF lado a lado. Falta o usuário criar o OAuth Client (ver README) e validar no Studio real o botão "Copiar" do painel Resultado & Análise.
+- Esteira de minutas implementada. Falta: HTML da tela do Projudi (lupa de análise → editor de minuta) para a extensão abrir o editor sozinha; hoje o assessor abre o editor e clica em "Inserir a minuta".

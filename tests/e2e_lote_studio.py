@@ -1,4 +1,5 @@
 """Fila completa: dois processos + base de conhecimento do Studio + análise automática no Studio (simulados). Antes: dois processos -> abre cada um, pede o PDF completo, OCR, salva número-OCR.pdf."""
+import json
 import base64, glob, http.server, os, shutil, subprocess, sys, tempfile, threading, uuid
 from pathlib import Path
 from playwright.sync_api import sync_playwright
@@ -8,7 +9,7 @@ from test_ocr import gerar_pdf   # noqa: E402
 
 RAIZ = Path(__file__).parent.parent / "extensao"
 PROC = """<html><head><meta charset="utf-8"><title>Processo</title></head><body><h3>Processo %s</h3>
-<a href="#" onclick="window.open('/PdfServico/GerarPDF?usu=1&chave=2&token=%s','pdf','width=900,height=600');return false">Gerar PDF de Processo Completo</a></body></html>"""
+<a href="#" onclick="window.open('/PdfServico/GerarPDF?usu=1&chave=2&token=%s','pdf','width=900,height=600');return false">Gerar PDF de Processo Completo</a><iframe id="ed" srcdoc="&lt;body contenteditable&gt;&lt;p&gt;inicio&lt;/p&gt;&lt;/body&gt;"></iframe></body></html>"""
 GERAR = """<html><head><meta charset="utf-8"><title>Gerar PDF</title></head><body><div id="ListaCheckBox"><ul>
 <li><input type="checkbox" name="chk0" id="todos" value="0" onclick="document.querySelectorAll('input[name=chk1],input[name=chk2]').forEach(c=>c.checked=this.checked)"><strong>Todos os Arquivos</strong><ul>
 <li>1<input type="checkbox" name="chk1" selecao="nivel1" value="11"><strong>Petição Enviada</strong><ul><li><input type="checkbox" name="chk2" pai="11" value="101"> <strong>acao.pdf</strong></li></ul></li>
@@ -43,7 +44,7 @@ STUDIO = """<html><head><meta charset="utf-8"><title>Assessor Judicial</title></
 <div id="tour-input-panel"><button>PDF</button><button>Texto / Casos</button><button>Auto-Detectar</button><button>Sentença</button>
  <div id="drop"><input accept="application/pdf,.pdf" multiple class="hidden" type="file" id="autos"><span id="nomearq"></span></div>
  <button id="tour-execute-btn" onclick="executar()">Gerar Minuta Judicial</button></div>
-<div class="bg-white border rounded"><div class="p-3.5 border-b flex"><div class="flex items-center gap-2"><h3>Resultado &amp; Análise</h3></div><div id="barra" class="flex items-center gap-1.5 opacity-50 pointer-events-none text-xs"><button>Editar</button></div></div><div id="res"><h4>Aguardando Execução</h4></div></div>
+<div class="bg-white border rounded"><div class="p-3.5 border-b flex"><div class="flex items-center gap-2"><h3>Resultado &amp; Análise</h3></div><div id="barra" class="flex items-center gap-1.5 opacity-50 pointer-events-none text-xs"><button>Editar</button><button title="Copiar" onclick="navigator.clipboard.writeText(window.__min)">Copiar</button></div></div><div id="res"><h4>Aguardando Execução</h4></div></div>
 <div id="modal" style="display:none"><button onclick="this.parentElement.style.display='none'">Fechar</button>
  <button id="tour-teses-base-conhecimento-tab" onclick="document.getElementById('base').style.display='block'">Base de Conhecimento</button>
  <div id="base" style="display:none"><div class="bg-slate-50 border relative"><span>Base de Conhecimento do Gabinete (Nuvem):</span><button>Adicionar PDF</button><input accept="application/pdf,.pdf" multiple class="hidden" type="file" id="base-input"><div id="docs"></div></div></div></div>
@@ -53,12 +54,26 @@ function novaAnalise(){ document.getElementById('nomearq').textContent=''; docum
 document.getElementById('autos').addEventListener('change', e => { document.getElementById('nomearq').textContent = e.target.files[0].name; window.__ultimo = {nome: e.target.files[0].name, tam: e.target.files[0].size}; });
 function executar(){ const b=document.getElementById('tour-execute-btn'); b.disabled=true; b.textContent='Analisando…';
   setTimeout(()=>{ const sel=document.getElementById('promptsel'); window.__analises.push({prompt: sel.options[sel.selectedIndex].text, ...window.__ultimo});
-    document.getElementById('res').innerHTML='<p>MINUTA GERADA</p>'; document.getElementById('barra').className='flex items-center gap-1.5 text-xs';
+    window.__min='SENTENÇA\\n\\nVistos, etc.\\n\\nJulgo **procedente** o pedido formulado.'; document.getElementById('res').innerHTML='<p>MINUTA GERADA</p>'; document.getElementById('barra').className='flex items-center gap-1.5 text-xs';
     b.disabled=false; b.textContent='Gerar Minuta Judicial'; }, 1200); }
 function excluir(b){ if(confirm('Excluir?')) b.closest('div.border').remove() }
 function adicionar(nome){ const d=document.createElement('div'); d.className='p-2.5 bg-white border rounded-lg'; d.innerHTML='<input type="checkbox" checked><div class="min-w-0"><p class="text-xs font-bold truncate" title="'+nome+'">'+nome+'</p><div class="flex"><span>2 MB</span></div></div><button title="Excluir documento da base permanentemente" onclick="excluir(this)">x</button>'; document.getElementById('docs').appendChild(d) }
 document.getElementById('base-input').addEventListener('change', e => { for (const f of e.target.files) setTimeout(()=>adicionar(f.name), 300); });
 </script></body></html>"""
+
+
+DOCSREQ = []
+class HD(http.server.BaseHTTPRequestHandler):
+    def do_POST(s):
+        n = int(s.headers.get("Content-Length") or 0); corpo = json.loads(s.rfile.read(n) or b"{}")
+        DOCSREQ.append((s.path, s.headers.get("Authorization"), corpo))
+        s.send_response(200); s.send_header("Content-Type", "application/json"); s.end_headers(); s.wfile.write(json.dumps({"documentId": "DOC123"}).encode())
+    def do_GET(s):
+        if s.path.startswith("/v1/documents/"):
+            corpo = json.dumps({"body": {"content": [{"paragraph": {"elements": [{"textRun": {"content": "SENTENÇA\n"}}]}}, {"paragraph": {"elements": [{"textRun": {"content": "Julgo procedente o pedido CORRIGIDO.\n"}}]}}]}}).encode(); tipo = "application/json"
+        else: corpo = b"<html><title>doc</title>doc</html>"; tipo = "text/html"
+        s.send_response(200); s.send_header("Content-Type", tipo); s.end_headers(); s.wfile.write(corpo)
+    def log_message(*a): pass
 
 
 class HS(http.server.BaseHTTPRequestHandler):
@@ -70,11 +85,14 @@ class HS(http.server.BaseHTTPRequestHandler):
 def main():
     tmp = Path(tempfile.mkdtemp()); ext = tmp / "ext"
     shutil.copytree(RAIZ, ext)
-    m = ext / "manifest.json"; m.write_text(m.read_text().replace("https://*.tjgo.jus.br/*", "http://localhost/*").replace("https://*.ai.studio/*", "http://127.0.0.1/*"))
+    m = ext / "manifest.json"; m.write_text(m.read_text().replace("https://*.tjgo.jus.br/*", "http://localhost/*").replace("https://*.ai.studio/*", "http://127.0.0.1/*").replace("https://docs.google.com/document/*", "http://127.0.0.1/*"))
+    d = ext / "docs-api.js"; d.write_text(d.read_text().replace("https://docs.googleapis.com/v1/documents", "http://127.0.0.1:8777/v1/documents").replace("https://docs.google.com/document/d/", "http://127.0.0.1:8777/d/").replace("const token = () =>", "const token = async () => 'tok-teste'; const _t = () =>"))
+    m.write_text(m.read_text().replace("COLE_AQUI_O_CLIENT_ID", "teste"))
     c = ext / "studio-cliente.js"; c.write_text(c.read_text().replace("https://assessor-judicial.ai.studio/", "http://127.0.0.1:8774/"))
     (ext / "background.js").write_text((ext / "background.js").read_text().replace('const DOMINIO = "tjgo.jus.br";', 'const DOMINIO = "localhost";'))
     srv = http.server.HTTPServer(("localhost", 8770), H)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
+    srvd = http.server.HTTPServer(("127.0.0.1", 8777), HD); threading.Thread(target=srvd.serve_forever, daemon=True).start()
     srv2 = http.server.HTTPServer(("127.0.0.1", 8774), HS)
     threading.Thread(target=srv2.serve_forever, daemon=True).start()
     exe = os.environ.get("CHROMIUM_PATH") or glob.glob("/opt/pw-browsers/chromium-*/chrome-linux*/chrome")[0]
@@ -103,7 +121,7 @@ def main():
         base = {"serventia": SERV, "classificador": "Emilly - minutando", "pasta": "Projudi/2026-10-02/Emilly", "prompt": "Outros Área Judicial - Família e Sucessões", "arquivoModelos": "Família - Decisões, Despachos e Sentenças"}
         itens = [{**base, "processo": "5293296-60.2026.8.09.0166", "url": "http://localhost:8770/proc?id=1"},
                  {**base, "processo": "5000001-11.2026.8.09.0166", "url": "http://localhost:8770/proc?id=2"}]
-        sw.evaluate("(j) => chrome.storage.local.set({ lote_t1: j })", {"itens": itens, "pasta": "Projudi", "opcoes": {"atualizarBase": True, "studio": {"ativo": True, "modo": "analise"}}})
+        sw.evaluate("(j) => chrome.storage.local.set({ lote_t1: j })", {"itens": itens, "pasta": "Projudi", "opcoes": {"atualizarBase": True, "studio": {"ativo": True, "modo": "analise", "docs": True}}})
         pg.goto(f"chrome-extension://{ext_id}/lote.html?lote=t1")
         for k in range(60):
             if pg.evaluate("() => document.body.dataset.pronto") == "1": break
@@ -116,11 +134,40 @@ def main():
         print(fins)
         print(pg.inner_text("#base"))
         assert "documento cadastrado" in pg.inner_text("#base") and "Família - Decisões, Despachos e Sentenças.pdf" in pg.inner_text("#base")
+        assert pg.inner_text("#lista").count("na esteira de minutas") == 2, pg.inner_text("#lista")
+        docs = studio.eval_on_selector_all("p[title]", "ps => ps.map(p => p.getAttribute('title'))"); assert docs == ["Família - Decisões, Despachos e Sentenças.pdf"], docs
+
+        # ---- esteira: um processo por vez (Studio -> Docs -> conferência -> Projudi) ----
+        def estados():
+            return sw.evaluate("async () => { const o = (await chrome.storage.local.get('esteira_ordem')).esteira_ordem || []; const d = await chrome.storage.local.get(o.map(i => 'esteira_' + i)); return o.map(i => d['esteira_' + i].estado) }")
+        def espera(cond, rot, n=90):
+            for _ in range(n):
+                if cond(): return
+                pg.wait_for_timeout(1000)
+            raise AssertionError(rot + " " + str(sw.evaluate("async () => Object.entries(await chrome.storage.local.get(null)).filter(([k]) => k.startsWith('esteira_m')).map(([k, v]) => [v.estado, v.erro])")) + str(estados()) + str([x.url[-40:] for x in ctx.pages]))
+        espera(lambda: estados() == ["conferindo", "aguardando"], "1º processo deveria estar em conferência e o 2º aguardando")
+        assert len(studio.evaluate("window.__analises")) == 1                              # o 2º não foi ao Studio
+        doc = [x for x in ctx.pages if x.url.startswith("http://127.0.0.1:8777/d/DOC123")][0]
+        doc.wait_for_selector("[data-projudi-ext=esteira] #ok", state="attached", timeout=20000)
+        assert any(x.url.startswith("blob:") for x in ctx.pages), [x.url for x in ctx.pages]       # PDF aberto ao lado
+        doc.locator("[data-projudi-ext=esteira] #ok").click()
+        espera(lambda: estados()[0] == "cadastrando", "deveria ir para o Projudi")
+        assert estados()[1] == "aguardando"                                                  # a fila só avança depois do lançamento
+        proj = [x for x in ctx.pages if x.url.startswith("http://localhost:8770/proc?id=1") and x.locator("[data-projudi-ext=esteira]").count()][0]
+        proj.wait_for_selector("[data-projudi-ext=esteira] #ins", state="attached", timeout=20000)
+        proj.locator("[data-projudi-ext=esteira] #ins").click(); proj.wait_for_timeout(1500)
+        ed = [f for f in proj.frames if f != proj.main_frame][0]
+        txt = ed.inner_text("body"); print("EDITOR:", txt, "| barra:", proj.evaluate("document.querySelector('[data-projudi-ext=esteira]').shadowRoot.querySelector('.m').innerText"), "| quadros:", [(f.url, f.locator("[data-projudi-ext]").count()) for f in proj.frames])
+        assert "Julgo procedente o pedido CORRIGIDO." in txt                                 # texto corrigido no Docs, lido de volta
+        proj.locator("[data-projudi-ext=esteira] #ok").click()
+        espera(lambda: estados()[0] == "concluido" and estados()[1] in ("analisando", "conferindo"), "2º deveria seguir para o Studio")
         analises = studio.evaluate("window.__analises"); print(analises)
         assert len(analises) == 2 and all(a["prompt"] == "Outros Área Judicial - Família e Sucessões" for a in analises), analises
         assert [a["nome"] for a in analises] == ["5293296-60.2026.8.09.0166-OCR.pdf", "5000001-11.2026.8.09.0166-OCR.pdf"]
-        assert pg.inner_text("#lista").count("análise concluída no Studio") == 2
-        docs = studio.eval_on_selector_all("p[title]", "ps => ps.map(p => p.getAttribute('title'))"); assert docs == ["Família - Decisões, Despachos e Sentenças.pdf"], docs
+        print(DOCSREQ)
+        assert DOCSREQ[0][2] == {"title": "5293296-60.2026.8.09.0166 – sentença"} and DOCSREQ[0][1] == "Bearer tok-teste"
+        rq = DOCSREQ[1][2]["requests"]; assert rq[0]["insertText"]["text"] == "SENTENÇA\nVistos, etc.\nJulgo procedente o pedido formulado."
+        assert any(r.get("updateParagraphStyle", {}).get("paragraphStyle", {}).get("alignment") == "JUSTIFIED" for r in rq)
         pdf = subprocess.run(["pdftotext", "-layout", fins[0]["pdf"], "-"], capture_output=True, text=True).stdout.lower(); pdf = " ".join(pdf.split())
         ctx.close()
     assert "5293296-60.2026.8.09.0166" in pdf and "movimentacao 8 : juntada" in pdf       # carimbo do Projudi preservado

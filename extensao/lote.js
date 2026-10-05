@@ -66,7 +66,7 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
     await chrome.storage.local.remove(["lote_fim_" + chave, "lote_prog_" + chave, "gerarpdf_pedido"]);
     let minuta = "";      // Lupa do Magistrado: usa a minuta que o assessor já escreveu na pré-análise
     if (opcoes.studio?.ativo && opcoes.studio.modo === "lupa" && item.situacao === "preAnalisadas" && item.urlPre) { passo("lendo a minuta escrita na pré-análise"); minuta = await limite(lerMinutaPre(item.urlPre), 60000, "a minuta da pré-análise não carregou").catch(() => ""); }
-    await chrome.storage.local.set({ gerarpdf_pedido: { todos: true, processo: item.processo, pasta, lote: chave, ts: Date.now(), studio: opcoes.studio?.ativo ? { ativo: true, modo: opcoes.studio.modo, prompt: item.prompt || "", tipo: "", minuta } : null } });
+    await chrome.storage.local.set({ gerarpdf_pedido: { todos: true, processo: item.processo, pasta, lote: chave, ts: Date.now(), studio: opcoes.studio?.ativo ? { ativo: true, modo: opcoes.studio.modo, prompt: item.prompt || "", tipo: "", minuta, url: item.url, urlPre: item.urlPre || "", docs: !!opcoes.studio.docs && opcoes.studio.modo !== "lupa" } : null } });
     let r = await limite(GerarUtil.capturarGerar(tab.id), 45000, "a página do processo não respondeu (pode haver um aviso do Projudi aberto nela)");
     if (!r.achou) {   // o botão fica na aba "Navegação de Arquivos"
       await chrome.tabs.update(tab.id, { url: BASE + "BuscaProcesso?PaginaAtual=98&PassoBusca=4" });
@@ -138,7 +138,7 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
     try {
       const r = await processar(p, id + ":" + i, p.pasta || pasta, (t) => marca(i, `⏳ ${esc(p.processo)} — ${esc(t)}`, ""), job.opcoes || {});
       feitos++;
-      const st = r.studio ? (r.studio.ok ? (r.studio.parcial ? ` — Studio: ${esc(r.studio.mensagem)}` : " — análise concluída no Studio") : ` — <span class="erro">Studio: ${esc(r.studio.erro)}</span>`) : "";
+      const st = r.studio ? (r.studio.ok ? (r.studio.parcial ? ` — Studio: ${esc(r.studio.mensagem)}` : r.studio.fila ? " — na esteira de minutas" : " — análise concluída no Studio" + (r.studio.docs ? (r.studio.docs.ok ? ` — Google Docs: ${esc(r.studio.docs.titulo)}` : ` — <span class="erro">Docs: ${esc(r.studio.docs.erro)}</span>`) : "")) : ` — <span class="erro">Studio: ${esc(r.studio.erro)}</span>`) : "";
       marca(i, `✔ ${esc(p.processo)} — ${r.paginas} páginas (${r.ocr} com OCR) — salvo${st}`, "ok");
     } catch (e) {
       erros++; marca(i, `✖ ${esc(p.processo)} — ${esc(e.message)}`, "erro");

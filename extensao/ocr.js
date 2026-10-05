@@ -1,6 +1,7 @@
 // Página de OCR: tela, arrastar/soltar e OCR automático dos PDFs baixados do Projudi. O trabalho pesado está em ocr-motor.js.
 import { fazerOcr, fmt } from "./ocr-motor.js";
 import { analisarNoStudio } from "./studio-cliente.js";
+import { enfileirar } from "./esteira-banco.js";
 
 const $ = (id) => document.getElementById(id);
 let arquivos = [], cancelado = false, rodando = false;
@@ -142,13 +143,14 @@ async function interceptado(idJob) {
     $("status").textContent = `Pronto: ${arqPdf}`;
     document.body.dataset.salvo = arqPdf;
     avisar("PDF do processo pronto", `${num}-OCR.pdf salvo (${res.ocr} de ${res.total} páginas com OCR).`);
-    let studio = null;      // análise automática no app de IA (opcional): só segue para o próximo processo quando ela termina
+    let studio = null;      // minuta no app de IA: entra na esteira (um processo por vez); o download não espera por ela
     if (job.studio && job.studio.ativo) {
-      $("status").textContent = "Enviando ao app de IA e aguardando a análise…";
-      try { studio = await analisarNoStudio(res.bytes, { nome: num + "-OCR.pdf", prompt: job.studio.prompt, modo: job.studio.modo, tipo: job.studio.tipo, processo: job.nome, minuta: job.studio.minuta }); }
-      catch (e) { studio = { ok: false, erro: e.message }; log("✖ app de IA: " + e.message); }
+      try {
+        await enfileirar({ processo: job.nome, url: job.studio.url || "", urlPre: job.studio.urlPre || "", prompt: job.studio.prompt, modo: job.studio.modo, docs: !!job.studio.docs, minutaAssessor: job.studio.minuta || "", pdfNome: num + "-OCR.pdf", pdf: arqPdf }, res.bytes);
+        await chrome.runtime.sendMessage({ acao: "esteira-abrir" });
+        studio = { ok: true, fila: true, mensagem: "na esteira de minutas" };
+      } catch (e) { studio = { ok: false, erro: e.message }; log("✖ esteira: " + e.message); }
       document.body.dataset.studio = JSON.stringify(studio);
-      avisar("Análise no app de IA", studio.ok ? `${num}: ${studio.mensagem || "concluída"}` : `${num}: ${studio.erro}`);
     }
     if (job.lote) await chrome.storage.local.set({ ["lote_fim_" + job.lote]: { ok: true, pdf: arqPdf, paginas: res.total, ocr: res.ocr, studio } });
     await chrome.storage.local.remove(chave);
