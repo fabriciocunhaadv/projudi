@@ -122,7 +122,7 @@ def main():
         assert pg.inner_text("#lista").count("análise concluída no Studio") == 2
         docs = studio.eval_on_selector_all("p[title]", "ps => ps.map(p => p.getAttribute('title'))"); assert docs == ["Família - Decisões, Despachos e Sentenças.pdf"], docs
         txt = Path(fins[0]["txt"]).read_text(encoding="utf-8")
-        pdf = subprocess.run(["pdftotext", fins[0]["pdf"], "-"], capture_output=True, text=True).stdout.lower(); pdf = " ".join(pdf.split())
+        pdf = subprocess.run(["pdftotext", "-layout", fins[0]["pdf"], "-"], capture_output=True, text=True).stdout.lower(); pdf = " ".join(pdf.split())
         ctx.close()
     print(txt[:1800])
     flat = " ".join(txt.lower().split())

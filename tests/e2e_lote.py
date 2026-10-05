@@ -72,7 +72,7 @@ def main():
         fins = [sw.evaluate("(k) => chrome.storage.local.get(k)", f"lote_fim_t1:{i}")[f"lote_fim_t1:{i}"] for i in (0, 1)]
         print(fins)
         txt = Path(fins[0]["txt"]).read_text(encoding="utf-8")
-        pdf = subprocess.run(["pdftotext", fins[0]["pdf"], "-"], capture_output=True, text=True).stdout.lower(); pdf = " ".join(pdf.split())
+        pdf = subprocess.run(["pdftotext", "-layout", fins[0]["pdf"], "-"], capture_output=True, text=True).stdout.lower(); pdf = " ".join(pdf.split())
         ctx.close()
     print(txt[:1800])
     flat = " ".join(txt.lower().split())
