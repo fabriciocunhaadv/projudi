@@ -1,7 +1,7 @@
 // Fila (esteira) das minutas: Studio -> Google Docs -> cadastro no Projudi, um processo por vez.
 // Os downloads não dependem dela. O PDF fica no IndexedDB (grande); o estado de cada item, no chrome.storage.local.
 const BANCO = "projudi_esteira", K = (id) => "esteira_" + id;
-export const ATIVOS = ["analisando", "conferindo", "conferido", "cadastrando"];
+export const ATIVOS = ["analisando", "pausado", "conferindo", "conferido", "cadastrando"];
 
 const abrir = () => new Promise((ok, erro) => { const r = indexedDB.open(BANCO, 1); r.onupgradeneeded = () => r.result.createObjectStore("pdf"); r.onsuccess = () => ok(r.result); r.onerror = () => erro(r.error); });
 async function comBanco(modo, fn) {
@@ -42,4 +42,4 @@ export async function remover(ids) {
   });
   for (const id of ids) await apagarPdf(id).catch(() => {});
 }
-export const ROTULO = { aguardando: "na fila", analisando: "analisando no Studio…", conferindo: "minuta no Google Docs — aguardando a sua conferência", conferido: "conferida — abrindo o Projudi…", cadastrando: "no Projudi — lance a minuta no editor", concluido: "concluído", erro: "erro", pulado: "pulado" };
+export const ROTULO = { aguardando: "na fila", analisando: "analisando no Studio…", pausado: "interrompido — escolha abaixo", conferindo: "minuta no Google Docs — aguardando a sua conferência", conferido: "conferida — abrindo o Projudi…", cadastrando: "no Projudi — lance a minuta no editor", concluido: "concluído", erro: "erro", pulado: "pulado" };

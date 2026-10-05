@@ -41,3 +41,11 @@ export async function analisarNoStudio(bytes, opcoes) {
   if (!r?.ok) throw new Error(r?.erro || "o app não confirmou a análise");
   return r;
 }
+
+// Lê a minuta que já está pronta na tela do app (sem analisar de novo).
+export async function lerMinutaAtual() {
+  const aba = await acharStudio();
+  const r = await chrome.tabs.sendMessage(aba.id, { acao: "studio-ler-minuta" });
+  if (!r?.ok) throw new Error(r?.erro || "não consegui ler a minuta do app");
+  return r.minuta;
+}

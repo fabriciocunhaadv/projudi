@@ -204,6 +204,7 @@
       responder({ ok: true }); return false;
     }
     if (m?.acao === "studio-enviar-base") { enviar(m.nome, m.arquivoId, m.b64, !!m.substituir).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
+    if (m?.acao === "studio-ler-minuta") { lerMinuta().then((t) => responder({ ok: !!t, minuta: t, erro: t ? "" : "não há minuta pronta na tela do app" }), (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
     if (m?.acao === "studio-analisar") { (m.modo === "lupa" ? lupa(m) : analisar(m)).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
     return false;
   });
