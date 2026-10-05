@@ -8,6 +8,12 @@ export async function acharStudio() {
   if (!aba) aba = await chrome.tabs.create({ url: STUDIO_URL, active: false });
   for (let i = 0; i < 60; i++) {     // espera a página carregar e o script da extensão responder
     try { if ((await chrome.tabs.sendMessage(aba.id, { acao: "studio-ping" }))?.ok) return aba; } catch (e) { /* ainda carregando */ }
+    if (i === 3) {      // aba aberta antes de a extensão ser (re)carregada: o script antigo morreu; injeta o novo sem precisar atualizar a página
+      try {
+        await chrome.scripting.executeScript({ target: { tabId: aba.id }, func: () => { delete window.__projudiStudioBase; } });
+        await chrome.scripting.executeScript({ target: { tabId: aba.id }, files: ["studio-base.js"] });
+      } catch (e) { /* sem permissão: segue esperando */ }
+    }
     await dorme(1000);
   }
   throw new Error("abra o app Assessor Judicial (e entre com a sua conta) e tente de novo");
@@ -43,9 +49,9 @@ export async function analisarNoStudio(bytes, opcoes) {
 }
 
 // Lê a minuta que já está pronta na tela do app (sem analisar de novo).
-export async function lerMinutaAtual() {
+export async function lerMinutaAtual(processo = "") {
   const aba = await acharStudio();
-  const r = await chrome.tabs.sendMessage(aba.id, { acao: "studio-ler-minuta" });
+  const r = await chrome.tabs.sendMessage(aba.id, { acao: "studio-ler-minuta", processo });
   if (!r?.ok) throw new Error(r?.erro || "não consegui ler a minuta do app");
   return r.minuta;
 }

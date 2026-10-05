@@ -32,7 +32,7 @@ async function analisar(it) {
 // A análise já tinha terminado no Studio (a extensão foi recarregada ou a tela travou): usa a minuta que está lá, sem analisar de novo.
 async function usarMinutaDoStudio(it) {
   await atualizar(it.id, { estado: "analisando", erro: "", rodada: Date.now() + Math.random() });
-  try { await entregar(it, await lerPdf(it.id), await lerMinutaAtual(), ""); }
+  try { await entregar(it, await lerPdf(it.id), await lerMinutaAtual(it.processo), ""); }
   catch (e) { await atualizar(it.id, { estado: "erro", erro: e.message }); }
 }
 
@@ -49,6 +49,8 @@ async function passo() {
   ocupado = true;
   try {
     const lista = await todos();
+    const rec = lista.find((i) => i.estado === "recebida");      // minuta enviada pelo botão da tela do Studio
+    if (rec) { await atualizar(rec.id, { estado: "analisando", rodada: Date.now() + Math.random() }); try { await entregar(rec, await lerPdf(rec.id), rec.minutaRecebida, ""); } catch (e) { await atualizar(rec.id, { estado: "erro", erro: e.message }); } return; }
     const conf = lista.find((i) => i.estado === "conferido");
     if (conf) { await cadastrar(conf); return; }
     if (lista.some((i) => ATIVOS.includes(i.estado))) return;          // só um por vez nesta esteira
@@ -62,7 +64,7 @@ async function desenhar() {
   $("linhas").innerHTML = lista.length ? lista.map((it, n) => {
     const b = [];
     if (it.estado === "aguardando") b.push(`<button data-a="pular" data-id="${it.id}">Pular</button>`);
-    if (["aguardando", "pausado", "erro", "analisando"].includes(it.estado)) b.push(`<button data-a="usar" data-id="${it.id}" title="Se o Studio já terminou a minuta deste processo e ela está na tela do app, a extensão a leva ao Google Docs sem analisar de novo">Usar a minuta que já está no Studio</button>`);
+    if (["aguardando", "pausado", "erro", "analisando"].includes(it.estado)) b.push(`<button data-a="usar" data-id="${it.id}" title="A extensão procura o número do processo no Histórico Local do Studio, carrega a minuta e a leva ao Google Docs, sem analisar de novo">Usar a minuta do Studio (busca no Histórico)</button>`);
     if (["pausado", "erro", "analisando"].includes(it.estado)) b.push(`<button data-a="repetir" data-id="${it.id}">${it.estado === "erro" ? "Tentar de novo" : "Analisar de novo"}</button>`);
     if (it.estado === "conferindo") { if (it.docUrl) b.push(`<a href="${esc(it.docUrl)}" target="_blank">Abrir Docs</a>`); b.push(`<button data-a="conferido" data-id="${it.id}">✔ Terminei a conferência — cadastrar no Projudi</button>`); }
     if (it.estado === "cadastrando") { b.push(`<button data-a="projudi" data-id="${it.id}">Abrir o processo</button>`, `<button data-a="concluir" data-id="${it.id}">✔ Lancei no Projudi — próximo processo</button>`); }

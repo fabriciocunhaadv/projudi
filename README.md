@@ -151,3 +151,8 @@ Os downloads dos PDFs continuam todos em paralelo à esteira. Cada PDF pronto en
 4. Só então o próximo processo da fila vai ao Studio.
 
 Limite atual: a extensão abre a tela do processo (ou a pré-análise, quando conhecida); você abre o editor de texto da minuta e clica em “Inserir”. Para chegar sozinha ao editor preciso do HTML da tela da lupa/“minutar” do Projudi.
+
+### Continuar de onde parou
+- Na esteira, o processo interrompido/com erro tem **"Usar a minuta que já está no Studio"** (lê a minuta aberta na tela do app) e **"Analisar de novo"**.
+- Na própria tela do Studio, quando houver processo pendente e uma minuta aberta, aparece embaixo a barra **"Enviar a minuta aberta aqui para este processo"**. Ela escolhe o processo pelo número que está na tela (ou você escolhe na lista) e a esteira segue: Google Docs ao lado do PDF → conferência → Projudi.
+- Se a aba do Studio já estava aberta quando a extensão foi recarregada, a extensão se reinjeta sozinha (não precisa atualizar a página).

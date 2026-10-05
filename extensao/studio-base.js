@@ -167,6 +167,27 @@
     } catch (e) { return ""; }
   }
 
+  // Abre "Histórico Local", procura o número do processo e carrega a minuta dele na tela do app.
+  async function carregarDoHistorico(processo) {
+    const meta = () => (document.getElementById("tour-meta-parties-box")?.innerText || "");
+    if (meta().includes(processo) && minutaDoPainel().length > 200) return true;      // já é a que está aberta
+    fecharJanelas();
+    const abrir = [...document.querySelectorAll("button")].find((b) => /^Histórico Local$/i.test((b.title || "").trim()) || /^Histórico Local$/i.test(texto(b)));
+    if (!abrir) throw new Error("não achei o botão “Histórico Local” do app");
+    abrir.click();
+    const caixa = await esperar(() => [...document.querySelectorAll("input")].find((i) => visivel(i) && /Buscar processo/i.test(i.placeholder || "")), 15000);
+    if (!caixa) throw new Error("a janela do Histórico não abriu");
+    definirValor(caixa, processo);
+    const carregar = await esperar(() => {
+      const card = [...document.querySelectorAll("div")].filter((d) => d.innerText && d.innerText.includes(processo) && d.querySelector("button") && d.innerText.length < 3000).pop();
+      return card && [...card.querySelectorAll("button")].find((b) => /Carregar Minuta/i.test(texto(b)));
+    }, 15000);
+    if (!carregar) throw new Error(`não achei o processo ${processo} no Histórico do app (ou ele ainda não tem minuta lá)`);
+    carregar.click();
+    if (!(await esperar(() => meta().includes(processo) && minutaDoPainel().length > 200, 30000))) throw new Error("a minuta do histórico não carregou na tela");
+    return true;
+  }
+
   async function lupa({ arquivoId, nome, prompt, processo, minuta }) {
     if (!minuta || !minuta.trim()) return { ok: true, parcial: true, mensagem: "a Lupa precisa da minuta elaborada pelo assessor: PDF baixado, auditoria não iniciada" };
     const bytes = arquivos.get(arquivoId);
@@ -204,8 +225,45 @@
       responder({ ok: true }); return false;
     }
     if (m?.acao === "studio-enviar-base") { enviar(m.nome, m.arquivoId, m.b64, !!m.substituir).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
-    if (m?.acao === "studio-ler-minuta") { lerMinuta().then((t) => responder({ ok: !!t, minuta: t, erro: t ? "" : "não há minuta pronta na tela do app" }), (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
+    if (m?.acao === "studio-ler-minuta") { (m.processo ? carregarDoHistorico(m.processo) : Promise.resolve()).then(() => lerMinuta()).then((t) => responder({ ok: !!t, minuta: t, erro: t ? "" : "não há minuta pronta na tela do app" })).catch((e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
     if (m?.acao === "studio-analisar") { (m.modo === "lupa" ? lupa(m) : analisar(m)).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
     return false;
   });
+
+  // ---------- botão na tela do app: "Enviar esta minuta à esteira" (para continuar de onde parou) ----------
+  const K = (id) => "esteira_" + id;
+  const PENDENTES = ["aguardando", "analisando", "pausado", "erro"];
+  async function pendentes() {
+    const { esteira_ordem = [] } = await chrome.storage.local.get("esteira_ordem");
+    const d = await chrome.storage.local.get(esteira_ordem.map(K));
+    return esteira_ordem.map((i) => d[K(i)]).filter((x) => x && PENDENTES.includes(x.estado));
+  }
+  const host = document.createElement("div"); host.setAttribute("data-projudi-ext", "studio-envio");
+  const sh = host.attachShadow({ mode: "open" });
+  sh.innerHTML = `<style>.b{position:fixed;left:50%;transform:translateX(-50%);bottom:10px;z-index:2147483646;background:#0b3d7a;color:#fff;font:13px system-ui,sans-serif;padding:8px 12px;border-radius:8px;box-shadow:0 2px 10px #0006;display:none;gap:8px;align-items:center;max-width:90vw}
+    button{font:13px system-ui;padding:5px 12px;border:0;border-radius:4px;cursor:pointer;background:#fff;color:#0b3d7a;font-weight:700} select{font:13px system-ui;max-width:260px}</style><div class="b"></div>`;
+  const caixa = sh.querySelector(".b");
+  document.documentElement.appendChild(host);
+  async function atualizarBotao() {
+    try {
+      if (!host.isConnected) document.documentElement.appendChild(host);
+      const pend = await pendentes(), tem = minutaDoPainel().length > 200;
+      if (!pend.length || !tem) { caixa.style.display = "none"; return; }
+      const num = (document.getElementById("tour-meta-parties-box")?.innerText || "").match(/\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/)?.[0];
+      const certo = pend.find((x) => x.processo === num) || pend[0];
+      const chave = pend.map((x) => x.id).join() + "|" + certo.id;
+      if (caixa.dataset.chave === chave && caixa.style.display === "flex") return;
+      caixa.dataset.chave = chave; caixa.style.display = "flex";
+      caixa.innerHTML = `<span>Esteira de minutas:</span><select>${pend.map((x) => `<option value="${x.id}" ${x.id === certo.id ? "selected" : ""}>${x.processo}</option>`).join("")}</select><button>Enviar a minuta aberta aqui para este processo</button><span class="r"></span>`;
+      caixa.querySelector("button").onclick = async () => {
+        const id = caixa.querySelector("select").value, minuta = await lerMinuta();
+        if (!minuta) { caixa.querySelector(".r").textContent = "não achei a minuta nesta tela"; return; }
+        await navigator.locks.request("esteira-item", async () => { const it = (await chrome.storage.local.get(K(id)))[K(id)]; if (it) await chrome.storage.local.set({ [K(id)]: { ...it, estado: "recebida", minutaRecebida: minuta, erro: "" } }); });
+        caixa.querySelector(".r").textContent = "enviada! o Google Docs vai abrir.";
+        setTimeout(atualizarBotao, 3000);
+      };
+    } catch (e) { /* extensão recarregada: esta cópia do script morreu */ }
+  }
+  setInterval(atualizarBotao, 2500);
+  atualizarBotao();
 })();
