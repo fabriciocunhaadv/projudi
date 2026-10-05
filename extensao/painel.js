@@ -68,12 +68,21 @@ function desenhar() {
     if (clsLista.length) h += `<div><b>2) Só estes classificadores</b> <small>(opcional — sem marcar nenhum, baixa todos)</small><br>` +
       clsLista.map((c) => `<label class="chip"><input type="checkbox" data-cls="${esc(c)}" ${selCls.has(c) ? "checked" : ""}> ${esc(c)} <small>(${todosP.filter((p) => nomeCls(p) === c && automacao[p.serventia]?.ativa).length})</small></label>`).join(" ") + `</div>`;
     h += `<div>Situação: <label><input type="checkbox" data-sit="naoAnalisadas" ${selSit.has("naoAnalisadas") ? "checked" : ""}> Não analisadas</label> <label><input type="checkbox" data-sit="preAnalisadas" ${selSit.has("preAnalisadas") ? "checked" : ""}> Pré-analisadas</label></div>`;
-    if (cand.length) {
-      h += `<table class="tp"><thead><tr><th><input type="checkbox" id="marcarTodos" ${fila.length === cand.length ? "checked" : ""}></th><th>Processo</th><th>Serventia</th><th>Classificador</th><th>Urgência</th><th>Início</th><th class="n">Dias</th></tr></thead><tbody>` +
-        cand.map((p) => `<tr class="tp-linha"><td><input type="checkbox" data-proc="${esc(p.processo)}" ${excluidos.has(p.processo) ? "" : "checked"}></td><td><b>${esc(p.processo)}</b></td><td>${esc(p.serventia)}</td><td class="cls">${esc(nomeCls(p))}</td><td>${esc(p.urgenciaTexto)}</td><td>${esc(p.dataInicio)}</td><td class="n">${dias0(p)}</td></tr>`).join("") + `</tbody></table>`;
-    } else h += `<p class="zero">${Object.values(automacao).some((x) => x.ativa) ? "Nenhum processo com esse filtro." : "Marque ao menos uma serventia acima."}</p>`;
-    h += `<p><button id="baixarLote" ${fila.length ? "" : "disabled"}>⬇ Baixar PDFs dos ${fila.length} processo(s)</button> <small>Ordem da fila: “${esc(Ordenar.MODOS[$("modo").value])}”. Cada processo gera <b>número-OCR.pdf</b> e <b>número-OCR.txt</b>.</small></p></div>`;
-    window.__candidatos = fila;
+    const SECOES = [["naoAnalisadas", "Não analisadas"], ["preAnalisadas", "Pré-analisadas"]];
+    const ordenada = [];   // a fila segue esta ordem: primeiro as não analisadas, depois as pré-analisadas (cada grupo na ordem de trabalho)
+    for (const [tipo, rotulo] of SECOES) {
+      const grupo = cand.filter((p) => p.tipo === tipo);
+      if (!grupo.length) continue;
+      ordenada.push(...grupo);
+      const marcados = grupo.filter((p) => !excluidos.has(p.processo)).length;
+      h += `<h3 class="sub-baixar">${rotulo} <span class="qtd">(${marcados} de ${grupo.length} marcados)</span></h3>` +
+        `<table class="tp"><thead><tr><th><input type="checkbox" data-todos="${tipo}" ${marcados === grupo.length ? "checked" : ""} title="Marcar/desmarcar todos"></th><th>Processo</th><th>Serventia</th><th>Classificador</th><th>Urgência</th><th>Início</th><th class="n">Dias</th></tr></thead><tbody>` +
+        grupo.map((p) => `<tr class="tp-linha"><td><input type="checkbox" data-proc="${esc(p.processo)}" ${excluidos.has(p.processo) ? "" : "checked"}></td><td><b>${esc(p.processo)}</b></td><td>${esc(p.serventia)}</td><td class="cls">${esc(nomeCls(p))}</td><td>${esc(p.urgenciaTexto)}</td><td>${esc(p.dataInicio)}</td><td class="n">${dias0(p)}</td></tr>`).join("") + `</tbody></table>`;
+    }
+    if (!ordenada.length) h += `<p class="zero">${Object.values(automacao).some((x) => x.ativa) ? "Nenhum processo com esse filtro." : "Marque ao menos uma serventia acima."}</p>`;
+    const fila2 = ordenada.filter((p) => !excluidos.has(p.processo));
+    h += `<p><button id="baixarLote" ${fila2.length ? "" : "disabled"}>⬇ Baixar PDFs dos ${fila2.length} processo(s)</button> <small>Ordem da fila: “${esc(Ordenar.MODOS[$("modo").value])}”. Cada processo gera <b>número-OCR.pdf</b> e <b>número-OCR.txt</b>.</small></p></div>`;
+    window.__candidatos = fila2;
   }
 
   // 3) Detalhe: tabelas no formato do Projudi (ou fila única na ordem de trabalho)
@@ -139,7 +148,10 @@ function csv() {
     else if (dado.cls !== undefined) { t.checked ? selCls.add(dado.cls) : selCls.delete(dado.cls); }
     else if (dado.sit !== undefined) { t.checked ? selSit.add(dado.sit) : selSit.delete(dado.sit); }
     else if (dado.proc !== undefined) { t.checked ? excluidos.delete(dado.proc) : excluidos.add(dado.proc); }
-    else if (t.id === "marcarTodos") { const lista = [...document.querySelectorAll("input[data-proc]")].map((x) => x.dataset.proc); lista.forEach((n) => (t.checked ? excluidos.delete(n) : excluidos.add(n))); }
+    else if (dado.todos !== undefined) { // marcar/desmarcar todos de UMA tabela (não analisadas ou pré-analisadas)
+      const tabela = t.closest("table");
+      [...tabela.querySelectorAll("input[data-proc]")].forEach((x) => (t.checked ? excluidos.delete(x.dataset.proc) : excluidos.add(x.dataset.proc)));
+    }
     else return;
     desenhar();
   });

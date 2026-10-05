@@ -92,18 +92,24 @@ def main():
         n_cand = pn.locator("input[data-proc]").count(); assert n_cand >= 1, n_cand
         pn.fill("input[data-prompt]", "Prompt Família"); pn.locator("input[data-prompt]").first.dispatch_event("change"); pn.wait_for_timeout(300)
         assert f"Baixar PDFs dos {n_cand} processo(s)" in pn.inner_text("body")
+        corpo = pn.inner_text("body")
+        assert "Não analisadas (" in corpo and "marcados)" in corpo                      # tabelas separadas por situação
+        assert pn.locator("input[data-todos]").count() >= 1
+        pn.locator("input[data-todos]").first.uncheck(); pn.wait_for_timeout(200)       # desmarca todos de uma tabela
+        pn.locator("input[data-todos]").first.check(); pn.wait_for_timeout(200)
+        assert f"Baixar PDFs dos {n_cand} processo(s)" in pn.inner_text("body")
         pn.locator("input[data-proc]").first.uncheck(); pn.wait_for_timeout(200)
         assert f"Baixar PDFs dos {n_cand - 1} processo(s)" in pn.inner_text("body")
         sw0 = ctx.service_workers[0]
         assert sw0.evaluate("chrome.storage.sync.get('automacao')")["automacao"][pn.locator("input[data-serv]").first.get_attribute("data-serv")]["prompt"] == "Prompt Família"
         pn.select_option("#visao", "fila"); pn.wait_for_timeout(300)
-        fila = pn.inner_text("body"); print(fila[:1800])
+        fila = pn.inner_text("body").split("número-OCR.txt.", 1)[-1]; print(fila[:1800])   # só a parte "Processos" (depois do bloco de download)
         # ordem de trabalho: urgência do processo > prioridade do classificador > mais antigo
         ordem = [fila.index(n) for n in ["2000002.90", "1000001-11", "1000002-22", "1000003-33", "1000004-44", "2000001.80", "1000006-66", "1000005-55"]]
         assert ordem == sorted(ordem), ordem
         assert "02/10/2026 14:31:23" in fila and "Maior de 80 Anos" in fila and "Réu Preso" in fila
         pn.select_option("#modo", "data"); pn.wait_for_timeout(300)
-        fila = pn.inner_text("body")
+        fila = pn.inner_text("body").split("número-OCR.txt.", 1)[-1]
         ordem = [fila.index(n) for n in ["2000002.90", "2000001.80", "1000006-66", "1000003-33", "1000004-44", "1000002-22", "1000005-55", "1000001-11"]]
         assert ordem == sorted(ordem), ordem   # só a data: 29/09, 30/09, 01/10 13:28/14:51/15:03/16:58, 02/10 13:33/14:31
         pn.select_option("#visao", "tabela"); pn.select_option("#modo", "trabalho"); pn.wait_for_timeout(300)
