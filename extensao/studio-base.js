@@ -145,7 +145,7 @@
       const md = bl.querySelector(".markdown-body"), h = bl.querySelector(":scope > h3");
       if (md) {
         if (h) linhas.push(texto(h));
-        [...md.children].forEach((c) => { const t = (c.innerText || c.textContent || "").replace(/\s+/g, " ").trim(); if (t) linhas.push(t); });
+        [...md.children].forEach((c) => { for (const l of (c.innerText || c.textContent || "").split(/\n+/)) { const t = l.replace(/\s+/g, " ").trim(); if (t) linhas.push(t); } });
       } else if (i === 0) {
         [...bl.querySelectorAll("p,span")].forEach((e) => { const t = texto(e); if (t && !linhas.includes(t) && e.children.length === 0) linhas.push(t); });
       } else { const t = (bl.innerText || "").replace(/\s+/g, " ").trim(); if (t) linhas.push(t); }
@@ -158,7 +158,10 @@
     const raiz = document.querySelector("div.font-serif"); if (!raiz) return "";
     const esc = (x) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const limpo = (no) => {
-      if (no.nodeType === 3) return esc(no.nodeValue);
+      if (no.nodeType === 3) {      // texto com quebras de linha preservadas pelo CSS (white-space: pre-*) vira <br>
+        const pre = no.parentElement && /^pre/.test(getComputedStyle(no.parentElement).whiteSpace);
+        return pre ? esc(no.nodeValue).replace(/\n/g, "<br>") : esc(no.nodeValue);
+      }
       if (no.nodeType !== 1) return "";
       const t = no.tagName.toLowerCase(); let h = [...no.childNodes].map(limpo).join("");
       if (t === "br") return "<br>";

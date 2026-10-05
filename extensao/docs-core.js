@@ -48,15 +48,22 @@ export function paragrafosDeHtml(html) {
       if (est.b) acc.b.push([ini, acc.texto.length]); if (est.i) acc.i.push([ini, acc.texto.length]); return;
     }
     if (no.nodeType !== 1) return;
-    if (no.tagName === "BR") { acc.texto += " "; return; }
+    if (no.tagName === "BR") { acc.texto += "\n"; return; }
     const e = { ...est }; if (/^(B|STRONG)$/.test(no.tagName)) e.b = true; if (/^(I|EM)$/.test(no.tagName)) e.i = true;
     for (const c of no.childNodes) inline(c, e, acc);
   };
   const emitir = (el, { titulo = false, citacao = false } = {}) => {
     const acc = { texto: "", b: [], i: [] }; for (const c of el.childNodes) inline(c, {}, acc);
-    const lead = acc.texto.length - acc.texto.trimStart().length, t = acc.texto.trim(); if (!t) return;
-    const aj = (r) => r.map(([x, y]) => [Math.max(0, x - lead), Math.min(t.length, y - lead)]).filter(([x, y]) => y > x);
-    saida.push({ texto: t, titulo, citacao, negritos: titulo ? [] : aj(acc.b), italicos: aj(acc.i) });
+    // quebras de linha (<br>) dentro do bloco viram parágrafos separados
+    let ini = 0;
+    for (const trecho of acc.texto.split("\n")) {
+      const fim = ini + trecho.length, lead = trecho.length - trecho.trimStart().length, t = trecho.trim();
+      if (t) {
+        const fatia = (r) => r.map(([x, y]) => [Math.max(x, ini + lead) - (ini + lead), Math.min(y, ini + lead + t.length) - (ini + lead)]).filter(([x, y]) => y > x && x >= 0);
+        saida.push({ texto: t, titulo, citacao, negritos: titulo ? [] : fatia(acc.b), italicos: fatia(acc.i) });
+      }
+      ini = fim + 1;
+    }
   };
   const percorrer = (no, ctx) => {
     for (const el of no.children) {

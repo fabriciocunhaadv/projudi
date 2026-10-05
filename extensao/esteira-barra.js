@@ -6,8 +6,8 @@
   const idDoc = (location.pathname.match(/\/d\/([\w-]+)/) || [])[1] || "";
   const host = document.createElement("div"); host.setAttribute("data-projudi-ext", "esteira");
   const sh = host.attachShadow({ mode: "open" });
-  sh.innerHTML = `<style>.b{position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#0b3d7a;color:#fff;font:14px system-ui,sans-serif;padding:8px 16px;display:none;gap:10px;align-items:center;flex-wrap:wrap;box-shadow:0 -2px 8px #0005}
-    button{font:14px system-ui;padding:6px 14px;border:0;border-radius:4px;cursor:pointer;background:#fff;color:#0b3d7a;font-weight:600} .m{flex:1;min-width:200px} small{opacity:.85}</style><div class="b"></div>`;
+  sh.innerHTML = `<style>.b{position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#0b3d7a;color:#fff;font:12px system-ui,sans-serif;padding:6px 10px;display:none;gap:6px;align-items:center;flex-wrap:wrap;box-shadow:0 -2px 8px #0005}
+    button{font:12px system-ui;padding:5px 9px;border:0;border-radius:4px;cursor:pointer;background:#fff;color:#0b3d7a;font-weight:600} .m{flex:1;min-width:200px} small{opacity:.85}</style><div class="b"></div>`;
   const barra = sh.querySelector(".b");
   document.documentElement.appendChild(host);
 

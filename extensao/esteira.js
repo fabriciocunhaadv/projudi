@@ -17,6 +17,7 @@ async function entregar(it, bytes, minuta, mensagem, html = "") {
   const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig");
   await abrirLadoALado(doc.url, urlPdf, esteiraConfig.abrirEm || "abas");
   const aviso = doc.via === "colar" ? "Sem o login do Google configurado, a extensão cola a minuta no documento (sem a configuração de página de monografia). Se o documento ficar em branco, use o botão da barra azul." : "";
+  chrome.notifications?.create({ type: "basic", iconUrl: "icone.png", title: "Minuta pronta para conferência", message: `${it.processo} — ${tipo}: Google Docs e PDF abertos.` });
   await atualizar(it.id, { estado: "conferindo", minuta, minutaHtml: html, tipo, titulo, docUrl: doc.url, via: doc.via, aviso, htmlColar: doc.html || "", colado: false, inserido: false });
 }
 

@@ -8,7 +8,9 @@ PAG = """<html><body><div id="root"><div class="bg-white border border-slate-200
 <div id="tour-result-tabs"><button>Minuta do Ato</button></div><div class="p-5"><div class="max-w-4xl font-serif select-text">
 <div class="text-center"><p>PODER JUDICIÁRIO DO ESTADO DE GOIÁS</p><p>PODER JUDICIÁRIO DO ESTADO DE GOIÁS</p><div class="pt-2"><span>SENTENÇA</span></div></div>
 <div id="tour-meta-parties-box">Identificação dos Autos &amp; Polos Processo nº: 5001234 CADERNO DE TESES</div>
-<div class="space-y-1.5"><h3>I - RELATÓRIO</h3><div class="markdown-body"><p>Trata-se de <strong>embargos</strong> de <em>declaração</em>.</p><p>Os autos vieram conclusos.</p></div></div>
+<div class="space-y-1.5"><h3>I - RELATÓRIO</h3><div class="markdown-body"><p>Trata-se de <strong>embargos</strong> de <em>declaração</em>.</p><p>Os autos vieram conclusos.</p><p style="white-space:pre-line">Linha um.
+
+Linha dois.</p></div></div>
 <div class="space-y-1.5 pt-2"><h3>II - FUNDAMENTAÇÃO</h3><div class="markdown-body"><h3>1. DA ADMISSIBILIDADE</h3><p>O recurso é tempestivo.</p><blockquote><p>"Art. 1.022."</p></blockquote></div></div>
 <div class="space-y-1.5 pt-2"><h3>III - DISPOSITIVO</h3><div class="markdown-body"><p>Diante do exposto, REJEITO os embargos. Cumpra-se.</p></div></div>
 <div class="text-center pt-6">Gabinete Judicial.</div></div></div></div></div></body></html>"""
@@ -27,4 +29,5 @@ from importlib import import_module
 import subprocess, json
 print(h)
 assert "<b>embargos</b>" in h and "<i>declaração</i>" in h and "<blockquote><p>\"Art. 1.022.\"</p></blockquote>" in h and "<h3>SENTENÇA</h3>" in h and "CADERNO" not in h
+assert "Linha um.<br><br>Linha dois." in h, h
 print("OK")
