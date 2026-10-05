@@ -43,17 +43,17 @@ STUDIO = """<html><head><meta charset="utf-8"><title>Assessor Judicial</title></
 <div id="tour-input-panel"><button>PDF</button><button>Texto / Casos</button><button>Auto-Detectar</button><button>Sentença</button>
  <div id="drop"><input accept="application/pdf,.pdf" multiple class="hidden" type="file" id="autos"><span id="nomearq"></span></div>
  <button id="tour-execute-btn" onclick="executar()">Gerar Minuta Judicial</button></div>
-<div class="bg-white border rounded"><div class="p-3.5 border-b flex"><div class="flex items-center gap-2"><h3>Resultado &amp; Análise</h3></div><div class="flex items-center gap-1.5 opacity-50 pointer-events-none text-xs"><button>Editar</button></div></div><div id="res"><h4>Aguardando Execução</h4></div></div>
+<div class="bg-white border rounded"><div class="p-3.5 border-b flex"><div class="flex items-center gap-2"><h3>Resultado &amp; Análise</h3></div><div id="barra" class="flex items-center gap-1.5 opacity-50 pointer-events-none text-xs"><button>Editar</button></div></div><div id="res"><h4>Aguardando Execução</h4></div></div>
 <div id="modal" style="display:none"><button onclick="this.parentElement.style.display='none'">Fechar</button>
  <button id="tour-teses-base-conhecimento-tab" onclick="document.getElementById('base').style.display='block'">Base de Conhecimento</button>
  <div id="base" style="display:none"><div class="bg-slate-50 border relative"><span>Base de Conhecimento do Gabinete (Nuvem):</span><button>Adicionar PDF</button><input accept="application/pdf,.pdf" multiple class="hidden" type="file" id="base-input"><div id="docs"></div></div></div></div>
 <script>
 window.__analises = [];
-function novaAnalise(){ document.getElementById('nomearq').textContent=''; document.getElementById('autos').value=''; const r=document.getElementById('res'); r.innerHTML='<h4>Aguardando Execução</h4>'; document.querySelector('.pointer-events-none-x'); document.querySelector('.border .flex.items-center.gap-1\\.5').className='flex items-center gap-1.5 opacity-50 pointer-events-none text-xs'; }
+function novaAnalise(){ document.getElementById('nomearq').textContent=''; document.getElementById('autos').value=''; const r=document.getElementById('res'); r.innerHTML='<h4>Aguardando Execução</h4>'; document.querySelector('.pointer-events-none-x'); document.getElementById('barra').className='flex items-center gap-1.5 opacity-50 pointer-events-none text-xs'; }
 document.getElementById('autos').addEventListener('change', e => { document.getElementById('nomearq').textContent = e.target.files[0].name; window.__ultimo = {nome: e.target.files[0].name, tam: e.target.files[0].size}; });
 function executar(){ const b=document.getElementById('tour-execute-btn'); b.disabled=true; b.textContent='Analisando…';
   setTimeout(()=>{ const sel=document.getElementById('promptsel'); window.__analises.push({prompt: sel.options[sel.selectedIndex].text, ...window.__ultimo});
-    document.getElementById('res').innerHTML='<p>MINUTA GERADA</p>'; document.querySelector('.border .flex.items-center.gap-1\\.5').className='flex items-center gap-1.5 text-xs';
+    document.getElementById('res').innerHTML='<p>MINUTA GERADA</p>'; document.getElementById('barra').className='flex items-center gap-1.5 text-xs';
     b.disabled=false; b.textContent='Gerar Minuta Judicial'; }, 1200); }
 function excluir(b){ if(confirm('Excluir?')) b.closest('div.border').remove() }
 function adicionar(nome){ const d=document.createElement('div'); d.className='p-2.5 bg-white border rounded-lg'; d.innerHTML='<input type="checkbox" checked><div class="min-w-0"><p class="text-xs font-bold truncate" title="'+nome+'">'+nome+'</p><div class="flex"><span>2 MB</span></div></div><button title="Excluir documento da base permanentemente" onclick="excluir(this)">x</button>'; document.getElementById('docs').appendChild(d) }
