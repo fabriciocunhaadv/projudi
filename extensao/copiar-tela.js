@@ -26,7 +26,7 @@
   const host = document.createElement("div");
   host.setAttribute("data-projudi-ext", "copiar");
   const sh = host.attachShadow({ mode: "open" });
-  sh.innerHTML = `<style>button{position:fixed;left:6px;bottom:38px;z-index:2147483646;font:11px system-ui,sans-serif;padding:3px 7px;border:1px solid #888;background:#fff;color:#444;border-radius:5px;cursor:pointer;opacity:.55}button:hover{opacity:1}</style><button></button>`;
+  sh.innerHTML = `<style>button{position:fixed;left:6px;bottom:38px;z-index:2147483646;opacity:.35;font:11px system-ui,sans-serif;padding:3px 7px;border:1px solid #888;background:#fff;color:#444;border-radius:5px;cursor:pointer;opacity:.55}button:hover{opacity:1}</style><button></button>`;
   const b = sh.querySelector("button");
   const rotulo = topo ? "Copiar lista aberta (extensão)" : "Copiar esta tela (extensão)";
   b.textContent = rotulo;
