@@ -11,8 +11,10 @@ saida = Path(__file__).parent / "publicacao"; saida.mkdir(exist_ok=True)
 anterior = saida / "ultima-versao.txt"
 if anterior.exists() and anterior.read_text().strip() == versao and "--forcar" not in sys.argv:
     sys.exit(f"A versão {versao} já foi empacotada. Aumente \"version\" em extensao/manifest.json (a loja só aceita número maior) ou use --forcar.")
-m.pop("key", None)
-if "COLE_AQUI" in json.dumps(m): print("AVISO: oauth2.client_id ainda é o texto de exemplo; sem ele o Google Docs usa o plano B (colar).")
+m.pop("key", None)                  # a loja não aceita "key" (ela mesma gera o ID)
+if "COLE_AQUI" in json.dumps(m.get("oauth2", {})):      # login do Google ainda não configurado: tira o bloco e a permissão do pacote da loja
+    m.pop("oauth2", None); m["permissions"] = [x for x in m.get("permissions", []) if x != "identity"]
+    print("AVISO: oauth2.client_id ainda é o texto de exemplo; o pacote vai SEM login do Google (o Docs usa o plano B: colar a minuta).")
 alvo = saida / f"projudi-extensao-{versao}.zip"
 with zipfile.ZipFile(alvo, "w", zipfile.ZIP_DEFLATED) as z:
     for f in sorted(raiz.rglob("*")):

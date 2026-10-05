@@ -2,7 +2,7 @@
 
 ## Uma vez só
 1. Conta de desenvolvedor: https://chrome.google.com/webstore/devconsole — entre com a conta Google que será a "dona" da extensão (de preferência uma conta própria para isso, não pessoal) e pague a taxa única de US$ 5.
-2. Gere o pacote: `python3 empacotar.py` → cria `publicacao/projudi-extensao-<versão>.zip`.
+2. **Pacote pronto:** use o arquivo `publicacao/projudi-extensao-1.0.0.zip` deste repositório (clique nele no GitHub → **Download raw file**). Não envie a pasta `extensao` zipada nem o "Download ZIP" do repositório: o manifesto de desenvolvimento tem o campo `key`, que a loja recusa ("O campo key não é permitido no manifesto"). Para gerar outro pacote: `python3 empacotar.py` → cria `publicacao/projudi-extensao-<versão>.zip`.
 3. No painel: **Novo item → enviar o .zip**.
 4. Aba **Listagem da loja**: nome, descrição (o que faz, para assessores/magistrados do TJGO), categoria *Produtividade*, ícone 128×128 (`extensao/icone.png`), ao menos 1 captura de tela (1280×800) e idioma Português (Brasil).
 5. Aba **Privacidade**:
