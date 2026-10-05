@@ -56,7 +56,6 @@ function desenhar(estado) {
   };
   $("ferramentas").onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("ferramentas.html") });
   $("ocr").onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("ocr.html") });
-  $("assistente").onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("assistente.html") });
   $("painel").onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("painel.html") });
   $("atualizar").onclick = async () => { await salvar(); chrome.runtime.sendMessage({ acao: "verificar" }); };
   desenhar((await chrome.storage.local.get("estado")).estado);
