@@ -13,7 +13,8 @@
     "storage",
     "identity",
     "clipboardWrite",
-    "tabGroups"
+    "tabGroups",
+    "unlimitedStorage"
   ],
   "host_permissions": [
     "https://*.tjgo.jus.br/*",

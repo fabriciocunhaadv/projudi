@@ -1,4 +1,4 @@
-import { todos, atualizar, lerPdf, remover, ROTULO, ATIVOS } from "./esteira-banco.js";
+import { todos, atualizar, lerPdf, remover, enfileirar, ROTULO, ATIVOS } from "./esteira-banco.js";
 import { analisarNoStudio, lerMinutaAtual } from "./studio-cliente.js";
 import { criarDocumento, abrirLadoALado, lerDocumento, tipoDaMinuta, nomeDoc } from "./docs-api.js";
 import { paragrafosDeHtml } from "./docs-core.js";
@@ -93,6 +93,26 @@ $("linhas").addEventListener("click", async (ev) => {
 });
 chrome.storage.sync.get("esteiraConfig").then(({ esteiraConfig = {} }) => { $("abrirEm").value = esteiraConfig.abrirEm || "abas"; });
 $("abrirEm").onchange = async () => { const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig"); chrome.storage.sync.set({ esteiraConfig: { ...esteiraConfig, abrirEm: $("abrirEm").value } }); };
+// Recuperação: coloca na fila PDFs "número-OCR.pdf" que já estão no computador (a fila foi perdida ou os PDFs vieram de fora).
+chrome.storage.sync.get("automacao").then(({ automacao = {} }) => {
+  const prompts = [...new Set(Object.values(automacao).map((a) => a.prompt).filter(Boolean))];
+  $("impPrompts").innerHTML = prompts.map((x) => `<option value="${esc(x)}">`).join("");
+  if (prompts.length === 1) $("impPrompt").value = prompts[0];
+});
+$("impArq").onchange = async () => {
+  const prompt = $("impPrompt").value.trim(), docs = $("impDocs").checked, arqs = [...$("impArq").files];
+  if (!prompt) { $("impMsg").textContent = "Preencha antes o prompt do Studio."; $("impArq").value = ""; return; }
+  let n = 0; const ja = new Set((await todos()).map((i) => i.processo));
+  for (const f of arqs) {
+    const proc = (f.name.match(/\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/) || [])[0];
+    if (!proc || ja.has(proc)) continue;
+    const num = proc.replace(/\D/g, ""), url = `BuscaProcesso?PaginaAtual=2&TipoConsultaProcesso=24&ProcessoNumero=${num.slice(0, -13)}-${num.slice(-13)}`;
+    await enfileirar({ processo: proc, url, urlPre: "", prompt, modo: "analise", docs, minutaAssessor: "", pdfNome: f.name, pdf: f.name }, new Uint8Array(await f.arrayBuffer()));
+    ja.add(proc); n++;
+  }
+  $("impMsg").textContent = n ? `${n} processo(s) adicionados à fila.` : "Nenhum arquivo novo (o nome precisa conter o número do processo).";
+  $("impArq").value = ""; passo();
+};
 $("limpar").onclick = async () => { await remover((await todos()).filter((i) => ["concluido", "pulado"].includes(i.estado)).map((i) => i.id)); desenhar(); };
 chrome.storage.onChanged.addListener((c, area) => { if (area === "local" && Object.keys(c).some((k) => k.startsWith("esteira_"))) { desenhar(); passo(); } });
 setInterval(passo, 3000);
