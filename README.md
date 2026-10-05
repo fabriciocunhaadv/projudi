@@ -147,7 +147,7 @@ Obs.: a Lupa do Magistrado não gera o documento (ela audita, não minuta). Test
 Os downloads dos PDFs continuam todos em paralelo à esteira. Cada PDF pronto entra na **esteira** (página `esteira.html`, aberta sozinha em segundo plano; também há o link na tela da fila), que trabalha **um processo por vez**:
 1. **Studio** gera a minuta (se der erro, o processo fica marcado com o erro e a esteira segue para o próximo; há “Tentar de novo”).
 2. **Google Docs** abre com a minuta “número – tipo” ao lado do PDF. Uma barra azul no rodapé do Docs traz o botão **“✔ Terminei a conferência — cadastrar no Projudi”**.
-3. Ao clicar, a extensão lê de volta o texto corrigido no Docs (precisa do login do Google acima; sem ele usa a minuta original do Studio) e abre o processo no Projudi. A barra do Projudi traz **“Inserir a minuta no editor (formatada)”** — usa a formatação cadastrada na extensão (Aprender texto/citação) — e **“✔ Lancei no Projudi — próximo processo”**.
+3. Ao clicar, a extensão lê de volta o texto corrigido no Docs (precisa do login do Google acima; sem ele usa a minuta original do Studio) e abre o processo no Projudi. A barra do Projudi traz **“Copiar minuta”** — usa a formatação cadastrada na extensão (Aprender texto/citação) — e **“✔ Lancei no Projudi — próximo processo”**.
 4. Só então o próximo processo da fila vai ao Studio.
 
 Limite atual: a extensão abre a tela do processo (ou a pré-análise, quando conhecida); você abre o editor de texto da minuta e clica em “Inserir”. Para chegar sozinha ao editor preciso do HTML da tela da lupa/“minutar” do Projudi.

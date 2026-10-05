@@ -154,11 +154,9 @@ def main():
         espera(lambda: estados()[0] == "cadastrando", "deveria ir para o Projudi")
         assert estados()[1] == "aguardando"                                                  # a fila só avança depois do lançamento
         proj = [x for x in ctx.pages if x.url.startswith("http://localhost:8770/proc?id=1") and x.locator("[data-projudi-ext=esteira]").count()][0]
-        proj.wait_for_selector("[data-projudi-ext=esteira] #ins", state="attached", timeout=20000)
-        proj.locator("[data-projudi-ext=esteira] #ins").click(); proj.wait_for_timeout(1500)
-        ed = [f for f in proj.frames if f != proj.main_frame][0]
-        txt = ed.inner_text("body"); print("EDITOR:", txt, "| barra:", proj.evaluate("document.querySelector('[data-projudi-ext=esteira]').shadowRoot.querySelector('.m').innerText"), "| quadros:", [(f.url, f.locator("[data-projudi-ext]").count()) for f in proj.frames])
-        assert "Julgo procedente o pedido CORRIGIDO." in txt                                 # texto corrigido no Docs, lido de volta
+        proj.wait_for_selector("[data-projudi-ext=esteira] #cop", state="attached", timeout=20000)        # só "Copiar minuta" e "Lancei"; nada é lançado no editor
+        assert proj.locator("[data-projudi-ext=esteira] #ins").count() == 0
+        assert "inicio" == [f for f in proj.frames if f != proj.main_frame][0].inner_text("body").strip()      # o editor do Projudi não foi tocado
         proj.locator("[data-projudi-ext=esteira] #ok").click()
         espera(lambda: estados()[0] == "concluido" and estados()[1] in ("analisando", "conferindo") and len(studio.evaluate("window.__analises")) == 2, "2º deveria seguir para o Studio")
         analises = studio.evaluate("window.__analises"); print(analises)

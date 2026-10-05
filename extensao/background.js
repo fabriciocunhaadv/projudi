@@ -213,10 +213,6 @@ chrome.runtime.onMessage.addListener((m, s, responder) => {
     chrome.tabs.query({ url }).then((abas) => (abas.length ? abas[0] : chrome.tabs.create({ url, active: false }))).then(() => responder({ ok: true }), (e) => responder({ ok: false, erro: String(e.message || e) }));
     return true;
   }
-  if (m?.acao === "esteira-inserir" && s.tab) {   // a barra (aba principal) pede para o quadro do editor inserir a minuta
-    chrome.tabs.sendMessage(s.tab.id, { acao: "esteira-inserir-texto", texto: m.texto, html: m.html || "" }).then((r) => responder(r || { ok: false }), () => responder({ ok: false }));
-    return true;
-  }
   if (m?.acao === "gerar-pdf-interceptar") { // a janela "Gerar PDF" entregou o pedido: a extensão busca o PDF, faz OCR e salva
     const id = String(Date.now());
     chrome.storage.local.set({ ["gerar_" + id]: { url: m.url, corpo: m.corpo, nome: m.nome, pasta: m.pasta, lote: m.lote, studio: m.studio } })
