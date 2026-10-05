@@ -1,6 +1,5 @@
 // Página de OCR: tela, arrastar/soltar e OCR automático dos PDFs baixados do Projudi. O trabalho pesado está em ocr-motor.js.
 import { fazerOcr, fmt } from "./ocr-motor.js";
-import { textoComOrigem } from "./texto-origem.js";
 import { analisarNoStudio } from "./studio-cliente.js";
 
 const $ = (id) => document.getElementById(id);
@@ -140,13 +139,9 @@ async function interceptado(idJob) {
     };
     $("status").textContent = "Salvando o PDF…";
     const arqPdf = await salvar(new Blob([res.bytes], { type: "application/pdf" }), num + "-OCR.pdf");
-    $("status").textContent = "Gerando o texto com a origem de cada trecho…";
-    const t = await textoComOrigem(res.bytes, { processo: job.nome, paginasOcr: res.paginasOcr || [] });
-    const arqTxt = await salvar(new Blob([t.texto], { type: "text/plain;charset=utf-8" }), num + "-OCR.txt");
-    log(`Texto: ${t.paginas} páginas, ${t.comOrigem} com origem identificada.`);
-    $("status").textContent = `Pronto: ${arqPdf} e ${arqTxt}`;
-    document.body.dataset.salvo = arqPdf + "|" + arqTxt;
-    avisar("PDF do processo pronto", `${num}-OCR.pdf e .txt salvos (${res.ocr} de ${res.total} páginas com OCR).`);
+    $("status").textContent = `Pronto: ${arqPdf}`;
+    document.body.dataset.salvo = arqPdf;
+    avisar("PDF do processo pronto", `${num}-OCR.pdf salvo (${res.ocr} de ${res.total} páginas com OCR).`);
     let studio = null;      // análise automática no app de IA (opcional): só segue para o próximo processo quando ela termina
     if (job.studio && job.studio.ativo) {
       $("status").textContent = "Enviando ao app de IA e aguardando a análise…";
@@ -155,7 +150,7 @@ async function interceptado(idJob) {
       document.body.dataset.studio = JSON.stringify(studio);
       avisar("Análise no app de IA", studio.ok ? `${num}: ${studio.mensagem || "concluída"}` : `${num}: ${studio.erro}`);
     }
-    if (job.lote) await chrome.storage.local.set({ ["lote_fim_" + job.lote]: { ok: true, pdf: arqPdf, txt: arqTxt, paginas: res.total, ocr: res.ocr, studio } });
+    if (job.lote) await chrome.storage.local.set({ ["lote_fim_" + job.lote]: { ok: true, pdf: arqPdf, paginas: res.total, ocr: res.ocr, studio } });
     await chrome.storage.local.remove(chave);
     document.body.dataset.pronto = "1";
     setTimeout(() => window.close(), 5000);

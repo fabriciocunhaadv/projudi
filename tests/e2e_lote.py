@@ -1,4 +1,4 @@
-"""Fila de download: dois processos -> abre cada um, pede o PDF completo, OCR, salva número-OCR.pdf e número-OCR.txt com a origem de cada trecho."""
+"""Fila de download: dois processos -> abre cada um, pede o PDF completo, OCR, salva número-OCR.pdf."""
 import base64, glob, http.server, os, shutil, subprocess, sys, tempfile, threading, uuid
 from pathlib import Path
 from playwright.sync_api import sync_playwright
@@ -71,18 +71,12 @@ def main():
         assert len(CORPOS) == 2, CORPOS
         fins = [sw.evaluate("(k) => chrome.storage.local.get(k)", f"lote_fim_t1:{i}")[f"lote_fim_t1:{i}"] for i in (0, 1)]
         print(fins)
-        txt = Path(fins[0]["txt"]).read_text(encoding="utf-8")
         pdf = subprocess.run(["pdftotext", "-layout", fins[0]["pdf"], "-"], capture_output=True, text=True).stdout.lower(); pdf = " ".join(pdf.split())
         ctx.close()
-    print(txt[:1800])
-    flat = " ".join(txt.lower().split())
-    assert "processo 5293296-60.2026.8.09.0166" in flat and "índice" in flat
-    assert "movimentação 1 (peticao enviada) | arquivo 1: doc1.pdf | pág. 1 de 1 do arquivo" in flat
-    assert "movimentação 8 (juntada -> peticao) | arquivo 2: doc2.pdf" in flat and "[ocr]" in flat
-    assert "pensão alimentícia" in flat and "guarda compartilhada" in flat          # texto das páginas-imagem, com OCR
-    assert "pagina um com texto nativo" in flat                                       # texto nativo preservado
-    assert flat.count("movimentacao 8 : juntada") == 2        # uma por página (2 e 3): o OCR não duplicou o carimbo
-    assert "pensão alimentícia" in pdf
+    assert "5293296-60.2026.8.09.0166" in pdf and "movimentacao 8 : juntada" in pdf       # carimbo do Projudi preservado
+    assert "pensão alimentícia" in pdf and "guarda compartilhada" in pdf                  # texto das páginas-imagem, com OCR
+    assert pdf.count("movimentacao 8 : juntada") == 2                                      # uma por página: o OCR não duplicou o carimbo
+
     print("OK")
 
 
