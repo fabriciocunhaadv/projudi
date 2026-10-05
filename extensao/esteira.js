@@ -12,8 +12,8 @@ async function entregar(it, bytes, minuta, mensagem) {
   const tipo = tipoDaMinuta(minuta), titulo = nomeDoc(it.processo, tipo), doc = await criarDocumento(titulo, minuta);
   const urlPdf = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
   await abrirLadoALado(doc.url, urlPdf);
-  const aviso = doc.via === "colar" ? (doc.copiou ? "Login do Google não configurado: cole (Ctrl+V) a minuta, já copiada, no documento em branco." : "Login do Google não configurado: use o botão Copiar do Studio e cole no documento.") : "";
-  await atualizar(it.id, { estado: "conferindo", minuta, tipo, titulo, docUrl: doc.url, via: doc.via, aviso });
+  const aviso = doc.via === "colar" ? "Sem o login do Google configurado, a extensão cola a minuta no documento (sem a configuração de página de monografia). Se o documento ficar em branco, use o botão da barra azul." : "";
+  await atualizar(it.id, { estado: "conferindo", minuta, tipo, titulo, docUrl: doc.url, via: doc.via, aviso, htmlColar: doc.html || "", colado: false, inserido: false });
 }
 
 async function analisar(it) {
@@ -40,8 +40,8 @@ async function cadastrar(it) {         // conferência terminada: pega o texto f
   let texto = it.minuta, aviso = it.aviso || "";
   try { const lido = it.docUrl && it.via === "api" ? await lerDocumento(it.docUrl.match(/\/d\/([\w-]+)/)?.[1]) : null; if (lido) texto = lido; else if (it.docUrl) aviso = "Sem o login do Google não dá para ler as suas correções: será usada a minuta original do Studio."; }
   catch (e) { aviso = "Não consegui ler o Google Docs (" + e.message + "): será usada a minuta original do Studio."; }
-  await chrome.tabs.create({ url: it.urlPre || it.url, active: true });
-  await atualizar(it.id, { estado: "cadastrando", textoFinal: texto, aviso });
+  const aba = await chrome.tabs.create({ url: it.urlPre || it.url, active: true });
+  await atualizar(it.id, { estado: "cadastrando", textoFinal: texto, aviso, projudiTab: aba.id, inserido: false });
 }
 
 async function passo() {

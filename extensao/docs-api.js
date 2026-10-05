@@ -27,7 +27,7 @@ export async function criarDocumento(titulo, minuta) {
     await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([html], { type: "text/html" }), "text/plain": new Blob([minuta], { type: "text/plain" }) })]);
     copiou = true;
   } catch (e) { /* página sem foco: o usuário usa o botão Copiar do app */ }
-  return { url: "https://docs.google.com/document/create?title=" + encodeURIComponent(titulo), via: "colar", copiou };
+  return { url: "https://docs.google.com/document/create?title=" + encodeURIComponent(titulo), via: "colar", copiou, html: htmlMonografia(minuta) };
 }
 
 // Abre Google Docs (esquerda) e PDF (direita), cada um em metade da tela.
