@@ -49,8 +49,9 @@
   const arquivos = new Map();      // arquivos recebidos da extensão (em partes), por id
   const partes = new Map();
 
-  async function enviar(nome, arquivoId, b64) {
+  async function enviar(nome, arquivoId, b64, substituir = false) {
     await abrirBase();
+    if (!substituir && cartaoDe(nome)) return { ok: false, existe: true, erro: `Já existe “${nome}” na base de conhecimento do app. O app não permite editar: exclua o documento antigo (lixeira) e envie de novo.` };
     let bytes = arquivoId ? arquivos.get(arquivoId) : null;
     if (!bytes && b64) { const bin = atob(b64); bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); }
     if (!bytes) throw new Error("arquivo não recebido");
@@ -168,7 +169,7 @@
       }
       responder({ ok: true }); return false;
     }
-    if (m?.acao === "studio-enviar-base") { enviar(m.nome, m.arquivoId, m.b64).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
+    if (m?.acao === "studio-enviar-base") { enviar(m.nome, m.arquivoId, m.b64, !!m.substituir).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
     if (m?.acao === "studio-analisar") { (m.modo === "lupa" ? lupa(m) : analisar(m)).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
     return false;
   });

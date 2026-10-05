@@ -47,6 +47,7 @@
           config: Object.fromEntries(["valid_styles", "valid_elements", "extended_valid_elements", "invalid_styles", "plugins", "toolbar", "content_style", "paste_as_text", "allowedContent", "extraAllowedContent", "forcePasteAsPlainText", "removeFormatAttributes"].map((k) => [k, pega(k)]).filter(([, v]) => v !== undefined)),
           sobrevive: sobrevive(ed, tipo), textareaAntes: (() => { try { const t = (ed.element && ed.element.$) || ed.getElement(); return String(t.value).replace(/data:[^"\s]{20,}/g, "data:…").slice(0, 700); } catch (e) { return "?"; } })(), conteudoAtual: String(ed.getContent ? ed.getContent() : ed.getData()).replace(/data:[^"\s]{20,}/g, "data:…").slice(0, 1500) });
       }
+      if (d.acao === "ler") return responder({ ok: true, tipo, html: String(ed.getData ? ed.getData() : ed.getContent()) });
       if (d.acao === "sincronizar") { // o formulário do Projudi lê o <textarea>, que o CKEditor só atualiza em certos momentos
         if (tipo === "tinymce") ed.save && ed.save(); else ed.updateElement && ed.updateElement();
         return responder({ ok: true });

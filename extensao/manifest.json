@@ -58,7 +58,8 @@
         "arquivos-core.js",
         "baixador.js",
         "gerarpdf.js",
-        "copiar-tela.js"
+        "copiar-tela.js",
+        "modelos-projudi.js"
       ],
       "all_frames": true,
       "match_about_blank": true,

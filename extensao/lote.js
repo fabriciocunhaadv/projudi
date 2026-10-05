@@ -1,4 +1,4 @@
-import { montarPdf, nomePadrao, semBarra } from "./modelos-pdf.js";
+import { montarPdf, nomePadrao, semBarra, acharServentia } from "./modelos-pdf.js";
 import { enviarBase } from "./studio-cliente.js";
 // Fila: para cada processo selecionado, abre o processo, pede o PDF completo ao Projudi e deixa a página de OCR salvar PDF + texto.
 const BASE = "https://projudi.tjgo.jus.br/";
@@ -28,6 +28,32 @@ function esperarFim(chave, ms) {
 const registro = [];      // linha do tempo, para diagnóstico
 const limite = (promessa, ms, msg) => Promise.race([promessa, new Promise((_, no) => setTimeout(() => no(new Error(msg)), ms))]);
 
+// Minuta já escrita no editor da pré-análise (para a Lupa do Magistrado): abre a tela da pré-análise e lê o editor (CKEditor/TinyMCE).
+async function lerMinutaPre(urlPre) {
+  const tab = await chrome.tabs.create({ url: new URL(urlPre, BASE).href, active: false });
+  try {
+    await carregou(tab.id); await dorme(2000);
+    for (let k = 0; k < 10; k++) {
+      const r = await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, world: "MAIN", func: () => {
+        try {
+          const ck = window.CKEDITOR; if (ck && ck.instances) { const n = Object.keys(ck.instances)[0]; if (n) return ck.instances[n].getData(); }
+          if (window.tinymce && window.tinymce.activeEditor) return window.tinymce.activeEditor.getContent();
+        } catch (e) { /* sem editor neste quadro */ }
+        return null;
+      } }).catch(() => []);
+      const html = r.map((x) => x.result).filter(Boolean).sort((a, b) => b.length - a.length)[0];
+      if (html) {
+        const d = new DOMParser().parseFromString(html, "text/html");
+        d.querySelectorAll("br").forEach((b) => b.replaceWith("\n"));
+        d.querySelectorAll("p,div,li,h1,h2,h3,h4,h5,h6,blockquote").forEach((e) => e.append("\n"));
+        return d.body.textContent.replace(/\u00a0/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+      }
+      await dorme(1000);
+    }
+    return "";
+  } finally { chrome.tabs.remove(tab.id).catch(() => {}); }
+}
+
 async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
   const passo = (t) => { registro.push(new Date().toLocaleTimeString("pt-BR") + " " + item.processo + " — " + t); etapa(t); };
   passo("abrindo o processo");
@@ -38,7 +64,9 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
     await carregou(tab.id); await dorme(1500);
     passo("procurando o botão Gerar PDF");
     await chrome.storage.local.remove(["lote_fim_" + chave, "lote_prog_" + chave, "gerarpdf_pedido"]);
-    await chrome.storage.local.set({ gerarpdf_pedido: { todos: true, processo: item.processo, pasta, lote: chave, ts: Date.now(), studio: opcoes.studio?.ativo ? { ativo: true, modo: opcoes.studio.modo, prompt: item.prompt || "", tipo: "" } : null } });
+    let minuta = "";      // Lupa do Magistrado: usa a minuta que o assessor já escreveu na pré-análise
+    if (opcoes.studio?.ativo && opcoes.studio.modo === "lupa" && item.situacao === "preAnalisadas" && item.urlPre) { passo("lendo a minuta escrita na pré-análise"); minuta = await limite(lerMinutaPre(item.urlPre), 60000, "a minuta da pré-análise não carregou").catch(() => ""); }
+    await chrome.storage.local.set({ gerarpdf_pedido: { todos: true, processo: item.processo, pasta, lote: chave, ts: Date.now(), studio: opcoes.studio?.ativo ? { ativo: true, modo: opcoes.studio.modo, prompt: item.prompt || "", tipo: "", minuta } : null } });
     let r = await limite(GerarUtil.capturarGerar(tab.id), 45000, "a página do processo não respondeu (pode haver um aviso do Projudi aberto nela)");
     if (!r.achou) {   // o botão fica na aba "Navegação de Arquivos"
       await chrome.tabs.update(tab.id, { url: BASE + "BuscaProcesso?PaginaAtual=98&PassoBusca=4" });
@@ -90,14 +118,16 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
     $("base").hidden = false;
     for (const v of varas) {
       const li = document.createElement("li"); $("base").append(li);
-      const d = modelos?.serventias?.[v.serventia];
+      const d = acharServentia(modelos, v.serventia);
       if (!d || !d.modelos?.length) { li.innerHTML = `⚠ ${esc(v.serventia)} — sem modelos capturados do Projudi (pulei a base de conhecimento)`; continue; }
       try {
         li.textContent = `⏳ ${v.serventia} — montando e enviando o PDF de modelos…`;
         const nome = semBarra(v.arquivoModelos || nomePadrao(v.serventia)) + ".pdf";
         const r = await enviarBase(nome, await montarPdf({ serventia: v.serventia, modelos: d.modelos.map((m) => ({ ...m, serventia: v.serventia })) }));
         li.innerHTML = `<span class="ok">✔</span> ${esc(v.serventia)} — base de conhecimento: ${r.substituiu ? "documento substituído" : "documento cadastrado"} (${esc(nome)})`;
-      } catch (e) { li.innerHTML = `<span class="erro">✖ ${esc(v.serventia)} — base de conhecimento: ${esc(e.message)}</span>`; }
+      } catch (e) {
+        li.innerHTML = e.existe ? `⚠ <b>${esc(v.serventia)}</b> — ${esc(e.message)} (a análise segue normalmente; os modelos antigos continuam na base)` : `<span class="erro">✖ ${esc(v.serventia)} — base de conhecimento: ${esc(e.message)}</span>`;
+      }
     }
   }
   let feitos = 0, erros = 0;

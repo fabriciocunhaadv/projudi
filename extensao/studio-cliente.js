@@ -25,11 +25,11 @@ export async function enviarArquivo(tabId, bytes) {
   return id;
 }
 
-export async function enviarBase(nome, bytes) {          // cadastra/atualiza (substitui) um PDF na Base de Conhecimento
+export async function enviarBase(nome, bytes, substituir = false) {          // cadastra/atualiza (substitui) um PDF na Base de Conhecimento
   const aba = await acharStudio();
   const arquivoId = await enviarArquivo(aba.id, bytes);
-  const r = await chrome.tabs.sendMessage(aba.id, { acao: "studio-enviar-base", nome, arquivoId });
-  if (!r?.ok) throw new Error(r?.erro || "o app não confirmou o envio");
+  const r = await chrome.tabs.sendMessage(aba.id, { acao: "studio-enviar-base", nome, arquivoId, substituir });
+  if (!r?.ok) { const e = new Error(r?.erro || "o app não confirmou o envio"); e.existe = !!r?.existe; throw e; }
   return r;
 }
 

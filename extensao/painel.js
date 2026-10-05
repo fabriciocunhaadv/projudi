@@ -171,7 +171,7 @@ function csv() {
     const fila = window.__candidatos || [];   // já na ordem de trabalho
     if (!fila.length) return;
     const hoje = new Date().toISOString().slice(0, 10), id = String(Date.now());
-    const itens = fila.map((p) => ({ processo: p.processo, url: p.url, classificador: nomeCls(p), serventia: p.serventia, situacao: p.tipo, arquivoModelos: automacao[p.serventia]?.arquivoModelos || "", prompt: automacao[p.serventia]?.prompt || "", pasta: `Projudi/${hoje}/${[p.serventia, nomeCls(p)].map((x) => String(x).replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60)).join("/")}` }));
+    const itens = fila.map((p) => ({ processo: p.processo, url: p.url, classificador: nomeCls(p), serventia: p.serventia, situacao: p.tipo, urlPre: p.urlPre || "", arquivoModelos: automacao[p.serventia]?.arquivoModelos || "", prompt: automacao[p.serventia]?.prompt || "", pasta: `Projudi/${hoje}/${[p.serventia, nomeCls(p)].map((x) => String(x).replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60)).join("/")}` }));
     await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/" + hoje, opcoes: { atualizarBase: opcoes.atualizarBase, studio: { ativo: opcoes.studio, modo: opcoes.modo } } } });
     chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + id) });
   });

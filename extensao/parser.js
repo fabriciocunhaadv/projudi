@@ -94,6 +94,7 @@
         processo: completo ? completo[1] : cel[i].match(RE_PROC)[0],
         url: els[i].querySelector("a[href*='Id_Processo']")?.getAttribute("href") || "",
         idPendencia: tr.querySelector("input[name='pendencias']")?.value || "",
+        urlPre: (() => { const a = [...tr.querySelectorAll("a[href]")].find((x) => /PreAnalis|Id_Pendencia/i.test(x.getAttribute("href") || "") && !/Id_Processo/i.test(x.getAttribute("href") || "")); return a ? a.getAttribute("href") : ""; })(),
         classificador, prioridade, tipoConclusao,
         urgencia: nivel ? parseInt(nivel, 10) : null, urgenciaTexto,
         marcadores: urgenciaTexto && !/^normal$/i.test(urgenciaTexto) ? [urgenciaTexto] : [],

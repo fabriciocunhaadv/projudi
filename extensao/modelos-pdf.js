@@ -63,3 +63,10 @@ export async function montarPdf({ serventia, modelos, geradoEm = new Date() }) {
   doc.setTitle(`Modelos — ${serventia}`); doc.setProducer("Extensão Conclusões Projudi");
   return doc.save();
 }
+
+// Os nomes da serventia diferem entre o painel ("... - Vara de Família e Sucessões - GO") e a lista de modelos ("... - Vara de Família e Sucessões").
+const chave = (s) => sem(s).replace(/\s*-\s*go\s*$/, "").replace(/\s+/g, " ").trim();
+export function acharServentia(modelos, nome) {
+  const k = chave(nome), todas = Object.entries(modelos?.serventias || {});
+  return (todas.find(([n]) => chave(n) === k) || todas.find(([n]) => chave(n).includes(k) || k.includes(chave(n))) || [])[1] || null;
+}

@@ -64,8 +64,21 @@ def main():
             return json.loads(pg.evaluate("() => document.body.dataset.enviado"))
         r1 = enviar(); print(r1)
         assert r1["ok"] and not r1["substituiu"] and r1["quantos"] == 1
-        r2 = enviar(); print(r2)
-        assert r2["ok"] and r2["substituiu"] and r2["quantos"] == 1             # o antigo foi excluído e o novo enviado: continua 1 só
+        # segunda vez: o documento já existe -> a extensão NÃO exclui sozinha; avisa para excluir o antigo
+        pg.evaluate("() => { delete document.body.dataset.enviado; delete document.body.dataset.erro; delete document.body.dataset.existe; }")
+        pg.click("button[data-a=enviar]")
+        for _ in range(240):
+            if pg.evaluate("() => !!document.body.dataset.existe"): break
+            pg.wait_for_timeout(250)
+        assert "Já existe" in pg.inner_text("#m-0") and "exclua o documento antigo" in pg.inner_text("#m-0"), pg.inner_text("#m-0")
+        assert studio.eval_on_selector_all("p[title]", "ps => ps.length") == 2           # nada foi excluído nem duplicado
+        # o usuário escolhe substituir: exclui o antigo e envia o novo
+        pg.click("button[data-substituir='1']")
+        for _ in range(240):
+            if pg.evaluate("() => !!document.body.dataset.enviado"): break
+            pg.wait_for_timeout(250)
+        r2 = json.loads(pg.evaluate("() => document.body.dataset.enviado")); print(r2)
+        assert r2["ok"] and r2["substituiu"] and r2["quantos"] == 1
         titulos = studio.eval_on_selector_all("p[title]", "ps => ps.map(p => p.getAttribute('title'))")
         print(titulos)
         assert titulos.count(nome_arq + ".pdf") == 1 and "Boletim.pdf" in titulos      # outros documentos da base intactos
