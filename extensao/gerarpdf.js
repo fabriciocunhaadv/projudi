@@ -13,7 +13,10 @@
   const marcar = (c, v) => { if (c.checked !== v) c.click(); };
   const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
 
+  // Arquivos que o usuário já marcou à mão na janela (sem contar a caixa "Todos").
+  const marcadasPeloUsuario = () => [...document.querySelectorAll("input[name=chk1]:checked,input[name=chk2]:checked")].filter((c) => !c.disabled).length;
   async function aplicar(pedido) {
+    if (pedido.marcados) return { marcadas: marcadasPeloUsuario() };      // respeita a seleção feita pelo usuário
     const todas = caixas(), cxTodos = document.getElementById("todos");
     if (cxTodos) { marcar(cxTodos, false); if (cxTodos.checked) cxTodos.checked = false; }
     todas.filter((c) => c !== cxTodos).forEach((c) => marcar(c, false));
@@ -69,7 +72,10 @@
       <div class="w"><div class="m"></div><button data-a="todos">⬇ Gerar e baixar tudo (extensão)</button><button class="s" data-a="diag">Copiar diagnóstico</button></div>`;
     const msg = (t) => { const m = sh.querySelector(".m"); m.textContent = t; m.style.display = "block"; };
     window.__projudiMsg = msg;
-    sh.querySelector('[data-a="todos"]').onclick = async () => { const r = await executar({ todos: true }); msg(r.erro ? "✖ " + r.erro : r.interceptado ? "PDF pedido; a extensão faz o OCR e salva em Downloads." : "Gerando o PDF do Projudi…"); };
+    const botaoTodos = sh.querySelector('[data-a="todos"]');
+    const rotulo = () => { const todos = document.getElementById("todos"), n = marcadasPeloUsuario(); botaoTodos.dataset.modo = n && !(todos && todos.checked) ? "marcados" : "todos"; botaoTodos.textContent = botaoTodos.dataset.modo === "marcados" ? `⬇ Gerar e baixar só os ${n} marcados (extensão)` : "⬇ Gerar e baixar tudo (extensão)"; };
+    rotulo(); setInterval(rotulo, 600);
+    botaoTodos.onclick = async () => { const r = await executar(botaoTodos.dataset.modo === "marcados" ? { marcados: true } : { todos: true }); msg(r.erro ? "✖ " + r.erro : r.interceptado ? "PDF pedido; a extensão faz o OCR e salva em Downloads." : "Gerando o PDF do Projudi…"); };
     sh.querySelector('[data-a="diag"]').onclick = async () => {
       const c = document.documentElement.cloneNode(true);
       c.querySelectorAll("script,style,link,svg,[data-projudi-ext]").forEach((e) => e.remove());

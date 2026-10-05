@@ -74,7 +74,7 @@ def main():
     shutil.copytree(RAIZ, ext)
     m = ext / "manifest.json"; m.write_text(m.read_text().replace("https://*.tjgo.jus.br/*", "http://localhost/*"))
     (ext / "background.js").write_text((ext / "background.js").read_text().replace('const DOMINIO = "tjgo.jus.br";', 'const DOMINIO = "localhost";'))
-    srv = http.server.HTTPServer(("localhost", 8769), H)
+    srv = http.server.ThreadingHTTPServer(("localhost", 8769), H)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     exe = os.environ.get("CHROMIUM_PATH") or glob.glob("/opt/pw-browsers/chromium-*/chrome-linux*/chrome")[0]
     with sync_playwright() as p:
@@ -105,6 +105,21 @@ def main():
         print(txt[:300]); assert "pensão alimentícia" in txt and "guarda compartilhada" in txt
         bx, salvo = ciclo(ctx, lambda b: b.check("#todos"))
         print(CORPOS); assert parse_qs(CORPOS[-1])["codigosArquivos"] == ["101;102;103;104;105;"]
+        # seleção feita à mão na janela do Gerar PDF: o botão da extensão respeita o que está marcado (não gera tudo)
+        from urllib.parse import parse_qs as pq
+        n0 = len(CORPOS)
+        man = ctx.new_page(); man.goto("http://localhost:8769/PdfServico/GerarPDF?usu=1&chave=2&token=3")
+        man.wait_for_selector("[data-projudi-ext=gerarpdf]", state="attached", timeout=20000)
+        assert "tudo" in man.evaluate("document.querySelector('[data-projudi-ext=gerarpdf]').shadowRoot.querySelector('[data-a=todos]').textContent")
+        man.check("input[name=chk2][value='102']"); man.check("input[name=chk1][value='11']"); man.wait_for_timeout(1200)
+        rot = man.evaluate("document.querySelector('[data-projudi-ext=gerarpdf]').shadowRoot.querySelector('[data-a=todos]').textContent")
+        print(rot); assert "só os 2 marcados" in rot
+        man.locator("[data-projudi-ext=gerarpdf] [data-a=todos]").click(); 
+        for _ in range(120):
+            if len(CORPOS) > n0: break
+            man.wait_for_timeout(500)
+        assert len(CORPOS) > n0, (n0, len(CORPOS), [c[:80] for c in CORPOS])
+        q2 = pq(CORPOS[-1]); print(q2); assert q2["codigosArquivos"] == ["102;"] and q2["codigosMovimentacoes"] == ["11;"], q2
         print("OK")
         ctx.close()
 
