@@ -9,6 +9,15 @@ const selCls = new Set(), selSit = new Set(["naoAnalisadas", "preAnalisadas"]), 
 let opcoes = { atualizarBase: false, studio: false, modo: "analise", docs: false };   // o que fazer depois de baixar
 let automacao = {};   // { serventia: { ativa, prompt } } — guardado na conta do Chrome (sincroniza entre computadores)
 const salvarAuto = () => chrome.storage.sync.set({ automacao });
+// Preenche sozinho (sem sobrescrever o que o usuário escreveu) o prompt e o arquivo de modelos de cada serventia.
+function completarAuto(servs) {
+  let mudou = false;
+  for (const { serventia: s } of servs) {
+    const a = automacao[s] || {}, prompt = a.prompt || Sugestoes.prompt(s), arq = a.arquivoModelos || Sugestoes.arquivo(s);
+    if (prompt !== a.prompt || arq !== a.arquivoModelos) { automacao[s] = { ...a, prompt, arquivoModelos: arq }; mudou = true; }
+  }
+  if (mudou) salvarAuto();
+}
 const nomeCls = (p) => p.classificador || "(sem classificador)";
 
 const todos = (s) => ["naoAnalisadas", "preAnalisadas"].flatMap((tipo) =>
@@ -62,6 +71,7 @@ function desenhar() {
     const clsLista = [...new Set(todosP.filter((p) => automacao[p.serventia]?.ativa).map(nomeCls))].sort((a, b) => a.localeCompare(b, "pt-BR"));
     const cand = todosP.filter((p) => automacao[p.serventia]?.ativa && (!selCls.size || selCls.has(nomeCls(p))) && selSit.has(p.tipo) && p.url).sort(Ordenar.comparador($("modo").value));
     const fila = cand.filter((p) => !excluidos.has(p.processo));
+    completarAuto(estado.serventias);
     h += `<h2>Baixar PDFs para análise</h2><div class="baixar"><div><b>1) Serventias em que você trabalha</b> <small>(a extensão só mexe nas marcadas)</small></div>` +
       `<table class="tp"><thead><tr><th>Automatizar</th><th>Serventia</th><th>Processos</th><th>Prompt no Studio <small>(igual ao da lista “Prompt Ativo”)</small></th><th>Arquivo de modelos na base <small>(PDF único)</small></th></tr></thead><tbody>` +
       estado.serventias.map((s) => `<tr class="tp-linha"><td class="n"><input type="checkbox" data-serv="${esc(s.serventia)}" ${automacao[s.serventia]?.ativa ? "checked" : ""}></td><td>${esc(s.serventia)}</td><td class="n">${todos(s).length}</td>` +
