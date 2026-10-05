@@ -31,8 +31,15 @@ export async function criarDocumento(titulo, minuta, paragrafos) {
   return { url: "https://docs.google.com/document/create?title=" + encodeURIComponent(titulo), via: "colar", copiou, html: htmlMonografia(conteudo) };
 }
 
-// Abre Google Docs (esquerda) e PDF (direita), cada um em metade da tela.
-export async function abrirLadoALado(urlDoc, urlPdf) {
+// Abre o Google Docs e o PDF. "abas" (padrão): duas abas vizinhas, agrupadas, na mesma janela (dá para usar o "Dividir guia" do Chrome com um clique);
+// "janelas": duas janelas, cada uma em metade da tela.
+export async function abrirLadoALado(urlDoc, urlPdf, modo = "abas") {
+  if (modo !== "janelas") {
+    const doc = await chrome.tabs.create({ url: urlDoc, active: true });
+    const pdf = await chrome.tabs.create({ url: urlPdf, active: false, windowId: doc.windowId, index: doc.index + 1 });
+    try { const g = await chrome.tabs.group({ tabIds: [doc.id, pdf.id] }); await chrome.tabGroups.update(g, { title: "Minuta + PDF", color: "blue" }); } catch (e) { /* sem agrupar */ }
+    return { doc: doc.id, pdf: pdf.id };
+  }
   const W = screen.availWidth || 1366, H = screen.availHeight || 768, L = screen.availLeft || 0, T = screen.availTop || 0, meio = Math.floor(W / 2);
   const criar = (o) => chrome.windows.create(o).catch(() => chrome.windows.create({ url: o.url, focused: o.focused }));      // posição recusada pelo Chrome (monitor atípico): abre sem posicionar
   const doc = await criar({ url: urlDoc, left: L, top: T, width: meio, height: H, focused: true });

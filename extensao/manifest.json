@@ -12,7 +12,8 @@
     "scripting",
     "storage",
     "identity",
-    "clipboardWrite"
+    "clipboardWrite",
+    "tabGroups"
   ],
   "host_permissions": [
     "https://*.tjgo.jus.br/*",

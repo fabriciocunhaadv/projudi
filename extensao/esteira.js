@@ -14,7 +14,8 @@ async function entregar(it, bytes, minuta, mensagem, html = "") {
   if (!minuta) throw new Error("o Studio concluiu, mas não consegui ler a minuta gerada");
   const tipo = tipoDaMinuta(minuta), titulo = nomeDoc(it.processo, tipo), ps = html ? paragrafosDeHtml(html) : null, doc = await criarDocumento(titulo, minuta, ps && ps.length ? ps : null);
   const urlPdf = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
-  await abrirLadoALado(doc.url, urlPdf);
+  const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig");
+  await abrirLadoALado(doc.url, urlPdf, esteiraConfig.abrirEm || "abas");
   const aviso = doc.via === "colar" ? "Sem o login do Google configurado, a extensão cola a minuta no documento (sem a configuração de página de monografia). Se o documento ficar em branco, use o botão da barra azul." : "";
   await atualizar(it.id, { estado: "conferindo", minuta, minutaHtml: html, tipo, titulo, docUrl: doc.url, via: doc.via, aviso, htmlColar: doc.html || "", colado: false, inserido: false });
 }
@@ -90,6 +91,8 @@ $("linhas").addEventListener("click", async (ev) => {
   if (a === "projudi") { const it = (await todos()).find((x) => x.id === id); chrome.tabs.create({ url: absoluta(it.urlPre || it.url) }); }
   passo();
 });
+chrome.storage.sync.get("esteiraConfig").then(({ esteiraConfig = {} }) => { $("abrirEm").value = esteiraConfig.abrirEm || "abas"; });
+$("abrirEm").onchange = async () => { const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig"); chrome.storage.sync.set({ esteiraConfig: { ...esteiraConfig, abrirEm: $("abrirEm").value } }); };
 $("limpar").onclick = async () => { await remover((await todos()).filter((i) => ["concluido", "pulado"].includes(i.estado)).map((i) => i.id)); desenhar(); };
 chrome.storage.onChanged.addListener((c, area) => { if (area === "local" && Object.keys(c).some((k) => k.startsWith("esteira_"))) { desenhar(); passo(); } });
 setInterval(passo, 3000);
