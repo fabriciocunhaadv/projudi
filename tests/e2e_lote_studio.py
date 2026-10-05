@@ -105,7 +105,10 @@ def main():
                  {**base, "processo": "5000001-11.2026.8.09.0166", "url": "http://localhost:8770/proc?id=2"}]
         sw.evaluate("(j) => chrome.storage.local.set({ lote_t1: j })", {"itens": itens, "pasta": "Projudi", "opcoes": {"atualizarBase": True, "studio": {"ativo": True, "modo": "analise"}}})
         pg.goto(f"chrome-extension://{ext_id}/lote.html?lote=t1")
-        pg.wait_for_selector("body[data-pronto='1']", timeout=900000)
+        for k in range(60):
+            if pg.evaluate("() => document.body.dataset.pronto") == "1": break
+            if k % 2 == 0: print(k * 10, "s |", pg.inner_text("#base").replace("\n", " / "), "|", pg.inner_text("#lista").replace("\n", " / "), "|", [p.url[-45:] for p in ctx.pages], flush=True)
+            pg.wait_for_timeout(10000)
         print(pg.inner_text("#lista")); print(pg.inner_text("#status"))
         assert "2 de 2 processo(s) baixado(s)" in pg.inner_text("#status")
         assert len(CORPOS) == 2, CORPOS
