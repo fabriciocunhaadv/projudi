@@ -96,10 +96,11 @@
   const painelResultado = () => [...document.querySelectorAll("h3")].find((h) => /Resultado\s*&\s*An[aá]lise/i.test(texto(h)));
   const resultadoPronto = () => {
     const h = painelResultado(); if (!h) return false;
+    if (document.getElementById("tour-result-tabs") && document.querySelector("div.font-serif")) return true;      // abas e texto da minuta já na tela
     const barra = h.parentElement.parentElement.lastElementChild;     // botões Editar / Copiar / Gerar PDF: ficam bloqueados enquanto não há resultado
     return !(barra && /pointer-events-none/.test(barra.className)) && !/Aguardando Execu/i.test(texto(h.closest("div.border") || document.body));
   };
-  const executando = () => { const b = document.getElementById("tour-execute-btn"); return !b || b.disabled || !/Gerar Minuta Judicial/i.test(texto(b)); };
+  const executando = () => { const b = document.getElementById("tour-execute-btn"); return !b || b.disabled || !/Gerar Minuta/i.test(texto(b)); };
 
   async function analisar({ arquivoId, nome, prompt, tipo }) {
     const bytes = arquivos.get(arquivoId);
@@ -133,17 +134,36 @@
     return { ok: true, mensagem: "análise concluída", minuta: await lerMinuta() };
   }
 
-  // Texto da minuta gerada: pelo botão "Copiar" do app; se falhar, lê o painel de resultado.
+  // Texto da minuta gerada, lido direto do painel de resultado (só o texto do ato: sem caixas de auditoria/teses).
+  // Se a estrutura da tela mudar, usa o botão "Copiar" do app.
+  function minutaDoPainel() {
+    const raiz = document.querySelector("div.font-serif"); if (!raiz) return "";
+    const linhas = [];
+    const blocos = [...raiz.children];
+    blocos.forEach((bl, i) => {
+      if (bl.id === "tour-meta-parties-box") return;
+      const md = bl.querySelector(".markdown-body"), h = bl.querySelector(":scope > h3");
+      if (md) {
+        if (h) linhas.push(texto(h));
+        [...md.children].forEach((c) => { const t = (c.innerText || c.textContent || "").replace(/\s+/g, " ").trim(); if (t) linhas.push(t); });
+      } else if (i === 0) {
+        [...bl.querySelectorAll("p,span")].forEach((e) => { const t = texto(e); if (t && !linhas.includes(t) && e.children.length === 0) linhas.push(t); });
+      } else { const t = (bl.innerText || "").replace(/\s+/g, " ").trim(); if (t) linhas.push(t); }
+    });
+    return linhas.join("\n");
+  }
+  window.__projudiMinutaDoPainel = minutaDoPainel;      // usado nos testes
   async function lerMinuta() {
     try {
-      const h = painelResultado(), barra = h?.parentElement.parentElement.lastElementChild;
+      const doPainel = minutaDoPainel();
+      if (doPainel.length > 200) return doPainel;
+      const h = painelResultado(), barra = h?.closest("div.border")?.querySelector("#tour-result-actions") || h?.parentElement.parentElement.lastElementChild;
       const copiar = barra && [...barra.querySelectorAll("button")].find((b) => /Copiar/i.test(texto(b) + " " + (b.title || "")));
       document.documentElement.dataset.projudiCopiado = "";
       if (copiar) { copiar.click(); await esperar(() => document.documentElement.dataset.projudiCopiado, 3000); }
       const t = document.documentElement.dataset.projudiCopiado;
       if (t && t.trim().length > 20) return t;
-      const corpo = h?.closest("div.border") || h?.parentElement.parentElement.parentElement;
-      return corpo ? (corpo.innerText || "").replace(/^[\s\S]*?Resultado\s*&\s*An[aá]lise\s*/i, "").trim() : "";
+      return doPainel;
     } catch (e) { return ""; }
   }
 
