@@ -13,7 +13,8 @@
     "storage"
   ],
   "host_permissions": [
-    "https://*.tjgo.jus.br/*"
+    "https://*.tjgo.jus.br/*",
+    "https://*.ai.studio/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -72,6 +73,25 @@
         "studio-diag.js"
       ],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.ai.studio/*"
+      ],
+      "js": [
+        "studio-base.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.ai.studio/*"
+      ],
+      "js": [
+        "studio-main.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
     }
   ],
   "content_security_policy": {

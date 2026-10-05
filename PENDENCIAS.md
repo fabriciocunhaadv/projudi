@@ -16,3 +16,9 @@
 - Saída: **3 arquivos .txt por serventia** (despacho, decisão, sentença), refeitos inteiros a cada varredura (sem duplicar). Nome: `Modelos-<Serventia>-<Tipo>.txt`.
   - Cada arquivo: cabeçalho (serventia, tipo, data da atualização), índice, e cada modelo com Id, nome, tipo, serventia e texto completo.
 - Envio para a base de conhecimento do Studio: primeiro manual (substituir os arquivos); depois automatizado (apagar o arquivo antigo e subir o novo com o mesmo nome). Falta: telas do Projudi (Alt+Shift+C no Cadastro de Modelo, na lista e com um modelo carregado) e a tela da base de conhecimento do Studio (botão Diagnóstico).
+
+## Atualização (base de conhecimento do Studio)
+- A "Base de Conhecimento do Gabinete" do app (Caderno de Teses & Modelos -> aba Base de Conhecimento) **só aceita PDF** (`accept="application/pdf,.pdf"`), então o arquivo de modelos é gerado em **PDF com texto** (não .txt).
+- **Um PDF por serventia** com decisões, despachos e sentenças: `Modelos - <Serventia> - Decisões, Despachos e Sentenças.pdf` (nome editável; também no painel, coluna "Arquivo de modelos na base do Studio").
+- Envio: a extensão (`studio-base.js` + página `modelos.html`) abre a base, **exclui o documento de mesmo nome** (se existir) e envia o novo -> não duplica. Testado só com uma cópia simulada da tela.
+- Falta: leitura dos modelos do Projudi (Cadastros -> Modelo): aguardando o HTML de dentro do quadro (botões "Copiar esta tela" / "Copiar lista aberta").

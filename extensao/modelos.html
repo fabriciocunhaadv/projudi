@@ -1,0 +1,18 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Modelos do Projudi — Conclusões Projudi</title>
+<style>
+  body { font: 14px system-ui, sans-serif; margin: 0; padding: 16px 24px; max-width: 980px; color: #222; }
+  h1 { font-size: 18px; margin: 0 0 4px; } .dica { color: #666; font-size: 12px; }
+  .serv { border: 1px solid #c3cfdf; border-radius: 8px; padding: 10px 14px; margin: 12px 0; }
+  .serv h2 { font-size: 15px; margin: 0 0 4px; } input[type=text] { width: 100%; padding: 5px 8px; box-sizing: border-box; }
+  button { padding: 6px 12px; cursor: pointer; margin: 6px 6px 0 0; } .ok { color: #1a7a1a; } .erro { color: #b00020; } .msg { margin-top: 6px; font-weight: 600; }
+  @media (prefers-color-scheme: dark) { body { background: #1c1d21; color: #e6e6e6; } .dica { color: #aaa; } .serv { border-color: #3d4a5e; } }
+</style>
+<h1>Modelos do Projudi (decisões, despachos e sentenças)</h1>
+<p class="dica">Um PDF por serventia, com todos os modelos, para a <b>Base de Conhecimento</b> do app de IA (que só aceita PDF). Ao enviar, o documento de mesmo nome é
+<b>substituído</b> (o antigo é excluído e o novo enviado), então nunca duplica. Os modelos ficam só neste computador.</p>
+<p id="vazio" class="dica" hidden>Ainda não há modelos capturados. A leitura automática da lista de modelos do Projudi (Cadastros → Modelo) é o próximo passo.</p>
+<div id="lista"></div>
+<script src="vendor/pdf-lib.min.js"></script>
+<script type="module" src="modelos.js"></script>

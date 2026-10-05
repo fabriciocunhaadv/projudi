@@ -123,3 +123,9 @@ No painel, em **Baixar PDFs para análise**:
    - `número-OCR.pdf` — o PDF completo do Projudi, agora pesquisável;
    - `número-OCR.txt` — texto integral de todas as páginas, com a origem de cada trecho (movimentação, arquivo, página do arquivo e do PDF; `[OCR]` marca o que veio de OCR) e um índice no início.
 Testes: `python tests/e2e_lote.py`, `python tests/e2e_extensao.py`.
+
+## Modelos do Projudi na base de conhecimento do Studio
+Página **Modelos do Projudi** (link no painel): para cada serventia gera **um PDF** com os modelos de decisão, despacho e sentença (índice + cada modelo com Id, nome, tipo e serventia) e,
+com **Enviar ao Studio**, cadastra o PDF na *Base de Conhecimento do Gabinete* do app **substituindo** o documento de mesmo nome (apaga o antigo e envia o novo; não duplica).
+O nome do arquivo é editável e fica gravado no painel (coluna "Arquivo de modelos na base do Studio"). A captura automática dos modelos no Projudi ainda depende das telas do cadastro de modelos.
+Teste: `python tests/e2e_studio_base.py`.

@@ -90,7 +90,7 @@ def main():
         assert "Marque ao menos uma serventia" in pn.inner_text("body")
         pn.locator("input[data-serv]").first.check(); pn.wait_for_timeout(300)
         n_cand = pn.locator("input[data-proc]").count(); assert n_cand >= 1, n_cand
-        pn.fill("input[data-prompt]", "Prompt Família"); pn.locator("input[data-prompt]").first.dispatch_event("change"); pn.wait_for_timeout(300)
+        pn.fill("input[data-prompt]", "Família - Decisões, Despachos e Sentenças"); pn.locator("input[data-prompt]").first.dispatch_event("change"); pn.wait_for_timeout(300)
         assert f"Baixar PDFs dos {n_cand} processo(s)" in pn.inner_text("body")
         corpo = pn.inner_text("body")
         assert "Não analisadas (" in corpo and "marcados)" in corpo                      # tabelas separadas por situação
@@ -101,7 +101,7 @@ def main():
         pn.locator("input[data-proc]").first.uncheck(); pn.wait_for_timeout(200)
         assert f"Baixar PDFs dos {n_cand - 1} processo(s)" in pn.inner_text("body")
         sw0 = ctx.service_workers[0]
-        assert sw0.evaluate("chrome.storage.sync.get('automacao')")["automacao"][pn.locator("input[data-serv]").first.get_attribute("data-serv")]["prompt"] == "Prompt Família"
+        assert sw0.evaluate("chrome.storage.sync.get('automacao')")["automacao"][pn.locator("input[data-serv]").first.get_attribute("data-serv")]["arquivoModelos"] == "Família - Decisões, Despachos e Sentenças"
         pn.select_option("#visao", "fila"); pn.wait_for_timeout(300)
         fila = pn.inner_text("body").split("número-OCR.txt.", 1)[-1]; print(fila[:1800])   # só a parte "Processos" (depois do bloco de download)
         # ordem de trabalho: urgência do processo > prioridade do classificador > mais antigo

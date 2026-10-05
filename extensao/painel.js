@@ -62,9 +62,9 @@ function desenhar() {
     const cand = todosP.filter((p) => automacao[p.serventia]?.ativa && (!selCls.size || selCls.has(nomeCls(p))) && selSit.has(p.tipo) && p.url).sort(Ordenar.comparador($("modo").value));
     const fila = cand.filter((p) => !excluidos.has(p.processo));
     h += `<h2>Baixar PDFs para análise</h2><div class="baixar"><div><b>1) Serventias em que você trabalha</b> <small>(a extensão só mexe nas marcadas)</small></div>` +
-      `<table class="tp"><thead><tr><th>Automatizar</th><th>Serventia</th><th>Processos</th><th>Prompt no app de IA <small>(nome igual ao da lista “Prompt Ativo”)</small></th></tr></thead><tbody>` +
+      `<table class="tp"><thead><tr><th>Automatizar</th><th>Serventia</th><th>Processos</th><th>Arquivo de modelos na base do Studio <small>(PDF único: decisões, despachos e sentenças)</small></th></tr></thead><tbody>` +
       estado.serventias.map((s) => `<tr class="tp-linha"><td class="n"><input type="checkbox" data-serv="${esc(s.serventia)}" ${automacao[s.serventia]?.ativa ? "checked" : ""}></td><td>${esc(s.serventia)}</td><td class="n">${todos(s).length}</td>` +
-        `<td><input type="text" data-prompt="${esc(s.serventia)}" value="${esc(automacao[s.serventia]?.prompt || "")}" placeholder="ex.: Outros Área Judicial - Família e Sucessões" size="46"></td></tr>`).join("") + `</tbody></table>`;
+        `<td><input type="text" data-prompt="${esc(s.serventia)}" value="${esc(automacao[s.serventia]?.arquivoModelos || "")}" placeholder="ex.: Família - Decisões, Despachos e Sentenças" size="46"></td></tr>`).join("") + `</tbody></table>`;
     if (clsLista.length) h += `<div><b>2) Só estes classificadores</b> <small>(opcional — sem marcar nenhum, baixa todos)</small><br>` +
       clsLista.map((c) => `<label class="chip"><input type="checkbox" data-cls="${esc(c)}" ${selCls.has(c) ? "checked" : ""}> ${esc(c)} <small>(${todosP.filter((p) => nomeCls(p) === c && automacao[p.serventia]?.ativa).length})</small></label>`).join(" ") + `</div>`;
     h += `<div>Situação: <label><input type="checkbox" data-sit="naoAnalisadas" ${selSit.has("naoAnalisadas") ? "checked" : ""}> Não analisadas</label> <label><input type="checkbox" data-sit="preAnalisadas" ${selSit.has("preAnalisadas") ? "checked" : ""}> Pré-analisadas</label></div>`;
@@ -144,7 +144,7 @@ function csv() {
   $("conteudo").addEventListener("change", (e) => {
     const t = e.target, dado = t.dataset || {};
     if (dado.serv !== undefined) { automacao[dado.serv] = { ...automacao[dado.serv], ativa: t.checked }; salvarAuto(); }
-    else if (dado.prompt !== undefined) { automacao[dado.prompt] = { ...automacao[dado.prompt], prompt: t.value.trim() }; salvarAuto(); return; }
+    else if (dado.prompt !== undefined) { automacao[dado.prompt] = { ...automacao[dado.prompt], arquivoModelos: t.value.trim() }; salvarAuto(); return; }
     else if (dado.cls !== undefined) { t.checked ? selCls.add(dado.cls) : selCls.delete(dado.cls); }
     else if (dado.sit !== undefined) { t.checked ? selSit.add(dado.sit) : selSit.delete(dado.sit); }
     else if (dado.proc !== undefined) { t.checked ? excluidos.delete(dado.proc) : excluidos.add(dado.proc); }
@@ -160,7 +160,7 @@ function csv() {
     const fila = window.__candidatos || [];   // já na ordem de trabalho
     if (!fila.length) return;
     const hoje = new Date().toISOString().slice(0, 10), id = String(Date.now());
-    const itens = fila.map((p) => ({ processo: p.processo, url: p.url, classificador: nomeCls(p), serventia: p.serventia, situacao: p.tipo, prompt: automacao[p.serventia]?.prompt || "", pasta: `Projudi/${hoje}/${[p.serventia, nomeCls(p)].map((x) => String(x).replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60)).join("/")}` }));
+    const itens = fila.map((p) => ({ processo: p.processo, url: p.url, classificador: nomeCls(p), serventia: p.serventia, situacao: p.tipo, arquivoModelos: automacao[p.serventia]?.arquivoModelos || "", pasta: `Projudi/${hoje}/${[p.serventia, nomeCls(p)].map((x) => String(x).replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60)).join("/")}` }));
     await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/" + hoje } });
     chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + id) });
   });
