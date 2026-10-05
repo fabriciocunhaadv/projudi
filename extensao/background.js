@@ -209,7 +209,7 @@ async function abrirGerarPdf(tabId) {
 chrome.runtime.onMessage.addListener((m, s, responder) => {
   if (m?.acao === "gerar-pdf-interceptar") { // a janela "Gerar PDF" entregou o pedido: a extensão busca o PDF, faz OCR e salva
     const id = String(Date.now());
-    chrome.storage.local.set({ ["gerar_" + id]: { url: m.url, corpo: m.corpo, nome: m.nome, pasta: m.pasta, lote: m.lote } })
+    chrome.storage.local.set({ ["gerar_" + id]: { url: m.url, corpo: m.corpo, nome: m.nome, pasta: m.pasta, lote: m.lote, studio: m.studio } })
       .then(() => chrome.tabs.create({ url: chrome.runtime.getURL("ocr.html?gerar=" + id), active: !m.lote }))
       .then(() => responder({ ok: true }), (e) => responder({ erro: String(e.message || e) }));
     return true;

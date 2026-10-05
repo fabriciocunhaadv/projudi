@@ -6,6 +6,7 @@ const link = (p) => (p.url ? new URL(p.url, BASE).href : "");
 const ROTULO = { naoAnalisadas: "Não analisadas", preAnalisadas: "Pré-analisadas" };
 let estado = null, aberto = false;
 const selCls = new Set(), selSit = new Set(["naoAnalisadas", "preAnalisadas"]), excluidos = new Set();   // seleção para baixar PDFs
+let opcoes = { atualizarBase: false, studio: false, modo: "analise" };   // o que fazer depois de baixar
 let automacao = {};   // { serventia: { ativa, prompt } } — guardado na conta do Chrome (sincroniza entre computadores)
 const salvarAuto = () => chrome.storage.sync.set({ automacao });
 const nomeCls = (p) => p.classificador || "(sem classificador)";
@@ -62,9 +63,10 @@ function desenhar() {
     const cand = todosP.filter((p) => automacao[p.serventia]?.ativa && (!selCls.size || selCls.has(nomeCls(p))) && selSit.has(p.tipo) && p.url).sort(Ordenar.comparador($("modo").value));
     const fila = cand.filter((p) => !excluidos.has(p.processo));
     h += `<h2>Baixar PDFs para análise</h2><div class="baixar"><div><b>1) Serventias em que você trabalha</b> <small>(a extensão só mexe nas marcadas)</small></div>` +
-      `<table class="tp"><thead><tr><th>Automatizar</th><th>Serventia</th><th>Processos</th><th>Arquivo de modelos na base do Studio <small>(PDF único: decisões, despachos e sentenças)</small></th></tr></thead><tbody>` +
+      `<table class="tp"><thead><tr><th>Automatizar</th><th>Serventia</th><th>Processos</th><th>Prompt no Studio <small>(igual ao da lista “Prompt Ativo”)</small></th><th>Arquivo de modelos na base <small>(PDF único)</small></th></tr></thead><tbody>` +
       estado.serventias.map((s) => `<tr class="tp-linha"><td class="n"><input type="checkbox" data-serv="${esc(s.serventia)}" ${automacao[s.serventia]?.ativa ? "checked" : ""}></td><td>${esc(s.serventia)}</td><td class="n">${todos(s).length}</td>` +
-        `<td><input type="text" data-prompt="${esc(s.serventia)}" value="${esc(automacao[s.serventia]?.arquivoModelos || "")}" placeholder="ex.: Família - Decisões, Despachos e Sentenças" size="46"></td></tr>`).join("") + `</tbody></table>`;
+        `<td><input type="text" data-promptia="${esc(s.serventia)}" value="${esc(automacao[s.serventia]?.prompt || "")}" placeholder="ex.: Outros Área Judicial - Família e Sucessões" size="40"></td>` +
+        `<td><input type="text" data-prompt="${esc(s.serventia)}" value="${esc(automacao[s.serventia]?.arquivoModelos || "")}" placeholder="ex.: Família - Decisões, Despachos e Sentenças" size="40"></td></tr>`).join("") + `</tbody></table>`;
     if (clsLista.length) h += `<div><b>2) Só estes classificadores</b> <small>(opcional — sem marcar nenhum, baixa todos)</small><br>` +
       clsLista.map((c) => `<label class="chip"><input type="checkbox" data-cls="${esc(c)}" ${selCls.has(c) ? "checked" : ""}> ${esc(c)} <small>(${todosP.filter((p) => nomeCls(p) === c && automacao[p.serventia]?.ativa).length})</small></label>`).join(" ") + `</div>`;
     h += `<div>Situação: <label><input type="checkbox" data-sit="naoAnalisadas" ${selSit.has("naoAnalisadas") ? "checked" : ""}> Não analisadas</label> <label><input type="checkbox" data-sit="preAnalisadas" ${selSit.has("preAnalisadas") ? "checked" : ""}> Pré-analisadas</label></div>`;
@@ -81,6 +83,11 @@ function desenhar() {
     }
     if (!ordenada.length) h += `<p class="zero">${Object.values(automacao).some((x) => x.ativa) ? "Nenhum processo com esse filtro." : "Marque ao menos uma serventia acima."}</p>`;
     const fila2 = ordenada.filter((p) => !excluidos.has(p.processo));
+    h += `<div class="opcoes"><b>3) Depois de baixar:</b><br>` +
+      `<label><input type="checkbox" data-op="atualizarBase" ${opcoes.atualizarBase ? "checked" : ""}> Cadastrar/atualizar a <b>base de conhecimento</b> do Studio com os modelos das varas selecionadas (PDF único por vara, substitui o antigo)</label><br>` +
+      `<label><input type="checkbox" data-op="studio" ${opcoes.studio ? "checked" : ""}> <b>Iniciar a análise</b> de cada PDF no Studio, uma de cada vez, com o prompt da vara:</label>` +
+      `<label class="radio"><input type="radio" name="modoStudio" data-modo="analise" ${opcoes.modo === "analise" ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> Análise dos processos (Gerar Minuta Judicial)</label>` +
+      `<label class="radio"><input type="radio" name="modoStudio" data-modo="lupa" ${opcoes.modo === "lupa" ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> Lupa do Magistrado <small>(precisa da minuta do assessor; por ora só baixa)</small></label></div>`;
     h += `<p><button id="baixarLote" ${fila2.length ? "" : "disabled"}>⬇ Baixar PDFs dos ${fila2.length} processo(s)</button> <small>Ordem da fila: “${esc(Ordenar.MODOS[$("modo").value])}”. Cada processo gera <b>número-OCR.pdf</b> e <b>número-OCR.txt</b>.</small></p></div>`;
     window.__candidatos = fila2;
   }
@@ -141,11 +148,15 @@ function csv() {
   $("busca").oninput = desenhar;
   RenderProjudi.ligarCopiar($("conteudo"));
   automacao = (await chrome.storage.sync.get("automacao")).automacao || {};
+  opcoes = { ...opcoes, ...((await chrome.storage.sync.get("opcoesLote")).opcoesLote || {}) };
   $("conteudo").addEventListener("change", (e) => {
     const t = e.target, dado = t.dataset || {};
     if (dado.serv !== undefined) { automacao[dado.serv] = { ...automacao[dado.serv], ativa: t.checked }; salvarAuto(); }
+    else if (dado.promptia !== undefined) { automacao[dado.promptia] = { ...automacao[dado.promptia], prompt: t.value.trim() }; salvarAuto(); return; }
     else if (dado.prompt !== undefined) { automacao[dado.prompt] = { ...automacao[dado.prompt], arquivoModelos: t.value.trim() }; salvarAuto(); return; }
     else if (dado.cls !== undefined) { t.checked ? selCls.add(dado.cls) : selCls.delete(dado.cls); }
+    else if (dado.op !== undefined) { opcoes[dado.op] = t.checked; chrome.storage.sync.set({ opcoesLote: opcoes }); }
+    else if (dado.modo !== undefined) { opcoes.modo = dado.modo; chrome.storage.sync.set({ opcoesLote: opcoes }); }
     else if (dado.sit !== undefined) { t.checked ? selSit.add(dado.sit) : selSit.delete(dado.sit); }
     else if (dado.proc !== undefined) { t.checked ? excluidos.delete(dado.proc) : excluidos.add(dado.proc); }
     else if (dado.todos !== undefined) { // marcar/desmarcar todos de UMA tabela (não analisadas ou pré-analisadas)
@@ -160,8 +171,8 @@ function csv() {
     const fila = window.__candidatos || [];   // já na ordem de trabalho
     if (!fila.length) return;
     const hoje = new Date().toISOString().slice(0, 10), id = String(Date.now());
-    const itens = fila.map((p) => ({ processo: p.processo, url: p.url, classificador: nomeCls(p), serventia: p.serventia, situacao: p.tipo, arquivoModelos: automacao[p.serventia]?.arquivoModelos || "", pasta: `Projudi/${hoje}/${[p.serventia, nomeCls(p)].map((x) => String(x).replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60)).join("/")}` }));
-    await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/" + hoje } });
+    const itens = fila.map((p) => ({ processo: p.processo, url: p.url, classificador: nomeCls(p), serventia: p.serventia, situacao: p.tipo, arquivoModelos: automacao[p.serventia]?.arquivoModelos || "", prompt: automacao[p.serventia]?.prompt || "", pasta: `Projudi/${hoje}/${[p.serventia, nomeCls(p)].map((x) => String(x).replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60)).join("/")}` }));
+    await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/" + hoje, opcoes: { atualizarBase: opcoes.atualizarBase, studio: { ativo: opcoes.studio, modo: opcoes.modo } } } });
     chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + id) });
   });
   $("csv").onclick = csv;

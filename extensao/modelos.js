@@ -1,21 +1,7 @@
-import { montarPdf, TIPOS, tipoCanonico } from "./modelos-pdf.js";
-const STUDIO_URL = "https://assessor-judicial.ai.studio/";
+import { montarPdf, TIPOS, tipoCanonico, nomePadrao, semBarra } from "./modelos-pdf.js";
+import { enviarBase } from "./studio-cliente.js";
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const nomePadrao = (serv) => `Modelos - ${serv.replace(/^.*?\s-\s(?:Vara\s+(?:de|do|da)\s+)?/i, "").trim() || serv} - Decisões, Despachos e Sentenças`;
-const semBarra = (s) => s.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim();
-const b64De = (bytes) => { let s = ""; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(s); };
-
-async function acharStudio() {
-  const padroes = chrome.runtime.getManifest().content_scripts.find((c) => c.js.includes("studio-base.js")).matches;
-  let [aba] = await chrome.tabs.query({ url: padroes });
-  if (!aba) aba = await chrome.tabs.create({ url: STUDIO_URL, active: false });
-  for (let i = 0; i < 60; i++) {     // espera a página carregar e o script da extensão responder
-    try { if ((await chrome.tabs.sendMessage(aba.id, { acao: "studio-ping" }))?.ok) return aba; } catch (e) { /* ainda carregando */ }
-    await new Promise((ok) => setTimeout(ok, 1000));
-  }
-  throw new Error("abra o app Assessor Judicial (e entre com a sua conta) e tente de novo");
-}
 
 async function gerar(serv, dados) {
   const nome = semBarra(($(`n-${serv.i}`).value || nomePadrao(serv.nome)));
@@ -46,9 +32,7 @@ async function desenhar() {
         msg.className = "msg ok"; msg.textContent = "PDF salvo em Downloads.";
       } else {
         msg.textContent = "Enviando ao Studio (pode levar alguns minutos)…";
-        const aba = await acharStudio();
-        const r = await chrome.tabs.sendMessage(aba.id, { acao: "studio-enviar-base", nome: arq, b64: b64De(bytes) });
-        if (!r?.ok) throw new Error(r?.erro || "o app não confirmou o envio");
+        const r = await enviarBase(arq, bytes);
         msg.className = "msg ok"; msg.textContent = `${r.substituiu ? "Documento antigo substituído" : "Documento cadastrado"} na base de conhecimento.`;
         document.body.dataset.enviado = JSON.stringify(r);
       }

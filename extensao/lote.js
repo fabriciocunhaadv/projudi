@@ -1,3 +1,5 @@
+import { montarPdf, nomePadrao, semBarra } from "./modelos-pdf.js";
+import { enviarBase } from "./studio-cliente.js";
 // Fila: para cada processo selecionado, abre o processo, pede o PDF completo ao Projudi e deixa a página de OCR salvar PDF + texto.
 const BASE = "https://projudi.tjgo.jus.br/";
 const $ = (id) => document.getElementById(id);
@@ -23,21 +25,28 @@ function esperarFim(chave, ms) {
   });
 }
 
-async function processar(item, chave, pasta) {
+const registro = [];      // linha do tempo, para diagnóstico
+const limite = (promessa, ms, msg) => Promise.race([promessa, new Promise((_, no) => setTimeout(() => no(new Error(msg)), ms))]);
+
+async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
+  const passo = (t) => { registro.push(new Date().toLocaleTimeString("pt-BR") + " " + item.processo + " — " + t); etapa(t); };
+  passo("abrindo o processo");
   const url = new URL(item.url, BASE).href;
   const tab = await chrome.tabs.create({ url, active: false });
   let popup = null;
   try {
     await carregou(tab.id); await dorme(1500);
-    await chrome.storage.local.remove(["lote_fim_" + chave, "gerarpdf_pedido"]);
-    await chrome.storage.local.set({ gerarpdf_pedido: { todos: true, processo: item.processo, pasta, lote: chave, ts: Date.now() } });
-    let r = await GerarUtil.capturarGerar(tab.id);
+    passo("procurando o botão Gerar PDF");
+    await chrome.storage.local.remove(["lote_fim_" + chave, "lote_prog_" + chave, "gerarpdf_pedido"]);
+    await chrome.storage.local.set({ gerarpdf_pedido: { todos: true, processo: item.processo, pasta, lote: chave, ts: Date.now(), studio: opcoes.studio?.ativo ? { ativo: true, modo: opcoes.studio.modo, prompt: item.prompt || "", tipo: "" } : null } });
+    let r = await limite(GerarUtil.capturarGerar(tab.id), 45000, "a página do processo não respondeu (pode haver um aviso do Projudi aberto nela)");
     if (!r.achou) {   // o botão fica na aba "Navegação de Arquivos"
       await chrome.tabs.update(tab.id, { url: BASE + "BuscaProcesso?PaginaAtual=98&PassoBusca=4" });
       await carregou(tab.id); await dorme(1500);
-      for (let k = 0; k < 8 && !r.achou; k++) { r = await GerarUtil.capturarGerar(tab.id); if (!r.achou) await dorme(1000); }
+      for (let k = 0; k < 8 && !r.achou; k++) { r = await limite(GerarUtil.capturarGerar(tab.id), 45000, "a aba “Navegação de Arquivos” não respondeu"); if (!r.achou) await dorme(1000); }
     }
     if (!r.achou) throw new Error("não achei o botão “Gerar PDF” no processo");
+    passo("abrindo a janela Gerar PDF");
     if (r.url) popup = await chrome.tabs.create({ url: r.url, active: false });
     // a janela Gerar PDF consome o pedido; se ele continuar lá depois de 90 s, ela não abriu
     const t0 = Date.now();
@@ -47,7 +56,14 @@ async function processar(item, chave, pasta) {
     }
     if ((await chrome.storage.local.get("gerarpdf_pedido")).gerarpdf_pedido) throw new Error("a janela “Gerar PDF” não abriu ou não carregou");
     if (popup) { chrome.tabs.remove(popup.id).catch(() => {}); popup = null; }
-    const fim = await esperarFim("lote_fim_" + chave, 40 * 60000);   // o OCR de um processo grande pode levar vários minutos
+    passo("janela Gerar PDF entregou o pedido; aguardando o início do OCR");
+    const inicio = await esperarFim("lote_prog_" + chave, 150000);      // a página de OCR publica o andamento assim que recebe o pedido
+    if (inicio.erro === "tempo esgotado" && !(await chrome.storage.local.get("lote_fim_" + chave))["lote_fim_" + chave]) throw new Error("a extensão não recebeu o pedido da janela Gerar PDF (a janela pode ter fechado antes de enviar)");
+    passo("aguardando o Projudi gerar o PDF e a extensão fazer o OCR");
+    const ouvir = (c, area) => { if (area === "local" && c["lote_prog_" + chave]?.newValue) passo(c["lote_prog_" + chave].newValue.txt); };
+    chrome.storage.onChanged.addListener(ouvir);
+    let fim;
+    try { fim = await esperarFim("lote_fim_" + chave, 40 * 60000); } finally { chrome.storage.onChanged.removeListener(ouvir); }   // o OCR de um processo grande pode levar vários minutos
     if (!fim.ok) throw new Error(fim.erro || "falhou");
     return fim;
   } finally {
@@ -63,16 +79,37 @@ async function processar(item, chave, pasta) {
   const itens = job.itens, pasta = job.pasta || "Projudi";
   $("lista").innerHTML = itens.map((p, i) => `<li data-i="${i}" class="fila">${esc(p.processo)} <small>${esc(p.classificador || "")}</small> — na fila</li>`).join("");
   $("barra").max = itens.length;
+  const diag = document.createElement("button"); diag.textContent = "Copiar diagnóstico"; diag.style.marginLeft = "8px";
+  diag.onclick = async () => { await navigator.clipboard.writeText(registro.join("\n")); diag.textContent = "Copiado! Cole no chat"; };
+  $("cancelar").after(diag);
   $("cancelar").onclick = () => { cancelado = true; $("status").textContent = "Cancelando depois do processo atual…"; };
   const marca = (i, html, cls) => { const li = document.querySelector(`li[data-i="${i}"]`); li.className = cls; li.innerHTML = html; };
+  if (job.opcoes?.atualizarBase) {     // cadastra/atualiza o PDF de modelos de cada vara selecionada na base do Studio
+    const { modelos } = await chrome.storage.local.get("modelos");
+    const varas = [...new Map(itens.map((p) => [p.serventia, p])).values()];
+    $("base").hidden = false;
+    for (const v of varas) {
+      const li = document.createElement("li"); $("base").append(li);
+      const d = modelos?.serventias?.[v.serventia];
+      if (!d || !d.modelos?.length) { li.innerHTML = `⚠ ${esc(v.serventia)} — sem modelos capturados do Projudi (pulei a base de conhecimento)`; continue; }
+      try {
+        li.textContent = `⏳ ${v.serventia} — montando e enviando o PDF de modelos…`;
+        const nome = semBarra(v.arquivoModelos || nomePadrao(v.serventia)) + ".pdf";
+        const r = await enviarBase(nome, await montarPdf({ serventia: v.serventia, modelos: d.modelos.map((m) => ({ ...m, serventia: v.serventia })) }));
+        li.innerHTML = `<span class="ok">✔</span> ${esc(v.serventia)} — base de conhecimento: ${r.substituiu ? "documento substituído" : "documento cadastrado"} (${esc(nome)})`;
+      } catch (e) { li.innerHTML = `<span class="erro">✖ ${esc(v.serventia)} — base de conhecimento: ${esc(e.message)}</span>`; }
+    }
+  }
   let feitos = 0, erros = 0;
   for (let i = 0; i < itens.length && !cancelado; i++) {
     const p = itens[i];
     $("status").textContent = `Processo ${i + 1} de ${itens.length}: ${p.processo}`;
     marca(i, `⏳ ${esc(p.processo)} — baixando…`, "");
     try {
-      const r = await processar(p, id + ":" + i, p.pasta || pasta);
-      feitos++; marca(i, `✔ ${esc(p.processo)} — ${r.paginas} páginas (${r.ocr} com OCR) — salvo`, "ok");
+      const r = await processar(p, id + ":" + i, p.pasta || pasta, (t) => marca(i, `⏳ ${esc(p.processo)} — ${esc(t)}`, ""), job.opcoes || {});
+      feitos++;
+      const st = r.studio ? (r.studio.ok ? (r.studio.parcial ? ` — Studio: ${esc(r.studio.mensagem)}` : " — análise concluída no Studio") : ` — <span class="erro">Studio: ${esc(r.studio.erro)}</span>`) : "";
+      marca(i, `✔ ${esc(p.processo)} — ${r.paginas} páginas (${r.ocr} com OCR) — salvo${st}`, "ok");
     } catch (e) {
       erros++; marca(i, `✖ ${esc(p.processo)} — ${esc(e.message)}`, "erro");
     }

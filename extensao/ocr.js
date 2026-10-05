@@ -1,6 +1,7 @@
 // Página de OCR: tela, arrastar/soltar e OCR automático dos PDFs baixados do Projudi. O trabalho pesado está em ocr-motor.js.
 import { fazerOcr, fmt } from "./ocr-motor.js";
 import { textoComOrigem } from "./texto-origem.js";
+import { analisarNoStudio } from "./studio-cliente.js";
 
 const $ = (id) => document.getElementById(id);
 let arquivos = [], cancelado = false, rodando = false;
@@ -107,15 +108,24 @@ async function automatico(idDownload) {
 }
 
 // PDF pedido ao Projudi pela janela "Gerar PDF": a extensão recebe o PDF antes de ir para Downloads, faz o OCR e salva só o pesquisável.
+let loteAtual = null;
+function publicar() {      // a página da fila mostra o que está acontecendo aqui (OCR página a página)
+  if (!loteAtual) return;
+  chrome.storage.local.set({ ["lote_prog_" + loteAtual]: { txt: $("status").textContent, t: Date.now() } });
+}
 async function interceptado(idJob) {
   document.body.dataset.modo = "auto";
   const chave = "gerar_" + idJob, job = (await chrome.storage.local.get(chave))[chave];
   if (!job) { log("Pedido não encontrado."); return; }
   rodando = true; cancelado = false; $("cancelar").disabled = false;
+  loteAtual = job.lote || null;
+  new MutationObserver(publicar).observe($("status"), { childList: true, characterData: true, subtree: true });
   $("status").textContent = "Pedindo o PDF ao Projudi (pode demorar)…";
   try {
-    const r = await fetch(job.url, { method: "POST", credentials: "include", cache: "no-store", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: job.corpo });
+    const ctl = new AbortController(), corte = setTimeout(() => ctl.abort(), 25 * 60000);      // o Projudi pode levar vários minutos para gerar um processo grande
+    const r = await fetch(job.url, { signal: ctl.signal, method: "POST", credentials: "include", cache: "no-store", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: job.corpo });
     const bytes = new Uint8Array(await r.arrayBuffer());
+    clearTimeout(corte);
     if (!r.ok || !ehPdf(bytes)) throw new Error(`o Projudi não devolveu um PDF (HTTP ${r.status}). Use o botão Gerar normal da janela: o OCR automático cuida do arquivo baixado.`);
     log(`PDF recebido do Projudi: ${(bytes.length / 1048576).toFixed(1)} MB`);
     const num = (job.nome || "").replace(/[^\w.\-]+/g, "_") || "processo", pasta = job.pasta ? job.pasta.replace(/[<>:"|?*\\]+/g, "_").replace(/^\/+|\/+$/g, "") + "/" : "";
@@ -137,7 +147,15 @@ async function interceptado(idJob) {
     $("status").textContent = `Pronto: ${arqPdf} e ${arqTxt}`;
     document.body.dataset.salvo = arqPdf + "|" + arqTxt;
     avisar("PDF do processo pronto", `${num}-OCR.pdf e .txt salvos (${res.ocr} de ${res.total} páginas com OCR).`);
-    if (job.lote) await chrome.storage.local.set({ ["lote_fim_" + job.lote]: { ok: true, pdf: arqPdf, txt: arqTxt, paginas: res.total, ocr: res.ocr } });
+    let studio = null;      // análise automática no app de IA (opcional): só segue para o próximo processo quando ela termina
+    if (job.studio && job.studio.ativo) {
+      $("status").textContent = "Enviando ao app de IA e aguardando a análise…";
+      try { studio = await analisarNoStudio(res.bytes, { nome: num + "-OCR.pdf", prompt: job.studio.prompt, modo: job.studio.modo, tipo: job.studio.tipo, processo: job.nome, minuta: job.studio.minuta }); }
+      catch (e) { studio = { ok: false, erro: e.message }; log("✖ app de IA: " + e.message); }
+      document.body.dataset.studio = JSON.stringify(studio);
+      avisar("Análise no app de IA", studio.ok ? `${num}: ${studio.mensagem || "concluída"}` : `${num}: ${studio.erro}`);
+    }
+    if (job.lote) await chrome.storage.local.set({ ["lote_fim_" + job.lote]: { ok: true, pdf: arqPdf, txt: arqTxt, paginas: res.total, ocr: res.ocr, studio } });
     await chrome.storage.local.remove(chave);
     document.body.dataset.pronto = "1";
     setTimeout(() => window.close(), 5000);

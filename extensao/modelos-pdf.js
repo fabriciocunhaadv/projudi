@@ -2,6 +2,9 @@
 // para a base de conhecimento do Studio (que só aceita PDF). Cada modelo leva Id, nome, tipo e serventia.
 const { PDFDocument, StandardFonts, rgb } = PDFLib;
 
+export const nomePadrao = (serv) => `Modelos - ${serv.replace(/^.*?\s-\s(?:Vara\s+(?:de|do|da)\s+)?/i, "").trim() || serv} - Decisões, Despachos e Sentenças`;
+export const semBarra = (s) => s.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim();
+
 export const TIPOS = ["Decisão", "Despacho", "Sentença"];
 const sem = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 export const tipoCanonico = (t) => TIPOS.find((x) => sem(x) === sem(t).replace(/s$/, "")) || TIPOS.find((x) => sem(t).startsWith(sem(x).slice(0, 5))) || t || "Outros";

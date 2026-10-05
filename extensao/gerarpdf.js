@@ -49,7 +49,7 @@
       campos.set("codigosArquivos", ids("chk2")); campos.set("codigosMovimentacoes", ids("chk1"));
       campos.set("PaginaAtual", "1"); campos.set("operacao", "GerarPDF");
       try {
-        const resp = await chrome.runtime.sendMessage({ acao: "gerar-pdf-interceptar", url: form.action, corpo: campos.toString(), nome: pedido.processo || "", pasta: pedido.pasta || "", lote: pedido.lote || "" });
+        const resp = await chrome.runtime.sendMessage({ acao: "gerar-pdf-interceptar", url: form.action, corpo: campos.toString(), nome: pedido.processo || "", pasta: pedido.pasta || "", lote: pedido.lote || "", studio: pedido.studio || null });
         if (resp && resp.ok) { if (pedido.lote) setTimeout(() => window.close(), 800); return { ok: true, marcadas: r.marcadas, interceptado: true }; }
       } catch (e) { /* cai no envio normal */ }
     }
