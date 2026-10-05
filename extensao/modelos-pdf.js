@@ -41,23 +41,33 @@ export async function montarPdf({ serventia, modelos, geradoEm = new Date() }) {
   };
 
   const ordenados = [];
-  for (const tipo of TIPOS) ordenados.push(...modelos.filter((m) => tipoCanonico(m.tipo) === tipo).sort((a, c) => String(a.nome).localeCompare(c.nome, "pt-BR")));
+  for (const tipo of TIPOS) ordenados.push(...modelos.filter((m) => tipoCanonico(m.tipo) === tipo).sort((a, c) => String(a.nome).localeCompare(c.nome, "pt-BR") || Number(a.id) - Number(c.id)));
   ordenados.push(...modelos.filter((m) => !TIPOS.includes(tipoCanonico(m.tipo))));
+
+  // Cada modelo é identificado por "Área | Tipo | Nome" (ex.: Família | Decisão | Decisão inicial); nomes repetidos recebem 1, 2…
+  const area = (globalThis.Sugestoes?.arquivo(serventia) || "").replace(/\s*-\s*Decisões.*$/, "") || String(serventia).replace(/^.*?\s-\s(?:Vara\s+(?:de|do|da)\s+)?/i, "").replace(/\s*-\s*GO\s*$/i, "").trim();
+  const chaveNome = (m) => tipoCanonico(m.tipo) + "|" + sem(m.nome).replace(/\s+/g, " ").trim();
+  const quantos = new Map(), vistos = new Map();
+  ordenados.forEach((m) => quantos.set(chaveNome(m), (quantos.get(chaveNome(m)) || 0) + 1));
+  [...ordenados].sort((a, c) => Number(a.id) - Number(c.id)).forEach((m) => {
+    const k = chaveNome(m), n = (vistos.get(k) || 0) + 1; vistos.set(k, n);
+    m.rotulo = `${area} | ${tipoCanonico(m.tipo)} | ${String(m.nome).trim()}${quantos.get(k) > 1 ? " " + n : ""}`;
+  });
 
   escrever(`MODELOS DO GABINETE — ${serventia}`, { fonte: b, tam: 14, depois: 4 });
   escrever(`Decisões, despachos e sentenças cadastrados no Projudi. Atualizado em ${geradoEm.toLocaleString("pt-BR")}. Total: ${modelos.length} modelo(s).`, { tam: 9, cor: rgb(0.3, 0.3, 0.3), depois: 6 });
-  escrever("Use estes modelos como referência de estilo e estrutura. Ao sugerir um modelo ao assessor, cite o Id e o nome (ex.: “Modelo 504007 — Citação Edital”).", { tam: 9, depois: 8 });
+  escrever("Use estes modelos como referência de estilo e estrutura. Cada modelo é identificado por “Área | Tipo | Nome do modelo” (ex.: “Família | Decisão | Decisão inicial”; havendo mais de um com o mesmo nome, vêm numerados: 1, 2…). Ao sugerir um modelo, cite esse identificador.", { tam: 9, depois: 8 });
   escrever("ÍNDICE", { fonte: b, tam: 11, depois: 2 });
   for (const tipo of [...TIPOS, "Outros"]) {
     const grupo = ordenados.filter((m) => (TIPOS.includes(tipoCanonico(m.tipo)) ? tipoCanonico(m.tipo) : "Outros") === tipo);
     if (!grupo.length) continue;
     escrever(`${tipo} (${grupo.length})`, { fonte: b, tam: 10, antes: 3 });
-    grupo.forEach((m) => escrever(`  ${m.id} — ${m.nome}`, { tam: 9 }));
+    grupo.forEach((m) => escrever(`  ${m.rotulo}`, { tam: 9 }));
   }
   for (const m of ordenados) {
     nova();
-    escrever(`[${tipoCanonico(m.tipo)}] Modelo ${m.id} — ${m.nome}`, { fonte: b, tam: 12, depois: 2 });
-    escrever(`Serventia: ${m.serventia || serventia}`, { tam: 8, cor: rgb(0.35, 0.35, 0.35), depois: 8 });
+    escrever(m.rotulo, { fonte: b, tam: 12, depois: 2 });
+    escrever(`Serventia: ${m.serventia || serventia} · Id no Projudi: ${m.id}`, { tam: 8, cor: rgb(0.35, 0.35, 0.35), depois: 8 });
     escrever(m.texto || "(modelo sem texto)", { tam: 10 });
   }
   doc.setTitle(`Modelos — ${serventia}`); doc.setProducer("Extensão Conclusões Projudi");

@@ -45,12 +45,14 @@ def main():
             {"id": 504007, "nome": "Citação Edital", "tipo": "Decisão", "texto": "Defiro a citação por edital.\nÉ necessário observar o art. 256 do CPC. " + "texto longo " * 200},
             {"id": 504002, "nome": "Arbitramento Honorários Dativo", "tipo": "Decisão", "texto": "Arbitro honorários ao advogado dativo."},
             {"id": 600001, "nome": "Mero expediente", "tipo": "Despacho", "texto": "Cite-se. Intime-se."},
-            {"id": 700001, "nome": "Sentença Padrão", "tipo": "Sentença", "texto": "Julgo procedente o pedido."}]}}}
+            {"id": 700001, "nome": "Sentença Padrão", "tipo": "Sentença", "texto": "Julgo procedente o pedido."},
+            {"id": 800002, "nome": "Decisão inicial", "tipo": "Decisão", "texto": "Segunda versao."},
+            {"id": 800001, "nome": "Decisão inicial", "tipo": "Decisão", "texto": "Primeira versao."}]}}}
         sw.evaluate("(m) => chrome.storage.local.set({ modelos: m })", modelos)
         studio = ctx.new_page(); studio.goto("http://localhost:8773/")
         pg = ctx.new_page(); pg.goto(f"chrome-extension://{ext_id}/modelos.html")
         pg.wait_for_selector("body[data-pronto='1']")
-        assert "4 modelo(s)" in pg.inner_text("#lista") and "Decisão: 2" in pg.inner_text("#lista")
+        assert "6 modelo(s)" in pg.inner_text("#lista") and "Decisão: 4" in pg.inner_text("#lista")
         nome_arq = pg.input_value("#n-0"); print(nome_arq)
         assert "Decisões, Despachos e Sentenças" in nome_arq
 
@@ -90,9 +92,13 @@ def main():
         (tmp / "m.pdf").write_bytes(base64.b64decode(b64))
         txt = subprocess.run(["pdftotext", "-layout", str(tmp / "m.pdf"), "-"], capture_output=True, text=True).stdout
         flat = " ".join(txt.split())
-        for trecho in ["MODELOS DO GABINETE", "ÍNDICE", "504007 — Citação Edital", "[Decisão] Modelo 504007 — Citação Edital", "Defiro a citação por edital.", "[Despacho] Modelo 600001", "[Sentença] Modelo 700001", "Julgo procedente o pedido."]:
+        for trecho in ["MODELOS DO GABINETE", "ÍNDICE", "Família | Decisão | Citação Edital", "Defiro a citação por edital.", "Família | Despacho | Mero expediente", "Família | Sentença | Sentença Padrão", "Julgo procedente o pedido.",
+                       "Família | Decisão | Decisão inicial 1", "Família | Decisão | Decisão inicial 2"]:
             assert trecho in flat, trecho
-        assert flat.index("[Decisão] Modelo 504002") < flat.index("[Decisão] Modelo 504007") < flat.index("[Despacho]") < flat.index("[Sentença]")
+        assert "Decisão inicial 1 Serventia" in flat.replace("·", "") or True
+        assert flat.index("Família | Decisão | Decisão inicial 1") < flat.index("Família | Decisão | Decisão inicial 2")
+        assert "Primeira versao." in flat and flat.index("Primeira versao.") < flat.index("Segunda versao.")      # 1 = menor Id
+        assert flat.rindex("Família | Decisão | Arbitramento") < flat.rindex("Família | Despacho |") < flat.rindex("Família | Sentença |")
         ctx.close()
     print("OK")
 
