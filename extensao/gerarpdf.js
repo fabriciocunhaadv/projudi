@@ -34,12 +34,20 @@
     return { marcadas: n };
   }
 
+  const valoresMarcados = (nome) => new Set([...document.querySelectorAll(`input[name=${nome}]:checked`)].map((c) => c.value));
   async function executar(pedido) {
+    // Seleção do usuário: guardada ANTES de qualquer coisa, para nenhum script da página (nem a escolha do volume) trocá-la por "tudo".
+    const guardada = pedido.marcados ? { c1: valoresMarcados("chk1"), c2: valoresMarcados("chk2") } : null;
     const r = await aplicar(pedido);
     if (!r.marcadas) return { erro: "não achei os arquivos pedidos na lista" };
+    const visivel = (e) => e && e.getBoundingClientRect().width > 0;
     const vol = document.querySelector("input[name=myradio]");      // escolher o volume revela o botão de gerar
-    if (vol && !vol.checked) vol.click();
+    if (vol && !vol.checked && !(guardada && visivel(botaoGerar()))) vol.click();
     await esperar(400);
+    if (guardada) {      // reaplica exatamente o que o usuário marcou, se algo mudou
+      for (const c of document.querySelectorAll("input[name=chk1],input[name=chk2]")) { const quer = (c.name === "chk1" ? guardada.c1 : guardada.c2).has(c.value); if (c.checked !== quer) c.click(); }
+      const todosCx = document.getElementById("todos"); if (todosCx && todosCx.checked) { todosCx.checked = false; }
+    }
     const b = botaoGerar();
     if (!b) return { erro: "botão Gerar não encontrado" };
     // Intercepta: em vez de deixar o Projudi entregar o PDF (páginas em imagem), a extensão faz o mesmo pedido, recebe o PDF,
@@ -48,12 +56,13 @@
     if (form && pedido.interceptar !== false) {
       const campos = new URLSearchParams();
       new FormData(form).forEach((v, k) => { if (typeof v === "string") campos.append(k, v); });
-      const ids = (nome) => [...document.querySelectorAll(`input[name=${nome}]:checked`)].map((c) => c.value).join(";") + ";";
+      const ids = (nome) => (guardada ? [...guardada[nome === "chk1" ? "c1" : "c2"]] : [...valoresMarcados(nome)]).join(";") + ";";
+      for (const k of ["chk0", "chk1", "chk2"]) campos.delete(k);      // só valem os códigos abaixo
       campos.set("codigosArquivos", ids("chk2")); campos.set("codigosMovimentacoes", ids("chk1"));
       campos.set("PaginaAtual", "1"); campos.set("operacao", "GerarPDF");
       try {
         const resp = await chrome.runtime.sendMessage({ acao: "gerar-pdf-interceptar", url: form.action, corpo: campos.toString(), nome: pedido.processo || "", pasta: pedido.pasta || "", lote: pedido.lote || "", studio: pedido.studio || null });
-        if (resp && resp.ok) { if (pedido.lote) setTimeout(() => window.close(), 800); return { ok: true, marcadas: r.marcadas, interceptado: true }; }
+        if (resp && resp.ok) { if (pedido.lote) setTimeout(() => window.close(), 800); return { ok: true, marcadas: r.marcadas, interceptado: true, arquivos: ids("chk2").split(";").filter(Boolean).length, movimentacoes: ids("chk1").split(";").filter(Boolean).length }; }
       } catch (e) { /* cai no envio normal */ }
     }
     b.click();
@@ -75,7 +84,7 @@
     const botaoTodos = sh.querySelector('[data-a="todos"]');
     const rotulo = () => { const todos = document.getElementById("todos"), n = marcadasPeloUsuario(); botaoTodos.dataset.modo = n && !(todos && todos.checked) ? "marcados" : "todos"; botaoTodos.textContent = botaoTodos.dataset.modo === "marcados" ? `⬇ Gerar e baixar só os ${n} marcados (extensão)` : "⬇ Gerar e baixar tudo (extensão)"; };
     rotulo(); setInterval(rotulo, 600);
-    botaoTodos.onclick = async () => { const r = await executar(botaoTodos.dataset.modo === "marcados" ? { marcados: true } : { todos: true }); msg(r.erro ? "✖ " + r.erro : r.interceptado ? "PDF pedido; a extensão faz o OCR e salva em Downloads." : "Gerando o PDF do Projudi…"); };
+    botaoTodos.onclick = async () => { const r = await executar(botaoTodos.dataset.modo === "marcados" ? { marcados: true } : { todos: true }); msg(r.erro ? "✖ " + r.erro : r.interceptado ? `PDF pedido (${r.arquivos} arquivo(s) em ${r.movimentacoes} movimentação(ões)); a extensão faz o OCR e salva em Downloads.` : "Gerando o PDF do Projudi…"); };
     sh.querySelector('[data-a="diag"]').onclick = async () => {
       const c = document.documentElement.cloneNode(true);
       c.querySelectorAll("script,style,link,svg,[data-projudi-ext]").forEach((e) => e.remove());
@@ -89,7 +98,7 @@
     if (!document.body || !pronta()) return;
     widget();
     const { gerarpdf_pedido: p } = await chrome.storage.local.get("gerarpdf_pedido");
-    if (!p || Date.now() - p.ts > 10 * 60000 || window.__projudiAplicado) return;
+    if (!p || Date.now() - p.ts > 3 * 60000 || window.__projudiAplicado) { if (p && Date.now() - p.ts > 3 * 60000) await chrome.storage.local.remove("gerarpdf_pedido"); return; }      // pedido antigo (de uma fila que não terminou) nunca se aplica sozinho
     window.__projudiAplicado = true;
     const r = await executar(p);
     if (r.erro && p.lote) await chrome.storage.local.set({ ["lote_fim_" + p.lote]: { ok: false, erro: "janela Gerar PDF: " + r.erro } });

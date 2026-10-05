@@ -111,6 +111,8 @@ def main():
         man = ctx.new_page(); man.goto("http://localhost:8769/PdfServico/GerarPDF?usu=1&chave=2&token=3")
         man.wait_for_selector("[data-projudi-ext=gerarpdf]", state="attached", timeout=20000)
         assert "tudo" in man.evaluate("document.querySelector('[data-projudi-ext=gerarpdf]').shadowRoot.querySelector('[data-a=todos]').textContent")
+        man.evaluate("document.querySelector('input[name=myradio]').addEventListener('click', () => document.querySelectorAll('input[name=chk1],input[name=chk2]').forEach(c => c.checked = true))")      # simula o volume marcando tudo
+        man.evaluate("document.getElementById('divGerarPdf').style.display = 'none'")      # botão do Projudi escondido até escolher o volume
         man.check("input[name=chk2][value='102']"); man.check("input[name=chk1][value='11']"); man.wait_for_timeout(1200)
         rot = man.evaluate("document.querySelector('[data-projudi-ext=gerarpdf]').shadowRoot.querySelector('[data-a=todos]').textContent")
         print(rot); assert "só os 2 marcados" in rot
