@@ -56,7 +56,8 @@
         "formatador.js",
         "arquivos-core.js",
         "baixador.js",
-        "gerarpdf.js"
+        "gerarpdf.js",
+        "copiar-tela.js"
       ],
       "all_frames": true,
       "match_about_blank": true,
