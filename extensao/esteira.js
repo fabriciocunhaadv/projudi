@@ -1,19 +1,22 @@
 import { todos, atualizar, lerPdf, remover, ROTULO, ATIVOS } from "./esteira-banco.js";
 import { analisarNoStudio, lerMinutaAtual } from "./studio-cliente.js";
 import { criarDocumento, abrirLadoALado, lerDocumento, tipoDaMinuta, nomeDoc } from "./docs-api.js";
+import { paragrafosDeHtml } from "./docs-core.js";
+const BASE = "https://projudi.tjgo.jus.br/";
+const absoluta = (u) => (u ? new URL(u, BASE).href : BASE);
 
 const $ = (id) => document.getElementById(id), esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 let dono = false, ocupado = false;
 
 // Com a minuta em mãos: cria o Google Docs e abre ao lado do PDF; o item passa a "conferindo".
-async function entregar(it, bytes, minuta, mensagem) {
+async function entregar(it, bytes, minuta, mensagem, html = "") {
   if (it.modo === "lupa" || !it.docs) return atualizar(it.id, { estado: it.modo === "lupa" ? "concluido" : "conferindo", minuta: minuta || "", tipo: tipoDaMinuta(minuta), aviso: mensagem });
   if (!minuta) throw new Error("o Studio concluiu, mas não consegui ler a minuta gerada");
-  const tipo = tipoDaMinuta(minuta), titulo = nomeDoc(it.processo, tipo), doc = await criarDocumento(titulo, minuta);
+  const tipo = tipoDaMinuta(minuta), titulo = nomeDoc(it.processo, tipo), ps = html ? paragrafosDeHtml(html) : null, doc = await criarDocumento(titulo, minuta, ps && ps.length ? ps : null);
   const urlPdf = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
   await abrirLadoALado(doc.url, urlPdf);
   const aviso = doc.via === "colar" ? "Sem o login do Google configurado, a extensão cola a minuta no documento (sem a configuração de página de monografia). Se o documento ficar em branco, use o botão da barra azul." : "";
-  await atualizar(it.id, { estado: "conferindo", minuta, tipo, titulo, docUrl: doc.url, via: doc.via, aviso, htmlColar: doc.html || "", colado: false, inserido: false });
+  await atualizar(it.id, { estado: "conferindo", minuta, minutaHtml: html, tipo, titulo, docUrl: doc.url, via: doc.via, aviso, htmlColar: doc.html || "", colado: false, inserido: false });
 }
 
 async function analisar(it) {
@@ -25,23 +28,26 @@ async function analisar(it) {
     if (!bytes) throw new Error("o PDF deste processo não está mais guardado");
     const r = await analisarNoStudio(bytes, { nome: it.pdfNome, prompt: it.prompt, modo: it.modo, tipo: "", processo: it.processo, minuta: it.minutaAssessor });
     if (!(await valida())) return;
-    await entregar(it, bytes, r.minuta, r.mensagem);
+    await entregar(it, bytes, r.minuta, r.mensagem, r.minutaHtml || "");
   } catch (e) { if (await valida()) await atualizar(it.id, { estado: "erro", erro: e.message }); }
 }
 
 // A análise já tinha terminado no Studio (a extensão foi recarregada ou a tela travou): usa a minuta que está lá, sem analisar de novo.
 async function usarMinutaDoStudio(it) {
   await atualizar(it.id, { estado: "analisando", erro: "", rodada: Date.now() + Math.random() });
-  try { await entregar(it, await lerPdf(it.id), await lerMinutaAtual(it.processo), ""); }
+  try { const m = await lerMinutaAtual(it.processo); await entregar(it, await lerPdf(it.id), m.texto, "", m.html); }
   catch (e) { await atualizar(it.id, { estado: "erro", erro: e.message }); }
 }
 
-async function cadastrar(it) {         // conferência terminada: pega o texto final e leva ao Projudi
-  let texto = it.minuta, aviso = it.aviso || "";
-  try { const lido = it.docUrl && it.via === "api" ? await lerDocumento(it.docUrl.match(/\/d\/([\w-]+)/)?.[1]) : null; if (lido) texto = lido; else if (it.docUrl) aviso = "Sem o login do Google não dá para ler as suas correções: será usada a minuta original do Studio."; }
-  catch (e) { aviso = "Não consegui ler o Google Docs (" + e.message + "): será usada a minuta original do Studio."; }
-  const aba = await chrome.tabs.create({ url: it.urlPre || it.url, active: true });
-  await atualizar(it.id, { estado: "cadastrando", textoFinal: texto, aviso, projudiTab: aba.id, inserido: false });
+async function cadastrar(it) {         // conferência terminada: pega o texto final (com negrito/itálico/citações) e leva ao Projudi
+  let texto = it.minuta, html = it.minutaHtml || "", aviso = it.aviso || "";
+  try {
+    const lido = it.docUrl && it.via === "api" ? await lerDocumento(it.docUrl.match(/\/d\/([\w-]+)/)?.[1]) : null;
+    if (lido) { texto = lido.texto; html = lido.html; aviso = ""; }
+    else if (it.docUrl) aviso = "Sem o login do Google não dá para ler as suas correções do Docs: será usada a minuta original do Studio.";
+  } catch (e) { aviso = "Não consegui ler o Google Docs (" + e.message + "): será usada a minuta original do Studio."; }
+  const aba = await chrome.tabs.create({ url: absoluta(it.urlPre || it.url), active: true });
+  await atualizar(it.id, { estado: "cadastrando", textoFinal: texto, htmlFinal: html, aviso, projudiTab: aba.id, inserido: false });
 }
 
 async function passo() {
@@ -50,7 +56,7 @@ async function passo() {
   try {
     const lista = await todos();
     const rec = lista.find((i) => i.estado === "recebida");      // minuta enviada pelo botão da tela do Studio
-    if (rec) { await atualizar(rec.id, { estado: "analisando", rodada: Date.now() + Math.random() }); try { await entregar(rec, await lerPdf(rec.id), rec.minutaRecebida, ""); } catch (e) { await atualizar(rec.id, { estado: "erro", erro: e.message }); } return; }
+    if (rec) { await atualizar(rec.id, { estado: "analisando", rodada: Date.now() + Math.random() }); try { await entregar(rec, await lerPdf(rec.id), rec.minutaRecebida, "", rec.htmlRecebido || ""); } catch (e) { await atualizar(rec.id, { estado: "erro", erro: e.message }); } return; }
     const conf = lista.find((i) => i.estado === "conferido");
     if (conf) { await cadastrar(conf); return; }
     if (lista.some((i) => ATIVOS.includes(i.estado))) return;          // só um por vez nesta esteira
@@ -81,7 +87,7 @@ $("linhas").addEventListener("click", async (ev) => {
   if (a === "usar") { usarMinutaDoStudio((await todos()).find((x) => x.id === id)); return; }
   if (a === "conferido") await atualizar(id, { estado: "conferido" });
   if (a === "concluir") await atualizar(id, { estado: "concluido" });
-  if (a === "projudi") { const it = (await todos()).find((x) => x.id === id); chrome.tabs.create({ url: it.urlPre || it.url }); }
+  if (a === "projudi") { const it = (await todos()).find((x) => x.id === id); chrome.tabs.create({ url: absoluta(it.urlPre || it.url) }); }
   passo();
 });
 $("limpar").onclick = async () => { await remover((await todos()).filter((i) => ["concluido", "pulado"].includes(i.estado)).map((i) => i.id)); desenhar(); };

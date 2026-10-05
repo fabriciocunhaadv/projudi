@@ -89,10 +89,10 @@
   }
 
   // ---------- lançar uma minuta pronta (esteira): o texto vira parágrafos e recebe a formatação cadastrada ----------
-  function inserirTexto(texto) {
+  function inserirTexto(texto, htmlRico = "") {
     if (!corpoEditavel()) return false;
     const esc = (x) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const bruto = String(texto).split(/\n+/).map((l) => l.trim()).filter(Boolean).map((l) => "<p>" + esc(l) + "</p>").join("");
+    const bruto = htmlRico || String(texto).split(/\n+/).map((l) => l.trim()).filter(Boolean).map((l) => "<p>" + esc(l) + "</p>").join("");
     const html = comSpans(F.formatarHtmlCorpo(bruto, cfg, document));
     const sel = document.getSelection();
     if (!sel.rangeCount || !document.body.contains(sel.getRangeAt(0).commonAncestorContainer)) {     // sem cursor no editor: lança no fim do texto
@@ -107,7 +107,7 @@
   chrome.runtime.onMessage.addListener((m, _s, responder) => {
     if (m?.acao !== "esteira-inserir-texto") return false;
     if (!corpoEditavel()) return false;       // só o quadro do editor responde
-    responder({ ok: inserirTexto(m.texto) }); return false;
+    responder({ ok: inserirTexto(m.texto, m.html) }); return false;
   });
 
   // ---------- aprender o padrão ----------

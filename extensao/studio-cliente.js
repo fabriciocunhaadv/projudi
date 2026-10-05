@@ -53,5 +53,5 @@ export async function lerMinutaAtual(processo = "") {
   const aba = await acharStudio();
   const r = await chrome.tabs.sendMessage(aba.id, { acao: "studio-ler-minuta", processo });
   if (!r?.ok) throw new Error(r?.erro || "não consegui ler a minuta do app");
-  return r.minuta;
+  return { texto: r.minuta, html: r.minutaHtml || "" };
 }

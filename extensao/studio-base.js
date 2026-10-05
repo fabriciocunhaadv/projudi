@@ -131,7 +131,7 @@
       if (Date.now() - t0 > 20 * 60000) throw new Error("a análise demorou mais de 20 minutos");
       await dorme(1000);
     }
-    return { ok: true, mensagem: "análise concluída", minuta: await lerMinuta() };
+    return { ok: true, mensagem: "análise concluída", minuta: await lerMinuta(), minutaHtml: minutaHtmlDoPainel() };
   }
 
   // Texto da minuta gerada, lido direto do painel de resultado (só o texto do ato: sem caixas de auditoria/teses).
@@ -153,6 +153,32 @@
     return linhas.join("\n");
   }
   window.__projudiMinutaDoPainel = minutaDoPainel;      // usado nos testes
+  // Mesma minuta, em HTML simples (títulos, parágrafos, citações, negrito e itálico preservados).
+  function minutaHtmlDoPainel() {
+    const raiz = document.querySelector("div.font-serif"); if (!raiz) return "";
+    const esc = (x) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const limpo = (no) => {
+      if (no.nodeType === 3) return esc(no.nodeValue);
+      if (no.nodeType !== 1) return "";
+      const t = no.tagName.toLowerCase(); let h = [...no.childNodes].map(limpo).join("");
+      if (t === "br") return "<br>";
+      if (/^(p|blockquote|h[1-6]|li|ul|ol)$/.test(t)) return `<${t}>${h}</${t}>`;
+      const c = no.classList;
+      if (/^(b|strong)$/.test(t) || c.contains("font-bold") || c.contains("font-semibold")) h = `<b>${h}</b>`;
+      if (/^(i|em)$/.test(t) || c.contains("italic")) h = `<i>${h}</i>`;
+      return h;
+    };
+    const saida = [];
+    [...raiz.children].forEach((bl, i) => {
+      if (bl.id === "tour-meta-parties-box") return;
+      const md = bl.querySelector(".markdown-body"), h = bl.querySelector(":scope > h3");
+      if (md) { if (h) saida.push(`<h3>${esc(texto(h))}</h3>`); saida.push([...md.childNodes].map(limpo).join("")); }
+      else if (i === 0) [...bl.querySelectorAll("p,span")].forEach((e) => { const t = texto(e); if (t && e.children.length === 0 && !saida.includes(`<h3>${esc(t)}</h3>`)) saida.push(`<h3>${esc(t)}</h3>`); });
+      else { const t = (bl.innerText || "").replace(/\s+/g, " ").trim(); if (t) saida.push(`<p>${esc(t)}</p>`); }
+    });
+    return saida.join("");
+  }
+  window.__projudiMinutaHtml = minutaHtmlDoPainel;      // usado nos testes
   async function lerMinuta() {
     try {
       const doPainel = minutaDoPainel();
@@ -225,7 +251,7 @@
       responder({ ok: true }); return false;
     }
     if (m?.acao === "studio-enviar-base") { enviar(m.nome, m.arquivoId, m.b64, !!m.substituir).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
-    if (m?.acao === "studio-ler-minuta") { (m.processo ? carregarDoHistorico(m.processo) : Promise.resolve()).then(() => lerMinuta()).then((t) => responder({ ok: !!t, minuta: t, erro: t ? "" : "não há minuta pronta na tela do app" })).catch((e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
+    if (m?.acao === "studio-ler-minuta") { (m.processo ? carregarDoHistorico(m.processo) : Promise.resolve()).then(() => lerMinuta()).then((t) => responder({ ok: !!t, minuta: t, minutaHtml: minutaHtmlDoPainel(), erro: t ? "" : "não há minuta pronta na tela do app" })).catch((e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
     if (m?.acao === "studio-analisar") { (m.modo === "lupa" ? lupa(m) : analisar(m)).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
     return false;
   });
@@ -258,7 +284,7 @@
       caixa.querySelector("button").onclick = async () => {
         const id = caixa.querySelector("select").value, minuta = await lerMinuta();
         if (!minuta) { caixa.querySelector(".r").textContent = "não achei a minuta nesta tela"; return; }
-        await navigator.locks.request("esteira-item", async () => { const it = (await chrome.storage.local.get(K(id)))[K(id)]; if (it) await chrome.storage.local.set({ [K(id)]: { ...it, estado: "recebida", minutaRecebida: minuta, erro: "" } }); });
+        await navigator.locks.request("esteira-item", async () => { const it = (await chrome.storage.local.get(K(id)))[K(id)]; if (it) await chrome.storage.local.set({ [K(id)]: { ...it, estado: "recebida", minutaRecebida: minuta, htmlRecebido: minutaHtmlDoPainel(), erro: "" } }); });
         caixa.querySelector(".r").textContent = "enviada! o Google Docs vai abrir.";
         setTimeout(atualizarBotao, 3000);
       };

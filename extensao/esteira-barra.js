@@ -60,7 +60,7 @@
       barra.innerHTML = `<span class="m"><b>Esteira de minutas</b> — processo ${it.processo} · ${it.tipo || ""}<br><small>${it.aviso || "Abra o editor de texto da minuta deste processo e clique em “Inserir a minuta”."}</small></span>
         <button id="ins">Inserir a minuta no editor (formatada)</button><button id="ok">✔ Lancei no Projudi — próximo processo</button>`;
       barra.querySelector("#ins").onclick = async () => {
-        const r = await chrome.runtime.sendMessage({ acao: "esteira-inserir", texto: it.textoFinal || it.minuta });
+        const r = await chrome.runtime.sendMessage({ acao: "esteira-inserir", texto: it.textoFinal || it.minuta, html: it.htmlFinal || it.minutaHtml || "" });
         msg(r?.ok ? "Minuta inserida no editor, com a sua formatação. Confira, salve no Projudi e clique em “Lancei no Projudi”." : "Não achei o editor de texto aberto nesta aba. Abra a minuta/pré-análise do processo e tente de novo.");
       };
       barra.querySelector("#ok").onclick = async () => { await mudar(it.id, "concluido"); msg("Concluído. Próximo processo da fila segue para o Studio."); setTimeout(desenhar, 1500); };
@@ -74,7 +74,7 @@
     if (it.projudiTab !== minhaAba) return;
     travaAuto = true;
     try {
-      const r = await chrome.runtime.sendMessage({ acao: "esteira-inserir", texto: it.textoFinal || it.minuta });
+      const r = await chrome.runtime.sendMessage({ acao: "esteira-inserir", texto: it.textoFinal || it.minuta, html: it.htmlFinal || it.minutaHtml || "" });
       if (r?.ok) {
         await navigator.locks.request("esteira-item", async () => { const x = (await chrome.storage.local.get(K(it.id)))[K(it.id)]; if (x) await chrome.storage.local.set({ [K(it.id)]: { ...x, inserido: true } }); });
         msg("Minuta lançada no editor com a sua formatação. Confira, salve no Projudi e clique em “Lancei no Projudi”.");

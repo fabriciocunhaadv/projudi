@@ -214,7 +214,7 @@ chrome.runtime.onMessage.addListener((m, s, responder) => {
     return true;
   }
   if (m?.acao === "esteira-inserir" && s.tab) {   // a barra (aba principal) pede para o quadro do editor inserir a minuta
-    chrome.tabs.sendMessage(s.tab.id, { acao: "esteira-inserir-texto", texto: m.texto }).then((r) => responder(r || { ok: false }), () => responder({ ok: false }));
+    chrome.tabs.sendMessage(s.tab.id, { acao: "esteira-inserir-texto", texto: m.texto, html: m.html || "" }).then((r) => responder(r || { ok: false }), () => responder({ ok: false }));
     return true;
   }
   if (m?.acao === "gerar-pdf-interceptar") { // a janela "Gerar PDF" entregou o pedido: a extensão busca o PDF, faz OCR e salva
