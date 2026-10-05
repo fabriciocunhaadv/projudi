@@ -160,7 +160,7 @@ def main():
         txt = ed.inner_text("body"); print("EDITOR:", txt, "| barra:", proj.evaluate("document.querySelector('[data-projudi-ext=esteira]').shadowRoot.querySelector('.m').innerText"), "| quadros:", [(f.url, f.locator("[data-projudi-ext]").count()) for f in proj.frames])
         assert "Julgo procedente o pedido CORRIGIDO." in txt                                 # texto corrigido no Docs, lido de volta
         proj.locator("[data-projudi-ext=esteira] #ok").click()
-        espera(lambda: estados()[0] == "concluido" and estados()[1] in ("analisando", "conferindo"), "2º deveria seguir para o Studio")
+        espera(lambda: estados()[0] == "concluido" and estados()[1] in ("analisando", "conferindo") and len(studio.evaluate("window.__analises")) == 2, "2º deveria seguir para o Studio")
         analises = studio.evaluate("window.__analises"); print(analises)
         assert len(analises) == 2 and all(a["prompt"] == "Outros Área Judicial - Família e Sucessões" for a in analises), analises
         assert [a["nome"] for a in analises] == ["5293296-60.2026.8.09.0166-OCR.pdf", "5000001-11.2026.8.09.0166-OCR.pdf"]
