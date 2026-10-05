@@ -5,8 +5,28 @@ const BASE = "https://projudi.tjgo.jus.br/";
 const link = (p) => (p.url ? new URL(p.url, BASE).href : "");
 const ROTULO = { naoAnalisadas: "Não analisadas", preAnalisadas: "Pré-analisadas" };
 let estado = null, aberto = false;
+// Situação de cada processo na automação: baixado / em que etapa da esteira (Studio, Google Docs, Projudi) está.
+let sitProc = {};
+const incluidos = new Set();          // já baixados que o usuário marcou de novo à mão
+const fora = (proc) => excluidos.has(proc) || (!!sitProc[proc]?.feito && !incluidos.has(proc) && !opcoes.refazer);
+const ETAPAS = {
+  aguardando: ["⏳", "Baixado — na fila do Studio"], analisando: ["🤖", "Analisando no Studio"], pausado: ["⏸", "Interrompido no Studio — decidir na esteira"],
+  conferindo: ["📝", "Google Docs — aguardando a sua conferência"], conferido: ["⚖", "Indo para o Projudi"], cadastrando: ["⚖", "No Projudi — lançar a minuta"],
+  concluido: ["✔", "Concluído"], erro: ["✖", "Erro na esteira"], pulado: ["↷", "Pulado na esteira"],
+};
+async function carregarSituacao() {
+  const tudo = await chrome.storage.local.get(null), novo = {};
+  for (const [proc, b] of Object.entries(tudo.baixados || {})) novo[proc] = { feito: true, icone: "⬇", texto: "Baixado em " + new Date(b.em).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }), esteira: false };
+  for (const id of tudo.esteira_ordem || []) {
+    const it = tudo["esteira_" + id]; if (!it) continue;
+    const [icone, texto] = ETAPAS[it.estado] || ["", it.estado];
+    novo[it.processo] = { feito: true, icone, texto: texto + (it.estado === "erro" && it.erro ? ": " + it.erro : ""), esteira: true, estado: it.estado };
+  }
+  sitProc = novo;
+}
+const celulaSit = (proc) => { const x = sitProc[proc]; return x ? `<span class="sit sit-${x.estado || "baixado"}">${x.icone} ${esc(x.texto)}</span>${x.esteira ? ' <a href="esteira.html" target="_blank">abrir esteira</a>' : ""}` : '<span class="sit-nada">não baixado</span>'; };
 const selCls = new Set(), selSit = new Set(["naoAnalisadas", "preAnalisadas"]), excluidos = new Set();   // seleção para baixar PDFs
-let opcoes = { atualizarBase: false, studio: false, modo: "analise", docs: false };   // o que fazer depois de baixar
+let opcoes = { atualizarBase: false, studio: false, modo: "analise", docs: false, refazer: false };   // o que fazer depois de baixar
 let automacao = {};   // { serventia: { ativa, prompt } } — guardado na conta do Chrome (sincroniza entre computadores)
 const salvarAuto = () => chrome.storage.sync.set({ automacao });
 // Preenche sozinho (sem sobrescrever o que o usuário escreveu) o prompt e o arquivo de modelos de cada serventia.
@@ -70,7 +90,7 @@ function desenhar() {
     const todosP = estado.serventias.flatMap((s) => todos(s).map((p) => ({ ...p, serventia: s.serventia })));
     const clsLista = [...new Set(todosP.filter((p) => automacao[p.serventia]?.ativa).map(nomeCls))].sort((a, b) => a.localeCompare(b, "pt-BR"));
     const cand = todosP.filter((p) => automacao[p.serventia]?.ativa && (!selCls.size || selCls.has(nomeCls(p))) && selSit.has(p.tipo) && p.url).sort(Ordenar.comparador($("modo").value));
-    const fila = cand.filter((p) => !excluidos.has(p.processo));
+    const fila = cand.filter((p) => !fora(p.processo));
     completarAuto(estado.serventias);
     h += `<h2>Baixar PDFs para análise</h2><div class="baixar"><div><b>1) Serventias em que você trabalha</b> <small>(a extensão só mexe nas marcadas)</small></div>` +
       `<table class="tp"><thead><tr><th>Automatizar</th><th>Serventia</th><th>Processos</th><th>Prompt no Studio <small>(igual ao da lista “Prompt Ativo”)</small></th><th>Arquivo de modelos na base <small>(PDF único)</small></th></tr></thead><tbody>` +
@@ -86,14 +106,16 @@ function desenhar() {
       const grupo = cand.filter((p) => p.tipo === tipo);
       if (!grupo.length) continue;
       ordenada.push(...grupo);
-      const marcados = grupo.filter((p) => !excluidos.has(p.processo)).length;
+      const marcados = grupo.filter((p) => !fora(p.processo)).length;
       h += `<h3 class="sub-baixar">${rotulo} <span class="qtd">(${marcados} de ${grupo.length} marcados)</span></h3>` +
-        `<table class="tp"><thead><tr><th><input type="checkbox" data-todos="${tipo}" ${marcados === grupo.length ? "checked" : ""} title="Marcar/desmarcar todos"></th><th>Processo</th><th>Serventia</th><th>Classificador</th><th>Urgência</th><th>Início</th><th class="n">Dias</th></tr></thead><tbody>` +
-        grupo.map((p) => `<tr class="tp-linha"><td><input type="checkbox" data-proc="${esc(p.processo)}" ${excluidos.has(p.processo) ? "" : "checked"}></td><td><b>${esc(p.processo)}</b></td><td>${esc(p.serventia)}</td><td class="cls">${esc(nomeCls(p))}</td><td>${esc(p.urgenciaTexto)}</td><td>${esc(p.dataInicio)}</td><td class="n">${dias0(p)}</td></tr>`).join("") + `</tbody></table>`;
+        `<table class="tp"><thead><tr><th><input type="checkbox" data-todos="${tipo}" ${marcados === grupo.length ? "checked" : ""} title="Marcar/desmarcar todos"></th><th>Processo</th><th>Serventia</th><th>Classificador</th><th>Urgência</th><th>Início</th><th class="n">Dias</th><th>Situação na automação</th></tr></thead><tbody>` +
+        grupo.map((p) => `<tr class="tp-linha"><td><input type="checkbox" data-proc="${esc(p.processo)}" ${fora(p.processo) ? "" : "checked"}></td><td><b>${esc(p.processo)}</b></td><td>${esc(p.serventia)}</td><td class="cls">${esc(nomeCls(p))}</td><td>${esc(p.urgenciaTexto)}</td><td>${esc(p.dataInicio)}</td><td class="n">${dias0(p)}</td><td>${celulaSit(p.processo)}</td></tr>`).join("") + `</tbody></table>`;
     }
     if (!ordenada.length) h += `<p class="zero">${Object.values(automacao).some((x) => x.ativa) ? "Nenhum processo com esse filtro." : "Marque ao menos uma serventia acima."}</p>`;
-    const fila2 = ordenada.filter((p) => !excluidos.has(p.processo));
-    h += `<div class="opcoes"><b>3) Depois de baixar:</b><br>` +
+    const fila2 = ordenada.filter((p) => !fora(p.processo));
+    const jaFeitos = cand.filter((p) => sitProc[p.processo]?.feito).length;
+    h += `<div class="opcoes"><label><input type="checkbox" data-op="refazer" ${opcoes.refazer ? "checked" : ""}> Baixar de novo também os já baixados <small>(${jaFeitos} já baixado(s)/na esteira — por padrão ficam desmarcados)</small></label> <a href="esteira.html" target="_blank">Abrir a esteira de minutas</a></div>` +
+      `<div class="opcoes"><b>3) Depois de baixar:</b><br>` +
       `<label><input type="checkbox" data-op="atualizarBase" ${opcoes.atualizarBase ? "checked" : ""}> Cadastrar/atualizar a <b>base de conhecimento</b> do Studio com os modelos das varas selecionadas (PDF único por vara, substitui o antigo)</label><br>` +
       `<label><input type="checkbox" data-op="studio" ${opcoes.studio ? "checked" : ""}> <b>Iniciar a análise</b> de cada PDF no Studio, uma de cada vez, com o prompt da vara:</label>` +
       `<label class="radio"><input type="radio" name="modoStudio" data-modo="analise" ${opcoes.modo === "analise" ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> Análise dos processos (Gerar Minuta Judicial)</label>` +
@@ -151,7 +173,11 @@ function csv() {
 
 (async () => {
   estado = (await chrome.storage.local.get("estado")).estado;
+  await carregarSituacao();
   chrome.storage.onChanged.addListener((c, area) => { if (area === "local" && c.estado) { estado = c.estado.newValue; desenhar(); } });
+  chrome.storage.onChanged.addListener(async (c, area) => {      // andamento da fila/esteira: atualiza a coluna "Situação na automação"
+    if (area === "local" && Object.keys(c).some((k) => k === "baixados" || k.startsWith("esteira_"))) { await carregarSituacao(); desenhar(); }
+  });
   const guardado = (k, d) => { try { return localStorage.getItem(k) || d; } catch { return d; } };
   $("modo").innerHTML = Object.entries(Ordenar.MODOS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
   $("modo").value = guardado("modo", "trabalho"); $("visao").value = guardado("visao", "tabela");
@@ -169,10 +195,10 @@ function csv() {
     else if (dado.op !== undefined) { opcoes[dado.op] = t.checked; chrome.storage.sync.set({ opcoesLote: opcoes }); }
     else if (dado.modo !== undefined) { opcoes.modo = dado.modo; chrome.storage.sync.set({ opcoesLote: opcoes }); }
     else if (dado.sit !== undefined) { t.checked ? selSit.add(dado.sit) : selSit.delete(dado.sit); }
-    else if (dado.proc !== undefined) { t.checked ? excluidos.delete(dado.proc) : excluidos.add(dado.proc); }
+    else if (dado.proc !== undefined) { if (t.checked) { excluidos.delete(dado.proc); incluidos.add(dado.proc); } else { excluidos.add(dado.proc); incluidos.delete(dado.proc); } }
     else if (dado.todos !== undefined) { // marcar/desmarcar todos de UMA tabela (não analisadas ou pré-analisadas)
       const tabela = t.closest("table");
-      [...tabela.querySelectorAll("input[data-proc]")].forEach((x) => (t.checked ? excluidos.delete(x.dataset.proc) : excluidos.add(x.dataset.proc)));
+      [...tabela.querySelectorAll("input[data-proc]")].forEach((x) => (t.checked ? (excluidos.delete(x.dataset.proc), incluidos.add(x.dataset.proc)) : (excluidos.add(x.dataset.proc), incluidos.delete(x.dataset.proc))));
     }
     else return;
     desenhar();

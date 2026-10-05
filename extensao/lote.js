@@ -138,6 +138,7 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
     try {
       const r = await processar(p, id + ":" + i, p.pasta || pasta, (t) => marca(i, `⏳ ${esc(p.processo)} — ${esc(t)}`, ""), job.opcoes || {});
       feitos++;
+      await navigator.locks.request("baixados", async () => { const { baixados = {} } = await chrome.storage.local.get("baixados"); baixados[p.processo] = { em: Date.now(), arquivo: r.pdf }; await chrome.storage.local.set({ baixados }); });
       const st = r.studio ? (r.studio.ok ? (r.studio.parcial ? ` — Studio: ${esc(r.studio.mensagem)}` : r.studio.fila ? " — na esteira de minutas" : " — análise concluída no Studio" + (r.studio.docs ? (r.studio.docs.ok ? ` — Google Docs: ${esc(r.studio.docs.titulo)}` : ` — <span class="erro">Docs: ${esc(r.studio.docs.erro)}</span>`) : "")) : ` — <span class="erro">Studio: ${esc(r.studio.erro)}</span>`) : "";
       marca(i, `✔ ${esc(p.processo)} — ${r.paginas} páginas (${r.ocr} com OCR) — salvo${st}`, "ok");
     } catch (e) {
