@@ -59,8 +59,6 @@
         "https://*.tjgo.jus.br/*"
       ],
       "js": [
-        "formatacao-core.js",
-        "formatador.js",
         "arquivos-core.js",
         "baixador.js",
         "gerarpdf.js",

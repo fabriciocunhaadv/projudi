@@ -70,22 +70,14 @@ Limitações: lê só "Pendentes" e "Pré-Análises > Simples" (não as Múltipl
 
 ---
 
-## Formatação automática da minuta (no editor de texto do Projudi)
-
-No editor aparecem, no canto inferior direito, os botões **Formatar seleção**, **Aprender texto** e **Aprender citação**.
-- **Colar:** ao colar do Word, Google Docs ou de um chat, o texto entra limpo (sem fonte/cor de origem) e já no seu padrão: fonte, tamanho,
-  justificado, recuo da 1ª linha; citações (recuadas, entre aspas longas ou iniciadas por `>`) saem com o padrão de citação; títulos centralizados são preservados.
-- **Formatar seleção (Alt+Shift+F):** reformata só o trecho selecionado (ou o parágrafo do cursor, se nada estiver selecionado); o resto da minuta não é tocado (Ctrl+Z desfaz). O texto é entregue pela API do próprio editor (TinyMCE/CKEditor) e leva fonte/tamanho também em `<span>`, para passar pelos filtros dele. O botão **Diagnóstico** copia as informações do editor (versão, filtros, o que sobrevive ao gravar), úteis se a formatação não aparecer no sistema.
-- **Aprender:** formate um parágrafo e uma citação do seu jeito, clique dentro deles e use *Aprender texto* / *Aprender citação*.
-  A extensão grava fonte, tamanho (com a unidade do editor), recuo, margens e entrelinha. Os valores também podem ser editados em *Ferramentas*.
-- Padrão inicial (até você ensinar): Times New Roman, 16px no texto, 14px nas citações (recuo 4cm), justificado, recuo de 1ª linha 2,5cm.
+> A formatação automática da minuta no editor do Projudi (colar formatado, “Formatar seleção”, “Aprender texto/citação”) foi **removida** a pedido. A minuta chega ao Projudi pelo botão “Copiar minuta” da barra da esteira.
 
 ## PDF com OCR (`ocr.html`, botão "PDF com OCR" no popup)
 Solte o PDF baixado do Projudi. A extensão confere página por página, faz OCR (português) **só nas páginas sem texto** e devolve o mesmo
 PDF com o texto invisível embutido (as imagens não são recomprimidas). Roda 100% no computador (bibliotecas em `extensao/vendor`, licenças em `vendor/licencas`).
 Teste: `python tests/test_ocr.py` (usa o `pdftotext` para conferir).
 
-Testes: `test_parser`, `test_formatacao`, `test_ocr`, `e2e_extensao`, `e2e_formatacao` (todos em `tests/`).
+Testes: `test_parser`, `test_ocr`, `e2e_extensao` e os demais `e2e_*` (todos em `tests/`).
 
 ## Tabelas no formato do Projudi
 No popup e no painel, os processos **não analisados** e **pré-analisados** aparecem em tabelas iguais às do Projudi: faixa azul com o tipo de

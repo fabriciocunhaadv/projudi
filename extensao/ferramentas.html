@@ -14,19 +14,6 @@
 <h1>Ferramentas</h1>
 <p><a href="painel.html">Painel de conclusões</a> · <a href="ocr.html">PDF com OCR</a></p>
 
-<h2>Formatação automática da minuta</h2>
-<p class="dica">No editor de texto do Projudi aparecem três botões no canto: <b>Formatar minuta</b>, <b>Aprender texto</b> e <b>Aprender citação</b>.
-Formate <u>um</u> parágrafo e <u>uma</u> citação do seu jeito (fonte, tamanho, justificado, recuo...), clique dentro deles e use <b>Aprender</b>:
-a extensão grava exatamente o seu padrão, com as unidades que o editor usa. Depois, ao colar a minuta, ela já entra formatada.
-Também dá para ajustar os valores à mão abaixo.</p>
-<div class="linha">
-  <label style="font-size:13px"><input type="checkbox" id="auto" style="display:inline;width:auto"> Formatar automaticamente ao colar</label>
-  <label style="font-size:13px"><input type="checkbox" id="detectarCitacao" style="display:inline;width:auto"> Reconhecer citações (recuo, aspas longas, <code>&gt;</code>)</label>
-  <label style="font-size:13px"><input type="checkbox" id="removerVazios" style="display:inline;width:auto"> Ao “Formatar minuta”, apagar parágrafos vazios</label>
-</div>
-<div id="perfis"></div>
-<p><button id="salvar">Salvar</button> <button id="restaurar">Restaurar padrão inicial</button><span id="ok"></span></p>
-<p class="dica">Atalho no editor: <b>Alt+Shift+F</b> formata a minuta inteira. O Ctrl+Z desfaz. A extensão só mexe no texto do campo; nada é salvo, assinado ou enviado por ela.</p>
 <h2>OCR automático dos PDFs do Projudi</h2>
 <p class="dica">Quando um PDF de <b>tjgo.jus.br</b> (por exemplo o “PDF completo do processo”) termina de baixar, a extensão abre a página de OCR em segundo plano,
 faz o OCR só nas páginas que são imagem e salva ao lado o arquivo <b>nome-OCR.pdf</b> na pasta Downloads. O PDF original continua intacto.</p>
@@ -36,5 +23,4 @@ faz o OCR só nas páginas que são imagem e salva ao lado o arquivo <b>nome-OCR
 </div>
 <p id="acessoArquivos" class="dica"></p>
 <p><button id="salvarOcr">Salvar</button> <button id="abrirDetalhes">Abrir detalhes da extensão</button> <span id="okOcr" style="color:#1a7a1a"></span></p>
-<script src="formatacao-core.js"></script>
 <script src="ferramentas.js"></script>

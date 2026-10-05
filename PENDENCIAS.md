@@ -9,7 +9,7 @@
 ## Em andamento / próximos passos
 - Captura dos modelos do Projudi (Cadastros → Modelo): aguardando o HTML das telas de cadastro e consulta.
 - Integração com o app Assessor Judicial (AI Studio): aguardando diagnóstico da tela no computador e as regras de prompt por serventia.
-- Validar no Projudi real: fila de PDFs por serventia, OCR em qualidade alta, formatação da minuta no CKEditor.
+- Validar no Projudi real: fila de PDFs por serventia, OCR em qualidade alta.
 
 ## Modelos do Projudi -> base de conhecimento do Studio (decisões já tomadas)
 - Aba "Modelos" na extensão: botão "Atualizar modelos" varre TODA a lista (Cadastros -> Modelo; qualquer quantidade, pois modelos são criados/editados/excluídos), guarda id, nome, tipo (despacho/decisão/sentença), serventia e texto, e mostra novos/alterados/excluídos desde a última varredura.
