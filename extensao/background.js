@@ -161,7 +161,7 @@ async function agendar() {
   if (intervalo > 0) chrome.alarms.create("verificar", { periodInMinutes: Math.max(5, +intervalo) });
 }
 
-chrome.runtime.onInstalled.addListener(() => { agendar(); verificar(); });
+chrome.runtime.onInstalled.addListener((d) => { agendar(); verificar(); if (d && d.reason === "install") chrome.tabs.create({ url: chrome.runtime.getURL("assistente.html") }); });
 chrome.runtime.onStartup.addListener(() => { agendar(); verificar(); });
 chrome.alarms.onAlarm.addListener((a) => a.name === "verificar" && verificar());
 chrome.storage.onChanged.addListener((c, area) => area === "sync" && agendar());

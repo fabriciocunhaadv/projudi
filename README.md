@@ -38,6 +38,13 @@ Teste do parser (sem acessar o Projudi): `python tests/test_parse.py`
 
 ---
 
+# Para quem está começando (modo simples)
+1. Instale a extensão e clique no ícone dela → **▶ Abrir o Assistente de minutas** (ele abre sozinho na primeira instalação).
+2. Deixe o **Projudi** e o **Studio** abertos e com a sua conta (o Assistente avisa o que falta).
+3. Marque as **varas** em que você trabalha.
+4. Clique **▶ Preparar minutas**. Acompanhe pelo quadro “Andamento”, que diz em uma frase o que fazer: *conferir no Google Docs* → botão azul **Concluir conferência e enviar ao Projudi** → *salvar no Projudi* → botão **Lancei no Projudi**.
+Tudo o mais (painel completo, modelos, ferramentas, fila) continua disponível em “Opções avançadas”.
+
 # Extensão do Chrome (recomendada) — pasta `extensao/`
 
 Faz o mesmo, mas dentro do seu Chrome já logado: sem Python e sem login do robô.
