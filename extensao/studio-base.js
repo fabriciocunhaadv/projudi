@@ -239,6 +239,41 @@
     return { ok: true, mensagem: "auditoria iniciada na Lupa do Magistrado" };
   }
 
+  // Módulo Turbo Independente: janela própria do app (Prompt do gabinete, Tipo de Ato, "Anexar PDF dos Autos"); gera a minuta em uma etapa só.
+  const painelTurbo = () => [...document.querySelectorAll("h1,h2,h3,div,span")].filter((e) => e.children.length < 4 && /M[oó]dulo Turbo/i.test(texto(e)) && visivel(e)).map((e) => e.closest("div.fixed") || e.closest("div.border") || e.parentElement.parentElement)[0];
+  async function turbo({ arquivoId, nome, prompt, tipo }) {
+    const bytes = arquivos.get(arquivoId);
+    if (!bytes) throw new Error("arquivo não recebido");
+    fecharJanelas();
+    let raiz = painelTurbo();
+    if (!raiz) { (botao(/Turbo/i) || [...document.querySelectorAll("[title*=Turbo i],[id*=turbo i]")].find(visivel))?.click(); raiz = await esperar(painelTurbo, 15000); }
+    if (!raiz) throw new Error("não achei o Módulo Turbo no app (abra o app e deixe o módulo disponível)");
+    const sel = seletorDePrompt(raiz, prompt);
+    if (prompt && (!sel || !escolherPrompt(sel, prompt))) throw new Error(`não achei o prompt “${prompt}” no Módulo Turbo`);
+    const bt = botao(tipo && !/auto/i.test(tipo) ? new RegExp(tipo, "i") : /Auto-?detectar/i, raiz); if (bt) bt.click();
+    await dorme(300);
+    botao(/Anexar PDF/i, raiz)?.click(); await dorme(300);
+    const input = raiz.querySelector("input[type=file]") || document.querySelector("input[type=file]");
+    if (!input) throw new Error("não achei o campo de envio do PDF no Módulo Turbo");
+    const dt = new DataTransfer(); dt.items.add(new File([bytes], nome, { type: "application/pdf" }));
+    input.files = dt.files; input.dispatchEvent(new Event("change", { bubbles: true }));
+    await esperar(() => texto(raiz).includes(nome.slice(0, 18)), 20000);
+    const gerar = () => [...raiz.querySelectorAll("button")].find((b) => /^(\W*)(Gerar|Analisar|Executar|Iniciar|Processar)/i.test(texto(b)) && visivel(b));
+    const exec = await esperar(() => { const b = gerar(); return b && !b.disabled ? b : null; }, 60000);
+    if (!exec) throw new Error("o botão de gerar do Módulo Turbo não ficou disponível");
+    const rotulo = texto(exec); exec.click();
+    await dorme(1500);
+    const t0 = Date.now();
+    for (;;) {
+      const e = erroNaTela(); if (e) throw new Error("o app avisou: " + e);
+      const b = gerar();
+      if (resultadoPronto() || (b && !b.disabled && texto(b) === rotulo && Date.now() - t0 > 5000 && /Resultado|Minuta/i.test(texto(raiz)) && !/Aguardando/i.test(texto(raiz)))) break;
+      if (Date.now() - t0 > 10 * 60000) throw new Error("o Módulo Turbo demorou mais de 10 minutos");
+      await dorme(1000);
+    }
+    return { ok: true, mensagem: "análise Turbo concluída", minuta: await lerMinuta(), minutaHtml: minutaHtmlDoPainel() };
+  }
+
   chrome.runtime.onMessage.addListener((m, _s, responder) => {
     if (m?.acao === "studio-ping") { responder({ ok: true }); return false; }
     if (m?.acao === "studio-parte") {     // recebe um arquivo em pedaços
@@ -255,7 +290,7 @@
     }
     if (m?.acao === "studio-enviar-base") { enviar(m.nome, m.arquivoId, m.b64, !!m.substituir).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
     if (m?.acao === "studio-ler-minuta") { (m.processo ? carregarDoHistorico(m.processo) : Promise.resolve()).then(() => lerMinuta()).then((t) => responder({ ok: !!t, minuta: t, minutaHtml: minutaHtmlDoPainel(), erro: t ? "" : "não há minuta pronta na tela do app" })).catch((e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
-    if (m?.acao === "studio-analisar") { (m.modo === "lupa" ? lupa(m) : analisar(m)).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
+    if (m?.acao === "studio-analisar") { (m.modo === "lupa" ? lupa(m) : m.modo === "turbo" ? turbo(m) : analisar(m)).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
     return false;
   });
 

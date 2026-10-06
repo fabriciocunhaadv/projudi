@@ -78,13 +78,22 @@
     sh.innerHTML = `<style>.w{position:fixed;left:6px;bottom:8px;z-index:2147483647;font:12px system-ui,sans-serif;display:flex;flex-direction:column;gap:4px;align-items:flex-start}
       button{font:12px system-ui;padding:5px 9px;border:1px solid #1a56a0;background:#1a56a0;color:#fff;border-radius:5px;cursor:pointer}button.s{background:#fff;color:#1a56a0}
       .m{background:#fffbe6;border:1px solid #e0c36a;border-radius:4px;padding:3px 6px;color:#333;display:none}</style>
-      <div class="w"><div class="m"></div><button data-a="todos">⬇ Gerar e baixar tudo (extensão)</button><button class="s" data-a="diag">Copiar diagnóstico</button></div>`;
+      <div class="w"><div class="m"></div><button data-a="todos">⬇ Gerar e baixar tudo (extensão)</button><button data-a="turbo" style="background:#d9780a;border-color:#d9780a">⚡ Gerar e enviar à Análise Turbo</button><button class="s" data-a="diag">Copiar diagnóstico</button></div>`;
     const msg = (t) => { const m = sh.querySelector(".m"); m.textContent = t; m.style.display = "block"; };
     window.__projudiMsg = msg;
     const botaoTodos = sh.querySelector('[data-a="todos"]');
     const rotulo = () => { const todos = document.getElementById("todos"), n = marcadasPeloUsuario(); botaoTodos.dataset.modo = n && !(todos && todos.checked) ? "marcados" : "todos"; botaoTodos.textContent = botaoTodos.dataset.modo === "marcados" ? `⬇ Gerar e baixar só os ${n} marcados (extensão)` : "⬇ Gerar e baixar tudo (extensão)"; };
     rotulo(); setInterval(rotulo, 600);
     botaoTodos.onclick = async () => { const r = await executar(botaoTodos.dataset.modo === "marcados" ? { marcados: true } : { todos: true }); msg(r.erro ? "✖ " + r.erro : r.interceptado ? `PDF pedido (${r.arquivos} arquivo(s) em ${r.movimentacoes} movimentação(ões)); a extensão faz o OCR e salva em Downloads.` : "Gerando o PDF do Projudi…"); };
+    const botaoTurbo = sh.querySelector('[data-a="turbo"]');
+    const rotuloT = () => { const n = marcadasPeloUsuario(), todos = document.getElementById("todos"); botaoTurbo.textContent = n && !(todos && todos.checked) ? `⚡ Gerar só os ${n} marcados e enviar à Análise Turbo` : "⚡ Gerar tudo e enviar à Análise Turbo"; };
+    rotuloT(); setInterval(rotuloT, 600);
+    botaoTurbo.onclick = async () => {      // mesmo download com OCR; o PDF segue para o Módulo Turbo do app de IA (via esteira)
+      const rx = /\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/, num = (document.title.match(rx) || document.body.textContent.match(rx) || [""])[0];
+      const ped = botaoTodos.dataset.modo === "marcados" ? { marcados: true } : { todos: true };
+      const r = await executar({ ...ped, processo: num, studio: { ativo: true, modo: "turbo", prompt: "", tipo: "", minuta: "", url: "", urlPre: "", docs: false } });
+      msg(r.erro ? "✖ " + r.erro : `PDF pedido (${r.arquivos ?? r.marcadas} arquivo(s)); depois do OCR ele vai para a Análise Turbo na aba da extensão.`);
+    };
     sh.querySelector('[data-a="diag"]').onclick = async () => {
       const c = document.documentElement.cloneNode(true);
       c.querySelectorAll("script,style,link,svg,[data-projudi-ext]").forEach((e) => e.remove());

@@ -10,7 +10,7 @@ let dono = false, ocupado = false;
 
 // Com a minuta em mãos: cria o Google Docs e abre ao lado do PDF; o item passa a "conferindo".
 async function entregar(it, bytes, minuta, mensagem, html = "") {
-  if (it.modo === "lupa" || !it.docs) return atualizar(it.id, { estado: it.modo === "lupa" ? "concluido" : "conferindo", minuta: minuta || "", tipo: tipoDaMinuta(minuta), aviso: mensagem });
+  if (it.modo === "lupa" || it.modo === "turbo" || !it.docs) return atualizar(it.id, { estado: it.modo === "lupa" || it.modo === "turbo" ? "concluido" : "conferindo", minuta: minuta || "", tipo: tipoDaMinuta(minuta), aviso: mensagem });
   if (!minuta) throw new Error("o Studio concluiu, mas não consegui ler a minuta gerada");
   const tipo = tipoDaMinuta(minuta), titulo = nomeDoc(it.processo, tipo), ps = html ? paragrafosDeHtml(html) : null, doc = await criarDocumento(titulo, minuta, ps && ps.length ? ps : null);
   const urlPdf = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));

@@ -120,6 +120,7 @@ function desenhar() {
       `<label><input type="checkbox" data-op="studio" ${opcoes.studio ? "checked" : ""}> <b>Iniciar a análise</b> de cada PDF no Studio, uma de cada vez, com o prompt da vara:</label>` +
       `<label class="radio"><input type="radio" name="modoStudio" data-modo="analise" ${opcoes.modo === "analise" ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> Análise dos processos (Gerar Minuta Judicial)</label>` +
       `<label class="radio"><input type="radio" name="modoStudio" data-modo="lupa" ${opcoes.modo === "lupa" ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> Lupa do Magistrado <small>(precisa da minuta do assessor; por ora só baixa)</small></label>` +
+      `<label class="radio"><input type="radio" name="modoStudio" data-modo="turbo" ${opcoes.modo === "turbo" ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> ⚡ Análise Turbo <small>(Módulo Turbo Independente: anexa o PDF com OCR, Auto-detectar, e gera)</small></label>` +
       `<label><input type="checkbox" data-op="docs" ${opcoes.docs ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> Depois da minuta pronta, <b>abrir no Google Docs</b> (“número – tipo”, padrão monografia) ao lado do PDF baixado</label></div>`;
     h += `<p><button id="baixarLote" ${fila2.length ? "" : "disabled"}>⬇ Baixar PDFs dos ${fila2.length} processo(s)</button> <small>Ordem da fila: “${esc(Ordenar.MODOS[$("modo").value])}”. Cada processo gera <b>número-OCR.pdf</b>.</small></p></div>`;
     window.__candidatos = fila2;
