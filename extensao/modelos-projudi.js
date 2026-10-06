@@ -18,46 +18,37 @@
       f.contentWindow.location.href = url;
     });
   }
-  const modal = () => document.getElementById("busca_padrao");
-  const modalAberto = () => { const m = modal(); return m && getComputedStyle(m).display !== "none"; };
-  const linhasDaTabela = () => [...document.querySelectorAll("#CorpoTabela tr")].filter((tr) => tr.querySelector("td") && norm(tr.textContent));
-
-  async function abrirPesquisa() {
-    if (modalAberto()) return;
-    const doc = quadro().contentDocument;
-    const lupa = [...doc.querySelectorAll("[title]")].find((e) => /^Localizar\b/i.test(e.getAttribute("title") || ""));
-    if (!lupa) throw new Error("não achei o botão Localizar na tela Cadastro de Modelo");
-    lupa.click();
-    if (!(await esperar(modalAberto, 10000))) throw new Error("a janela de pesquisa de modelos não abriu");
-  }
+  // A tela Cadastros → Modelo ("Busca de Modelo") fica DENTRO do quadro "Principal": campo "Modelo", botão Consultar, tabela #CorpoTabela
+  // (cada linha traz data_id1 = Id, data_desc1 = nome e data_descs = "desc2;Serventia;desc3;Tipo;"), paginação #Paginacao com caixa "Ir".
+  const D = () => quadro().contentDocument;
+  const linhasQuadro = () => [...D().querySelectorAll("#CorpoTabela tr[data_id1]")];
+  const primeiroId = () => linhasQuadro()[0]?.getAttribute("data_id1") || "";
   async function consultar(filtro) {
-    const campo = document.getElementById("nomeBusca1");
+    const d = D(), campo = d.getElementById("nomeBusca1"), botao = d.getElementById("formLocalizarBotao");
+    if (!botao) throw new Error("não achei o botão Consultar da tela Modelo");
     if (campo) { campo.value = filtro || ""; campo.dispatchEvent(new Event("input", { bubbles: true })); }
-    const antes = linhasDaTabela().map((r) => r.textContent).join("|");
-    document.getElementById("busca_padraoLocalizar").click();
-    await esperar(() => { const a = linhasDaTabela().map((r) => r.textContent).join("|"); return a && (a !== antes || !antes); }, 20000);
+    const antes = linhasQuadro().map((r) => r.getAttribute("data_id1")).join("|");
+    botao.click();
+    if (!(await esperar(() => { const a = linhasQuadro().map((r) => r.getAttribute("data_id1")).join("|"); return a && (a !== antes || !antes); }, 20000))) {
+      if (!linhasQuadro().length) throw new Error(filtro ? `a pesquisa por “${filtro}” não devolveu modelos` : "a lista de modelos veio vazia");
+    }
     await dorme(300);
   }
   function lerLinhas() {
-    const cab = [...document.querySelectorAll("#tabelaLocalizar thead th")].map((t) => sem(t.textContent));
-    const col = (rx) => cab.findIndex((c) => rx.test(c));
-    const iId = col(/^id$/), iServ = col(/serventia/), iTipo = col(/tipo/), iNome = col(/modelo|descri/);
-    return linhasDaTabela().map((tr) => {
-      const td = [...tr.querySelectorAll("td")].map((c) => norm(c.textContent));
-      const g = (i, alt) => (i >= 0 ? td[i] : alt) || "";
-      return { id: g(iId, td.find((x) => /^\d{3,}$/.test(x))), nome: g(iNome, td[2]), serventia: g(iServ, td[3]), tipo: g(iTipo, td[4]), tr };
+    return linhasQuadro().map((tr) => {
+      const d = (tr.getAttribute("data_descs") || "").split(";"), pega = (k) => norm(d[d.indexOf(k) + 1] || "");
+      return { id: tr.getAttribute("data_id1"), nome: norm(tr.getAttribute("data_desc1")), serventia: pega("desc2"), tipo: pega("desc3"), tr };
     }).filter((l) => l.id);
   }
-  const totalInformado = () => +((norm(document.getElementById("PaginacaoBuscaPadrao")?.textContent).match(/Total de:?\s*(\d+)/i) || [])[1] || 0);
-  async function proximaPagina(atual) {
-    const links = [...document.querySelectorAll("#PaginacaoBuscaPadrao a")];
-    const alvo = links.find((a) => norm(a.textContent) === String(atual + 1)) || links.find((a) => /^(pr[oó]xima|>|»)$/i.test(norm(a.textContent)));
-    if (!alvo) return false;
-    const antes = linhasDaTabela()[0]?.textContent;
-    alvo.click();
-    await esperar(() => linhasDaTabela()[0]?.textContent !== antes, 15000);
-    await dorme(300);
-    return true;
+  const totalInformado = () => +((norm(D().getElementById("Paginacao")?.textContent).match(/Total de:?\s*(\d+)/i) || [])[1] || 0);
+  async function irParaPagina(n) {
+    const d = D(), caixa = d.getElementById("CaixaTextoPosicionar"), ir = d.querySelector("#Paginacao .BotaoIr, .BotaoIr");
+    if (!caixa || !ir) return false;
+    const antes = primeiroId();
+    caixa.value = String(n); ir.click();
+    await esperar(() => primeiroId() !== antes, 15000);
+    await dorme(250);
+    return primeiroId() !== antes;
   }
 
   // ---------- leitura do texto do modelo no editor do quadro ----------
@@ -76,37 +67,42 @@
   const hash = (s) => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return String(h >>> 0); };
 
   async function carregarTexto(m, anterior) {
-    await abrirPesquisa();
+    if (!(await navegar("Modelo"))) throw new Error("a tela Modelo não carregou");
     await consultar(m.nome);
     const linha = lerLinhas().find((l) => l.id === m.id);
     if (!linha) throw new Error(`modelo ${m.id} não apareceu na pesquisa`);
-    const alvo = linha.tr.querySelector("td a, td img, td button, td input") || linha.tr.querySelector("td");
-    alvo.click();
-    await esperar(() => !modalAberto(), 10000);
-    // o texto chega ao editor depois que o quadro recarrega o modelo
+    const editar = linha.tr.querySelector("button[name=formLocalizarimgEditar]") || linha.tr.querySelector("td button, td a, td img");
+    editar.click();
+    await esperar(() => !D().getElementById("formLocalizarBotao"), 15000);           // o quadro saiu da lista e abriu o cadastro do modelo
     let html = "";
-    const ok = await esperar(() => { const r = pedirAoEditor("ler"); html = r && r.ok ? r.html : ""; return html && html !== anterior; }, 20000, 400);
-    if (!ok) throw new Error(`o texto do modelo ${m.id} não carregou no editor`);
+    const lido = () => { const r = pedirAoEditor("ler"); html = r && r.ok ? r.html : ""; return html && html !== anterior; };
+    if (!(await esperar(lido, 12000, 400))) { if (!(html || (pedirAoEditor("ler") || {}).html)) throw new Error(`o texto do modelo ${m.id} não carregou no editor`); html = html || pedirAoEditor("ler").html; }      // texto igual ao do anterior: aceita
     return html;
   }
 
   function relatar(msg) { try { chrome.runtime.sendMessage({ acao: "modelos-progresso", ...msg }); } catch (e) { /* página fechada */ } }
 
+  const chaveServ = (x) => sem(x).replace(/\s*-\s*go\s*$/, "").replace(/\s+/g, " ").trim();
   async function capturar() {
     cancelar = false;
     relatar({ txt: "Abrindo Cadastros → Modelo…" });
     if (!(await navegar("Modelo"))) throw new Error("a tela Modelo não carregou");
-    await abrirPesquisa(); await consultar("");
-    const lista = []; let pagina = 1;
-    for (;;) {
-      lista.push(...lerLinhas().map(({ tr, ...x }) => x));
-      relatar({ txt: `Lendo a lista de modelos (página ${pagina}; ${lista.length} até agora)…` });
-      if (!(await proximaPagina(pagina))) break;
-      pagina++;
+    await consultar("");
+    const lista = []; const vistos = new Set();
+    const total = totalInformado(), porPagina = linhasQuadro().length || 15, paginas = total ? Math.ceil(total / porPagina) : 200;
+    for (let pagina = 1; pagina <= paginas; pagina++) {
+      if (cancelar) throw new Error("cancelado");
+      if (pagina > 1 && !(await irParaPagina(pagina))) break;
+      const novas = lerLinhas().map(({ tr, ...x }) => x).filter((x) => !vistos.has(x.id));
+      novas.forEach((x) => vistos.add(x.id)); lista.push(...novas);
+      relatar({ txt: `Lendo a lista de modelos (página ${pagina} de ${total ? paginas : "?"}; ${lista.length} até agora)…` });
+      if (!novas.length) break;
     }
-    const unica = [...new Map(lista.map((x) => [x.id, x])).values()];
-    const total = totalInformado();
-    const aviso = total && unica.length !== total ? `A lista informa ${total} modelos, mas li ${unica.length}.` : "";
+    // só as serventias em que o usuário trabalha (se nenhuma estiver marcada no painel, todas as que têm serventia)
+    const { automacao = {} } = await chrome.storage.sync.get("automacao");
+    const minhas = Object.entries(automacao).filter(([, a]) => a.ativa).map(([n]) => chaveServ(n));
+    const unica = lista.filter((x) => x.serventia && (!minhas.length || minhas.some((k) => chaveServ(x.serventia) === k || chaveServ(x.serventia).includes(k) || k.includes(chaveServ(x.serventia)))));
+    const aviso = (total && lista.length !== total ? `A lista informa ${total} modelos, mas li ${lista.length}. ` : "") + `${unica.length} modelo(s) são das suas serventias${minhas.length ? "" : " (nenhuma marcada no painel: li todas)"}.`;
     const modelos = []; let anterior = "";
     for (let i = 0; i < unica.length; i++) {
       if (cancelar) throw new Error("cancelado");
@@ -117,7 +113,6 @@
       const texto = htmlParaTexto(html);
       modelos.push({ ...m, texto, hash: hash(texto) });
     }
-    if (modalAberto()) document.querySelector("#modalBusca-content-titulo .modal_close")?.click();
     // agrupa por serventia e compara com a captura anterior
     const { modelos: antes } = await chrome.storage.local.get("modelos");
     const servs = {}; const diff = { novos: [], alterados: [], excluidos: [] };

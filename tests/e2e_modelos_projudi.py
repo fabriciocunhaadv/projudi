@@ -1,5 +1,4 @@
-"""Captura dos modelos do Projudi (simulado com a mesma estrutura da moldura: janela de pesquisa #busca_padrao, #CorpoTabela, #PaginacaoBuscaPadrao,
-quadro 'Principal' com Cadastro de Modelo e editor). Confere lista paginada, texto de cada modelo e as diferenças entre duas capturas."""
+"""Captura dos modelos do Projudi (simulado com a estrutura real: quadro Principal com a lista Busca de Modelo, paginação, tela de edição e outra serventia que deve ser ignorada)."""
 import glob, http.server, json, os, shutil, tempfile, threading
 from pathlib import Path
 from playwright.sync_api import sync_playwright
@@ -9,25 +8,25 @@ SERV = "Montes Claros de Goias - Vara de Família e Sucessões"
 DADOS = {"modelos": [{"id": 504000 + i, "nome": f"Modelo {i:02d} teste", "tipo": ["Decisão", "Despacho", "Sentença"][i % 3],
                       "texto": f"<p>Texto do modelo {i}.</p><p>Segundo parágrafo&nbsp;do {i}.</p>"} for i in range(1, 21)]}
 
-SHELL = """<html><body><div id="busca_padrao" style="display:none"><div id="modalBusca-content-titulo"><span class="modal_close" onclick="fechar()">x</span></div>
-<div id="busca_padrao_campos"><input id="nomeBusca1" placeholder="Modelo"></div><input type="submit" id="busca_padraoLocalizar" value="Consultar" onclick="consultar(1);return false">
-<table id="tabelaLocalizar"><thead><tr><th></th><th>Id</th><th>Modelo</th><th>Serventia</th><th>Tipo Modelo</th></tr></thead><tbody id="CorpoTabela">&nbsp;</tbody></table><div id="PaginacaoBuscaPadrao"></div></div>
-<iframe id="Principal" name="userMainFrame" src="/inicio" style="width:800px;height:500px"></iframe>
+OUTRA = "Goiania - 3a Vara Civel"
+OUTROS = [{"id": 700000 + i, "nome": f"Outro {i:02d}", "tipo": "Despacho", "texto": "<p>x</p>", "serv": OUTRA} for i in range(1, 8)]
+
+SHELL = """<html><body><iframe id="Principal" name="userMainFrame" src="/inicio" style="width:900px;height:600px"></iframe></body></html>"""
+LISTA = """<html><body><h3>Busca de Modelo</h3><input id="nomeBusca1"><button id="formLocalizarBotao" onclick="consultar()">Consultar</button>
+<table><tbody id="CorpoTabela"></tbody></table><div id="Paginacao"></div>
 <script>
 let lista = [];
-function MostrarBuscaPadrao(){ document.getElementById('busca_padrao').style.display='block' }
-function fechar(){ document.getElementById('busca_padrao').style.display='none' }
-async function consultar(p){ const f=document.getElementById('nomeBusca1').value; const r=await fetch('/lista?f='+encodeURIComponent(f)); lista=await r.json(); pagina(p) }
+async function consultar(){ const f=document.getElementById('nomeBusca1').value; lista=await (await fetch('/lista?f='+encodeURIComponent(f))).json(); pagina(1) }
 function pagina(p){ const ini=(p-1)*15, fatia=lista.slice(ini,ini+15);
-  document.getElementById('CorpoTabela').innerHTML = fatia.map((m,i)=>'<tr onclick="selecionar('+m.id+')"><td>'+(ini+i+1)+'</td><td>'+m.id+'</td><td>'+m.nome+'</td><td>'+m.serventia+'</td><td>'+m.tipo+'</td></tr>').join('') || '<tr><td colspan=5>Nenhum</td></tr>';
-  const n=Math.ceil(lista.length/15); let h='Página '; for(let k=1;k<=n;k++) h += k===p ? '| '+k+' | ' : '<a href="#" onclick="pagina('+k+');return false">'+k+'</a> ';
-  document.getElementById('PaginacaoBuscaPadrao').innerHTML = h + ' Total de: '+lista.length }
-function selecionar(id){ fechar(); document.getElementById('Principal').contentWindow.carregar(id) }
+  document.getElementById('CorpoTabela').innerHTML = fatia.map(m=>`<tr data_id1="${m.id}" data_desc1="${m.nome}" data_descs="desc2;${m.serv};desc3;${m.tipo};"><td>${m.id}</td><td>${m.nome}</td><td><button name="formLocalizarimgEditar" onclick="location.href='/ModeloEditar?id=${m.id}'">E</button><button name="formLocalizarimgexcluir">X</button></td></tr>`).join('');
+  document.getElementById('Paginacao').innerHTML=`<input id="CaixaTextoPosicionar" value="${p}"><button class="BotaoIr" onclick="pagina(+document.getElementById('CaixaTextoPosicionar').value)">Ir</button> Total de: ${lista.length}` }
 </script></body></html>"""
-QUADRO = """<html><body><h3>Cadastro de Modelo</h3><img title="Localizar - Localiza um registro no banco" onclick="parent.MostrarBuscaPadrao()" width=20 height=20 src="data:,">
-<div id="ed" contenteditable></div>
+EDITAR = """<html><body><h3>Cadastro de Modelo</h3><div id="ed" contenteditable></div>
 <script>window.CKEDITOR={instances:{editor1:{getData:()=>document.getElementById('ed').innerHTML,document:{$:document}}}};
-async function carregar(id){ const r=await fetch('/texto?id='+id); const t=await r.text(); setTimeout(()=>{document.getElementById('ed').innerHTML=t},300) }</script></body></html>"""
+fetch('/texto'+location.search).then(r=>r.text()).then(t=>setTimeout(()=>{document.getElementById('ed').innerHTML=t},300))</script></body></html>"""
+
+
+def todos(): return [{**m, "serv": SERV} for m in DADOS["modelos"]] + OUTROS
 
 
 class H(http.server.BaseHTTPRequestHandler):
@@ -35,10 +34,12 @@ class H(http.server.BaseHTTPRequestHandler):
         from urllib.parse import urlparse, parse_qs
         u = urlparse(s.path); q = parse_qs(u.query)
         if u.path == "/": corpo, tipo = SHELL, "text/html"
-        elif u.path in ("/inicio", "/Modelo"): corpo, tipo = (QUADRO if u.path == "/Modelo" else "<html><body>inicio</body></html>"), "text/html"
+        elif u.path == "/inicio": corpo, tipo = "<html><body>inicio</body></html>", "text/html"
+        elif u.path == "/Modelo": corpo, tipo = LISTA, "text/html"
+        elif u.path == "/ModeloEditar": corpo, tipo = EDITAR, "text/html"
         elif u.path == "/lista":
             f = (q.get("f") or [""])[0].lower()
-            corpo, tipo = json.dumps([{"id": m["id"], "nome": m["nome"], "serventia": SERV, "tipo": m["tipo"]} for m in DADOS["modelos"] if f in m["nome"].lower()]), "application/json"
+            corpo, tipo = json.dumps([{"id": m["id"], "nome": m["nome"], "serv": m["serv"], "tipo": m["tipo"]} for m in todos() if f in m["nome"].lower()]), "application/json"
         elif u.path == "/texto":
             mid = int(q["id"][0]); corpo, tipo = next(m["texto"] for m in DADOS["modelos"] if m["id"] == mid), "text/html"
         else: s.send_response(404); s.end_headers(); return
@@ -50,7 +51,7 @@ def main():
     tmp = Path(tempfile.mkdtemp()); ext = tmp / "ext"
     shutil.copytree(RAIZ, ext)
     m = ext / "manifest.json"; m.write_text(m.read_text().replace("https://*.tjgo.jus.br/*", "http://localhost/*"))
-    srv = http.server.HTTPServer(("localhost", 8776), H)
+    srv = http.server.ThreadingHTTPServer(("localhost", 8776), H)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     exe = os.environ.get("CHROMIUM_PATH") or glob.glob("/opt/pw-browsers/chromium-*/chrome-linux*/chrome")[0]
     with sync_playwright() as p:
@@ -58,6 +59,7 @@ def main():
             args=["--headless=new", "--no-sandbox", f"--disable-extensions-except={ext}", f"--load-extension={ext}"])
         sw = ctx.service_workers[0] if ctx.service_workers else ctx.wait_for_event("serviceworker")
         ext_id = sw.url.split("/")[2]
+        sw.evaluate("(n) => chrome.storage.sync.set({automacao: {[n]: {ativa: true}}})", SERV)
         proj = ctx.new_page(); proj.goto("http://localhost:8776/"); proj.wait_for_timeout(2500)
         pg = ctx.new_page(); pg.goto(f"chrome-extension://{ext_id}/modelos.html"); pg.wait_for_selector("body[data-pronto='1']")
 
