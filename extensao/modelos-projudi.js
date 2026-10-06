@@ -119,8 +119,9 @@
     // só as serventias em que o usuário trabalha (se nenhuma estiver marcada no painel, todas as que têm serventia)
     const { automacao = {} } = await chrome.storage.sync.get("automacao");
     const minhas = Object.entries(automacao).filter(([, a]) => a.ativa).map(([n]) => chaveServ(n));
-    const unica = lista.filter((x) => x.serventia && (!minhas.length || minhas.some((k) => chaveServ(x.serventia) === k || chaveServ(x.serventia).includes(k) || k.includes(chaveServ(x.serventia)))));
-    const aviso = (total && lista.length !== total ? `A lista informa ${total} modelos, mas li ${lista.length}. ` : "") + `${unica.length} modelo(s) são das suas serventias${minhas.length ? "" : " (nenhuma marcada no painel: li todas)"}.`;
+    const tipoOk = (x) => /decis|despach|sentenc/.test(sem(x.tipo));   // só decisão, despacho e sentença (ignora citação, ofício, certidão etc.)
+    const unica = lista.filter((x) => x.serventia && tipoOk(x) && (!minhas.length || minhas.some((k) => chaveServ(x.serventia) === k || chaveServ(x.serventia).includes(k) || k.includes(chaveServ(x.serventia)))));
+    const aviso = (total && lista.length !== total ? `A lista informa ${total} modelos, mas li ${lista.length}. ` : "") + `${unica.length} modelo(s) de decisão/despacho/sentença das suas serventias${minhas.length ? "" : " (nenhuma marcada no painel: li todas)"}.`;
     const modelos = []; let anterior = "";
     for (let i = 0; i < unica.length; i++) {
       if (cancelar) throw new Error("cancelado");

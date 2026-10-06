@@ -27,7 +27,8 @@ EDITAR = """<html><body><h3>Cadastro de Modelo</h3><div id="ed" contenteditable>
 fetch('/texto'+location.search).then(r=>r.text()).then(t=>setTimeout(()=>{document.getElementById('ed').innerHTML=t},300))</script></body></html>"""
 
 
-def todos(): return [{**m, "serv": SERV} for m in DADOS["modelos"]] + OUTROS
+EXTRAS = [{"id": 800000 + i, "nome": f"Citação {i:02d}", "tipo": "Outros", "texto": "<p>y</p>", "serv": SERV} for i in range(1, 4)]
+def todos(): return [{**m, "serv": SERV} for m in DADOS["modelos"]] + EXTRAS + OUTROS
 
 
 class H(http.server.BaseHTTPRequestHandler):
