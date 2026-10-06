@@ -1,0 +1,8 @@
+<!doctype html><meta charset="utf-8"><title>Monitor de Rotina — Relatório</title><link rel="stylesheet" href="estilo.css">
+<style>body { max-width: 900px; margin-inline: auto; }</style>
+<h1>Relatório</h1>
+<div class="linha">Período: <select id="per"><option value="1">hoje</option><option value="7" selected>últimos 7 dias</option><option value="30">últimos 30 dias</option><option value="0">tudo</option></select>
+<button class="p" id="copiar">Copiar relatório para análise</button> <span id="ok" class="ok"></span></div>
+<div id="conteudo"></div>
+<h2>Texto do relatório (é isto que será copiado)</h2><pre id="txt"></pre>
+<script src="analise.js"></script><script src="relatorio.js"></script>

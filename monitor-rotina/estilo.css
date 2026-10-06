@@ -1,0 +1,9 @@
+body { font: 14px system-ui, sans-serif; margin: 0; padding: 12px 16px; color: #202124; }
+h1 { font-size: 16px; margin: 0 0 8px; } h2 { font-size: 14px; margin: 16px 0 6px; }
+button { font: inherit; padding: 5px 10px; border: 1px solid #1a56a0; background: #fff; color: #1a56a0; border-radius: 6px; cursor: pointer; }
+button.p { background: #1a56a0; color: #fff; } button.r { border-color: #b00020; color: #b00020; } button:disabled { opacity: .5; }
+table { border-collapse: collapse; width: 100%; } td, th { border: 1px solid #ccd; padding: 3px 7px; text-align: left; vertical-align: top; } th { background: #eef2f7; }
+small, .dica { color: #5f6368; } .ok { color: #137333; } .erro { color: #b00020; }
+input[type=text] { font: inherit; padding: 4px 6px; } .linha { display: flex; gap: 6px; align-items: center; margin: 4px 0; flex-wrap: wrap; }
+pre { white-space: pre-wrap; background: #f6f8fa; padding: 8px; border-radius: 6px; max-height: 360px; overflow: auto; }
+@media (prefers-color-scheme: dark) { body { background: #202124; color: #e8eaed; } th { background: #2a2d33; } td, th { border-color: #555; } pre { background: #2a2d33; } button { background: #202124; } button.p { background: #1a56a0; } }

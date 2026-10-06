@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Monitor de Rotina (uso pessoal)",
+  "version": "0.1.0",
+  "description": "Mede, nos sites que você escolher, o tempo e os passos repetidos; grava tarefas para repetir sozinho; gera um relatório anônimo para análise. Tudo fica no seu computador.",
+  "icons": { "128": "icone.png" },
+  "permissions": ["storage", "unlimitedStorage", "tabs", "idle", "scripting", "webNavigation", "alarms"],
+  "optional_host_permissions": ["*://*/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup.html", "default_title": "Monitor de Rotina" },
+  "options_page": "opcoes.html"
+}

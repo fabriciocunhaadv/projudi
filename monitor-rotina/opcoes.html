@@ -1,0 +1,17 @@
+<!doctype html><meta charset="utf-8"><title>Monitor de Rotina — Opções</title><link rel="stylesheet" href="estilo.css">
+<style>body { max-width: 860px; margin-inline: auto; }</style>
+<h1>Monitor de Rotina — Opções</h1>
+<p class="dica">Uso pessoal. Tudo fica neste computador. O monitor só enxerga os sites que você autorizar abaixo e guarda apenas <b>tempo, tipo de página e rótulos curtos de botões</b> (números viram “#”). Nunca guarda texto digitado, conteúdo de página nem números de processo.</p>
+
+<h2>Sites monitorados</h2>
+<div id="sites"></div>
+<div class="linha"><input type="text" id="novo" size="34" placeholder="ex.: tjgo.jus.br  ou  docs.google.com"><button class="p" id="add">Autorizar e adicionar</button></div>
+<small>O Chrome vai pedir a sua permissão para cada site. Depois de adicionar, recarregue as abas desse site.</small>
+<div class="linha"><label><input type="checkbox" id="rotulos"> Guardar o rótulo dos botões clicados (ex.: “Gerar PDF”). Desmarcado, só conta cliques.</label></div>
+
+<h2>Tarefas gravadas</h2>
+<div id="tarefas"></div>
+
+<h2>Dados</h2>
+<p class="linha"><button class="r" id="apagar">Apagar todos os dados do monitor</button> <span id="info" class="dica"></span></p>
+<script src="util.js"></script><script src="opcoes.js"></script>
