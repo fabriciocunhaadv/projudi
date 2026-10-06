@@ -34,7 +34,6 @@ Todas usam dados fictícios (comarca "Exemplo", processos inventados).
 
 **Justificativa das permissões:**
 - **activeTab:** capturar, a pedido do usuário, o HTML da tela atual para diagnóstico.
-- **alarms:** verificar as conclusões periodicamente, no intervalo escolhido pelo usuário.
 - **downloads:** salvar na pasta de Downloads os PDFs dos processos (número-OCR.pdf).
 - **notifications:** avisar o usuário sobre conclusões novas e quando a minuta está pronta.
 - **offscreen:** ler a página de conclusões do Projudi em segundo plano.

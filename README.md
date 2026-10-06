@@ -41,7 +41,7 @@ Teste do parser (sem acessar o Projudi): `python tests/test_parse.py`
 # Extensão do Chrome (recomendada) — pasta `extensao/`
 
 Faz o mesmo, mas dentro do seu Chrome já logado: sem Python e sem login do robô.
-- Confere sozinha a cada X minutos (10 min a 3 h) enquanto o Chrome estiver aberto e você logado.
+- A verificação é **sempre manual** (botão “Verificar agora”): nada roda sozinho no Projudi, para não derrubar a sua sessão.
 - Ícone com o número de conclusões **não analisadas** no total.
 - Notificação do Windows quando chegar conclusão nova.
 - Lista de **processos** não analisados e pré-analisados, agrupados por **classificador** (ex.: "Emilly - minutando"), com data e usuário da pré-análise.

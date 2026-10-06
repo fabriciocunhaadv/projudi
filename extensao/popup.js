@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const PADRAO = { filtro: "Montes Claros", intervalo: 30, notificar: true };
+const PADRAO = { filtro: "Montes Claros", notificar: true };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 function listaProcessos(titulo, procs, tipo, aberto) {
@@ -35,10 +35,10 @@ function desenhar(estado) {
 (async () => {
   RenderProjudi.ligarCopiar($("conteudo"));
   const cfg = { ...PADRAO, ...(await chrome.storage.sync.get(PADRAO)) };
-  $("filtro").value = cfg.filtro; $("intervalo").value = String(cfg.intervalo); $("notificar").checked = cfg.notificar;
+  $("filtro").value = cfg.filtro; $("notificar").checked = cfg.notificar;
   const salvar = () => chrome.storage.sync.set({
-    filtro: $("filtro").value, intervalo: +$("intervalo").value, notificar: $("notificar").checked });
-  ["filtro", "intervalo", "notificar"].forEach((i) => $(i).addEventListener("change", salvar));
+    filtro: $("filtro").value, notificar: $("notificar").checked });
+  ["filtro", "notificar"].forEach((i) => $(i).addEventListener("change", salvar));
   $("diagnostico").onclick = async () => {
     const { debug = {}, estado } = await chrome.storage.local.get(["debug", "estado"]);
     const txt = JSON.stringify({ debug, resumo: estado?.serventias?.map((s) => ({ s: s.serventia, erro: s.erro, linhas: s.linhas,

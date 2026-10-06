@@ -5,7 +5,6 @@
   "description": "Confere automaticamente as conclusões não analisadas e pré-analisadas de cada serventia no Projudi/TJGO.",
   "permissions": [
     "activeTab",
-    "alarms",
     "downloads",
     "notifications",
     "offscreen",

@@ -53,6 +53,9 @@ def main():
             args=["--headless=new", "--no-sandbox", f"--disable-extensions-except={ext}", f"--load-extension={ext}"])
         sw = ctx.service_workers[0] if ctx.service_workers else ctx.wait_for_event("serviceworker")
         estado = None
+        time.sleep(3)
+        assert sw.evaluate("chrome.storage.local.get('estado')").get("estado") is None      # nada roda sozinho ao instalar
+        sw.evaluate("verificar()")                                                         # só roda quando o usuário manda
         for _ in range(40):
             estado = sw.evaluate("chrome.storage.local.get('estado')").get("estado")
             if estado and estado["status"] in ("ok", "erro", "deslogado"): break

@@ -1,7 +1,7 @@
 const DOMINIO = "tjgo.jus.br";
 const BASE = "https://projudi.tjgo.jus.br/";
 const LISTA = BASE + "Usuario?PaginaAtual=9";
-const PADRAO = { filtro: "Montes Claros", intervalo: 30, notificar: true };
+const PADRAO = { filtro: "Montes Claros", notificar: true };
 let rodando = false;
 
 const getCfg = async () => ({ ...PADRAO, ...(await chrome.storage.sync.get(PADRAO)) });
@@ -155,16 +155,8 @@ async function terminar(estado, cfg) {
 }
 
 
-async function agendar() {
-  const { intervalo } = await getCfg();
-  await chrome.alarms.clear("verificar");
-  if (intervalo > 0) chrome.alarms.create("verificar", { periodInMinutes: Math.max(5, +intervalo) });
-}
-
-chrome.runtime.onInstalled.addListener(() => { agendar(); verificar(); chrome.storage.sync.remove("formatacao"); });
-chrome.runtime.onStartup.addListener(() => { agendar(); verificar(); });
-chrome.alarms.onAlarm.addListener((a) => a.name === "verificar" && verificar());
-chrome.storage.onChanged.addListener((c, area) => area === "sync" && agendar());
+// A verificação das conclusões é SEMPRE manual ("Verificar agora"): nada roda sozinho no Projudi, para não derrubar a sessão do usuário.
+chrome.runtime.onInstalled.addListener(() => { chrome.storage.sync.remove("formatacao"); });
 // Captura o HTML da aba (e de todos os iframes), sem scripts/estilos, para diagnóstico/ajustes.
 async function capturarAba(tabId) {
   const res = await chrome.scripting.executeScript({
