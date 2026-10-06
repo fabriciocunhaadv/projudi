@@ -23,7 +23,25 @@
   const D = () => quadro().contentDocument;
   const linhasQuadro = () => [...D().querySelectorAll("#CorpoTabela tr[data_id1]")];
   const primeiroId = () => linhasQuadro()[0]?.getAttribute("data_id1") || "";
+  // "Modelo" abre primeiro o CADASTRO de modelo (barra de ícones); a lista "Busca de Modelo" aparece ao clicar na lupa "Localizar" da barra.
+  async function abrirLista() {
+    if (D().getElementById("formLocalizarBotao")) return;
+    const cand = [...D().querySelectorAll("[title*=ocalizar i],[alt*=ocalizar i],[name*=ocalizar i],[id*=ocalizar i]")]
+      .filter((e) => !e.closest("#CorpoTabela") && !/^formLocalizarBotao$/.test(e.id));
+    if (!cand.length) throw new Error("não achei a lupa Localizar na tela Modelo");
+    const alvo = cand.find((e) => /^(button|a|img|input|i|span)$/i.test(e.tagName) && !e.closest("td,label,.campo")) || cand[0];
+    const aberta = () => D().getElementById("formLocalizarBotao");
+    // tenta o próprio ícone, depois o botão/link que o envolve e o ícone dentro dele
+    for (const e of [alvo.querySelector("img"), alvo, alvo.closest("button,a")]) {
+      if (!e || aberta()) continue;
+      e.click();
+      if (await esperar(aberta, 3000)) break;
+    }
+    if (!(await esperar(aberta, 10000))) throw new Error("cliquei em Localizar, mas a lista de modelos não abriu");
+    await dorme(300);
+  }
   async function consultar(filtro) {
+    await abrirLista();
     const d = D(), campo = d.getElementById("nomeBusca1"), botao = d.getElementById("formLocalizarBotao");
     if (!botao) throw new Error("não achei o botão Consultar da tela Modelo");
     if (campo) { campo.value = filtro || ""; campo.dispatchEvent(new Event("input", { bubbles: true })); }

@@ -12,6 +12,7 @@ OUTRA = "Goiania - 3a Vara Civel"
 OUTROS = [{"id": 700000 + i, "nome": f"Outro {i:02d}", "tipo": "Despacho", "texto": "<p>x</p>", "serv": OUTRA} for i in range(1, 8)]
 
 SHELL = """<html><body><iframe id="Principal" name="userMainFrame" src="/inicio" style="width:900px;height:600px"></iframe></body></html>"""
+CADASTRO = """<html><body><h3>Cadastro de Modelo</h3><button name="imgLocalizar"><img title="Localizar - Localiza um registro no banco" width=20 height=20 src="data:," onclick="location.href='/ModeloLista'"></button><input placeholder="Digite Tipo de Arquivo"></body></html>"""
 LISTA = """<html><body><h3>Busca de Modelo</h3><input id="nomeBusca1"><button id="formLocalizarBotao" onclick="consultar()">Consultar</button>
 <table><tbody id="CorpoTabela"></tbody></table><div id="Paginacao"></div>
 <script>
@@ -35,7 +36,8 @@ class H(http.server.BaseHTTPRequestHandler):
         u = urlparse(s.path); q = parse_qs(u.query)
         if u.path == "/": corpo, tipo = SHELL, "text/html"
         elif u.path == "/inicio": corpo, tipo = "<html><body>inicio</body></html>", "text/html"
-        elif u.path == "/Modelo": corpo, tipo = LISTA, "text/html"
+        elif u.path == "/Modelo": corpo, tipo = CADASTRO, "text/html"
+        elif u.path == "/ModeloLista": corpo, tipo = LISTA, "text/html"
         elif u.path == "/ModeloEditar": corpo, tipo = EDITAR, "text/html"
         elif u.path == "/lista":
             f = (q.get("f") or [""])[0].lower()
