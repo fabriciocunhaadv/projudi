@@ -93,10 +93,11 @@ function desenhar() {
     const fila = cand.filter((p) => !fora(p.processo));
     completarAuto(estado.serventias);
     h += `<h2>Baixar PDFs para análise</h2><div class="baixar"><div><b>1) Serventias em que você trabalha</b> <small>(a extensão só mexe nas marcadas)</small></div>` +
-      `<table class="tp"><thead><tr><th>Automatizar</th><th>Serventia</th><th>Processos</th><th>Prompt no Studio <small>(igual ao da lista “Prompt Ativo”)</small></th><th>Arquivo de modelos na base <small>(PDF único)</small></th></tr></thead><tbody>` +
+      `<table class="tp"><thead><tr><th>Automatizar</th><th>Serventia</th><th>Processos</th><th>Prompt no Studio <small>(igual ao da lista “Prompt Ativo”)</small></th><th>Arquivo de modelos na base <small>(PDF único)</small></th><th>Prompt no ExecAgaia <small>(opcional; vazio = igual ao do Studio)</small></th></tr></thead><tbody>` +
       estado.serventias.map((s) => `<tr class="tp-linha"><td class="n"><input type="checkbox" data-serv="${esc(s.serventia)}" ${automacao[s.serventia]?.ativa ? "checked" : ""}></td><td>${esc(s.serventia)}</td><td class="n">${todos(s).length}</td>` +
         `<td><input type="text" data-promptia="${esc(s.serventia)}" value="${esc(automacao[s.serventia]?.prompt || "")}" placeholder="ex.: Outros Área Judicial - Família e Sucessões" size="40"></td>` +
-        `<td><input type="text" data-prompt="${esc(s.serventia)}" value="${esc(automacao[s.serventia]?.arquivoModelos || "")}" placeholder="ex.: Família - Decisões, Despachos e Sentenças" size="40"></td></tr>`).join("") + `</tbody></table>`;
+        `<td><input type="text" data-prompt="${esc(s.serventia)}" value="${esc(automacao[s.serventia]?.arquivoModelos || "")}" placeholder="ex.: Família - Decisões, Despachos e Sentenças" size="40"></td>` +
+        `<td><input type="text" data-promptagaia="${esc(s.serventia)}" value="${esc(automacao[s.serventia]?.promptAgaia || "")}" placeholder="ex.: Fabrício Família e Sucessões" size="34"></td></tr>`).join("") + `</tbody></table>`;
     if (clsLista.length) h += `<div><b>2) Só estes classificadores</b> <small>(opcional — sem marcar nenhum, baixa todos)</small><br>` +
       clsLista.map((c) => `<label class="chip"><input type="checkbox" data-cls="${esc(c)}" ${selCls.has(c) ? "checked" : ""}> ${esc(c)} <small>(${todosP.filter((p) => nomeCls(p) === c && automacao[p.serventia]?.ativa).length})</small></label>`).join(" ") + `</div>`;
     h += `<div>Situação: <label><input type="checkbox" data-sit="naoAnalisadas" ${selSit.has("naoAnalisadas") ? "checked" : ""}> Não analisadas</label> <label><input type="checkbox" data-sit="preAnalisadas" ${selSit.has("preAnalisadas") ? "checked" : ""}> Pré-analisadas</label></div>`;
@@ -190,6 +191,7 @@ function csv() {
   $("conteudo").addEventListener("change", (e) => {
     const t = e.target, dado = t.dataset || {};
     if (dado.serv !== undefined) { automacao[dado.serv] = { ...automacao[dado.serv], ativa: t.checked }; salvarAuto(); }
+    else if (dado.promptagaia !== undefined) { automacao[dado.promptagaia] = { ...automacao[dado.promptagaia], promptAgaia: t.value.trim() }; salvarAuto(); return; }
     else if (dado.promptia !== undefined) { automacao[dado.promptia] = { ...automacao[dado.promptia], prompt: t.value.trim() }; salvarAuto(); return; }
     else if (dado.prompt !== undefined) { automacao[dado.prompt] = { ...automacao[dado.prompt], arquivoModelos: t.value.trim() }; salvarAuto(); return; }
     else if (dado.cls !== undefined) { t.checked ? selCls.add(dado.cls) : selCls.delete(dado.cls); }

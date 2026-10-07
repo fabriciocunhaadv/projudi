@@ -58,6 +58,8 @@
         "https://*.tjgo.jus.br/*"
       ],
       "js": [
+        "sugestoes.js",
+        "agaia-botao.js",
         "arquivos-core.js",
         "baixador.js",
         "gerarpdf.js",
@@ -106,6 +108,15 @@
         "esteira-barra.js"
       ],
       "all_frames": false,
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://simplesefacil.tjgo.jus.br/agaia/*"
+      ],
+      "js": [
+        "agaia-form.js"
+      ],
       "run_at": "document_idle"
     }
   ],
