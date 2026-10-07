@@ -43,6 +43,7 @@ export async function enviarBase(nome, bytes, substituir = false) {          // 
 export async function analisarNoStudio(bytes, opcoes) {
   const aba = await acharStudio();
   const arquivoId = await enviarArquivo(aba.id, bytes);
+  if (opcoes.modo === "turbo") return analisarTurbo(aba, arquivoId, opcoes);
   const r = await chrome.tabs.sendMessage(aba.id, { acao: "studio-analisar", arquivoId, ...opcoes });
   if (!r?.ok) throw new Error(r?.erro || "o app não confirmou a análise");
   return r;
@@ -54,4 +55,24 @@ export async function lerMinutaAtual(processo = "") {
   const r = await chrome.tabs.sendMessage(aba.id, { acao: "studio-ler-minuta", processo });
   if (!r?.ok) throw new Error(r?.erro || "não consegui ler a minuta do app");
   return { texto: r.minuta, html: r.minutaHtml || "" };
+}
+
+// Módulo Turbo: o app responde logo e grava o resultado no storage; assim uma queda do canal de mensagem não perde a análise.
+async function analisarTurbo(aba, arquivoId, opcoes) {
+  const reqId = "t" + Date.now() + Math.random().toString(36).slice(2, 6), chave = "studio_res_" + reqId;
+  let r;
+  try { r = await chrome.tabs.sendMessage(aba.id, { acao: "studio-analisar", arquivoId, reqId, ...opcoes }); }
+  catch (e) { throw new Error("o app do Studio não recebeu o pedido (" + e.message + "). Atualize a aba do assessor-judicial e tente de novo"); }
+  if (!r?.ok) throw new Error(r?.erro || "o app não confirmou a análise");
+  const t0 = Date.now(); let carregando = 0;
+  for (;;) {
+    const res = (await chrome.storage.local.get(chave))[chave];
+    if (res) { await chrome.storage.local.remove(chave); if (!res.ok) throw new Error(res.erro || "o Módulo Turbo falhou"); return res; }
+    const aba2 = await chrome.tabs.get(aba.id).catch(() => null);
+    if (!aba2) throw new Error("a aba do assessor-judicial foi fechada durante a análise");
+    carregando = aba2.status === "loading" ? carregando + 1 : 0;
+    if (carregando > 10) throw new Error("a aba do assessor-judicial recarregou durante a análise");
+    if (Date.now() - t0 > 12 * 60000) throw new Error("o Módulo Turbo não terminou em 12 minutos");
+    await dorme(2000);
+  }
 }

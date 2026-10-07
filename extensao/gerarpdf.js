@@ -91,6 +91,8 @@
     botaoTurbo.onclick = async () => {      // mesmo download com OCR; o PDF segue para o Módulo Turbo do app de IA (via esteira), com o prompt da serventia
       const { processo_atual: at } = await chrome.storage.local.get("processo_atual");
       const rec = at && Date.now() - at.ts < 4 * 3600000 ? at : null;
+      const brutos = (document.body.textContent.match(/processo_n\.(\d{7})(\d{2})(\d{4})8(\d{2})(\d{4})/) || []);      // o arquivo “processo_n.<número>.pdf” da lista identifica o processo
+      const cnjDaLista = brutos[1] ? `${brutos[1]}-${brutos[2]}.${brutos[3]}.8.${brutos[4]}.${brutos[5]}` : "";
       let prompt = "";
       if (rec) {
         const { automacao = {} } = await chrome.storage.sync.get("automacao"), k = (x) => sem(x).replace(/\s*-\s*go\s*$/, "");
@@ -98,8 +100,8 @@
         prompt = automacao[ch]?.prompt || (globalThis.Sugestoes ? Sugestoes.prompt(rec.serventia) : "");
       }
       const ped = botaoTodos.dataset.modo === "marcados" ? { marcados: true } : { todos: true };
-      const r = await executar({ ...ped, processo: rec ? rec.cnj : "", studio: { ativo: true, modo: "turbo", prompt, tipo: "", minuta: "", url: "", urlPre: "", docs: false } });
-      msg(r.erro ? "✖ " + r.erro : `PDF pedido (${r.arquivos ?? r.marcadas} arquivo(s)) de ${rec ? rec.cnj + " — prompt: " + (prompt || "(não definido)") : "processo não identificado (abra a tela do processo antes)"}; depois do OCR ele vai para a Análise Turbo.`);
+      const r = await executar({ ...ped, processo: rec ? rec.cnj : cnjDaLista, studio: { ativo: true, modo: "turbo", prompt, tipo: "", minuta: "", url: "", urlPre: "", docs: false } });
+      msg(r.erro ? "✖ " + r.erro : `PDF pedido (${r.arquivos ?? r.marcadas} arquivo(s)) de ${rec ? rec.cnj + " — prompt: " + (prompt || "(não definido)") : (cnjDaLista || "processo") + " — prompt não definido (atualize a tela do processo no Projudi para a extensão identificar a serventia)"}; depois do OCR ele vai para a Análise Turbo.`);
     };
     sh.querySelector('[data-a="diag"]').onclick = async () => {
       const c = document.documentElement.cloneNode(true);
