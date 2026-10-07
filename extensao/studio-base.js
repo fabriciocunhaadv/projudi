@@ -242,11 +242,12 @@
     if (!bytes && !textoAutos) throw new Error("arquivo não recebido");
     fecharJanelas();
     (document.getElementById("btn-sidebar-minute-auditor") || botao(/Auditoria Ouro/i))?.click();
-    const modal = await esperar(() => [...document.querySelectorAll("h2")].find((h) => /Lupa do Magistrado/i.test(texto(h)))?.closest("div.fixed"), 20000);
+    const achaModal = () => [...document.querySelectorAll("h2")].find((h) => /Lupa do Magistrado/i.test(texto(h)))?.closest("div.fixed");
+    let modal = await esperar(achaModal, 20000);
     if (!modal) throw new Error("a janela da Lupa do Magistrado não abriu");
     // Leva a janela ao formulário de nova auditoria: depois de uma auditoria ela reabre na tela de resultado (“Bancada”/“Resultado & Análise”).
     // Insiste nos botões que levam ao formulário até aparecer o botão “Auditar Minuta”.
-    const noForm = () => botao(/Auditar Minuta/i, modal) && modal.querySelector("textarea");
+    const noForm = () => (botao(/Auditar Minuta/i, modal) || botao(/^Colar Texto$/i, modal)) && [...modal.querySelectorAll("textarea")].filter(visivel).length >= 1;
     const caminhos = [/^\s*Nova Auditoria\s*$/i, /Iniciar Nova Auditoria/i, /Limpar Tudo|Novo Cadastro/i, /Nova Auditoria/i];
     document.documentElement.dataset.projudiAutoConfirm = "1";
     try {
@@ -300,12 +301,34 @@
       if (Date.now() - t0 > 8 * 60000) throw new Error("a auditoria da Lupa demorou mais de 8 minutos");
     }
     const resumo = texto_().replace(/Auditar Minuta com Rigor do Magistrado.*$/i, "").slice(0, 300);
-    // Confere em “Processos Auditados” se a auditoria ficou gravada (cada processo precisa aparecer na lista).
+    // Confere em “Processos Auditados” se a auditoria ficou gravada. Só segue para o próximo depois de confirmar:
+    // consulta a aba por até ~100 s e, se não aparecer, fecha e reabre o módulo e navega de novo pelos botões.
     const dig = String(processo || "").replace(/\D/g, "").slice(0, 9);
-    botao(/^\s*Processos Auditados/i, modal)?.click(); await dorme(3000);
-    const lista = texto_(), qtd = (lista.match(/Processos Auditados\s*(\d+)/i) || [])[1];
-    const gravou = !dig || new RegExp(dig.slice(0, 7) + "[.\\-]?" + dig.slice(7, 9)).test(lista);
-    if (!gravou) throw new Error(`a auditoria terminou, mas ${processo} não aparece em “Processos Auditados” (a lista tem ${qtd ?? "?"} registro(s)). Tente de novo`);
+    const rxProc = dig ? new RegExp(dig.slice(0, 7) + "[.\\-]?" + dig.slice(7, 9)) : null;
+    const consulta = async () => {
+      botao(/^\s*Processos Auditados/i, modal)?.click();
+      await dorme(2500);
+      const lista = texto_(), qtd = (lista.match(/Processos Auditados\s*(\d+)/i) || [])[1];
+      return { ok: !rxProc || rxProc.test(lista), qtd };
+    };
+    let conf = { ok: false, qtd: undefined };
+    for (let tent = 0; tent < 3 && !conf.ok; tent++) {
+      if (tent > 0) {      // fecha e reabre o módulo
+        (botao(/^\s*Fechar\s*$/i, modal) || modal.querySelector("button[aria-label*=echar]"))?.click();
+        await dorme(1200); if (achaModal()) fecharJanelas();
+        await dorme(800);
+        (document.getElementById("btn-sidebar-minute-auditor") || botao(/Auditoria Ouro/i))?.click();
+        modal = await esperar(achaModal, 20000);
+        if (!modal) throw new Error("a Lupa não reabriu para conferir Processos Auditados");
+        await dorme(1500);
+      }
+      for (let i = 0; i < 6 && !conf.ok; i++) {
+        conf = await consulta();
+        if (!conf.ok) { if (i % 2) { botao(/^\s*Nova Auditoria\s*$/i, modal)?.click(); await dorme(1000); } await dorme(i < 2 ? 3000 : 5000); }
+      }
+    }
+    const qtd = conf.qtd;
+    if (!conf.ok) throw new Error(`a auditoria terminou, mas ${processo} não aparece em “Processos Auditados” mesmo após aguardar e reabrir o módulo (a lista tem ${qtd ?? "?"} registro(s)). Não passei para o próximo`);
     // Deixa a Lupa pronta para o próximo processo: volta em Nova Auditoria e clica em “Limpar Tudo (Novo Cadastro)”.
     try {
       document.documentElement.dataset.projudiAutoConfirm = "1";
