@@ -27,6 +27,7 @@ async function carregarSituacao() {
 const celulaSit = (proc) => { const x = sitProc[proc]; return x ? `<span class="sit sit-${x.estado || "baixado"}">${x.icone} ${esc(x.texto)}</span>${x.esteira ? ' <a href="esteira.html" target="_blank">abrir esteira</a>' : ""}` : '<span class="sit-nada">não baixado</span>'; };
 const selCls = new Set(), selSit = new Set(["naoAnalisadas", "preAnalisadas"]), excluidos = new Set();   // seleção para baixar PDFs
 let opcoes = { atualizarBase: false, studio: false, modo: "analise", docs: false, refazer: false };   // o que fazer depois de baixar
+let entradaStudio = "pdf";
 let automacao = {};   // { serventia: { ativa, prompt } } — guardado na conta do Chrome (sincroniza entre computadores)
 const salvarAuto = () => chrome.storage.sync.set({ automacao });
 // Preenche sozinho (sem sobrescrever o que o usuário escreveu) o prompt e o arquivo de modelos de cada serventia.
@@ -122,7 +123,8 @@ function desenhar() {
       `<label class="radio"><input type="radio" name="modoStudio" data-modo="analise" ${opcoes.modo === "analise" ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> Análise dos processos (Gerar Minuta Judicial)</label>` +
       `<label class="radio"><input type="radio" name="modoStudio" data-modo="lupa" ${opcoes.modo === "lupa" ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> Lupa do Magistrado <small>(precisa da minuta do assessor; por ora só baixa)</small></label>` +
       `<label class="radio"><input type="radio" name="modoStudio" data-modo="turbo" ${opcoes.modo === "turbo" ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> ⚡ Análise Turbo <small>(Módulo Turbo Independente: anexa o PDF com OCR, Auto-detectar, e gera)</small></label>` +
-      `<label><input type="checkbox" data-op="docs" ${opcoes.docs ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> Depois da minuta pronta, <b>abrir no Google Docs</b> (“número – tipo”, padrão monografia) ao lado do PDF baixado</label></div>`;
+      `<label><input type="checkbox" data-op="docs" ${opcoes.docs ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> Depois da minuta pronta, <b>abrir no Google Docs</b> (“número – tipo”, padrão monografia) ao lado do PDF baixado</label><br>` +
+      `<label>Enviar os autos ao Studio como: <select data-entrada ${opcoes.studio ? "" : "disabled"}><option value="pdf" ${entradaStudio === "pdf" ? "selected" : ""}>PDF (arquivo completo)</option><option value="txt" ${entradaStudio === "txt" ? "selected" : ""}>texto extraído do PDF com OCR (mais rápido)</option></select> <small>(o .txt de cada processo também é salvo ao lado do PDF)</small></label></div>`;
     h += `<p><button id="baixarLote" ${fila2.length ? "" : "disabled"}>⬇ Baixar PDFs dos ${fila2.length} processo(s)</button> <small>Ordem da fila: “${esc(Ordenar.MODOS[$("modo").value])}”. Cada processo gera <b>número-OCR.pdf</b>.</small></p></div>`;
     window.__candidatos = fila2;
   }
@@ -187,9 +189,11 @@ function csv() {
   $("busca").oninput = desenhar;
   RenderProjudi.ligarCopiar($("conteudo"));
   automacao = (await chrome.storage.sync.get("automacao")).automacao || {};
+  entradaStudio = ((await chrome.storage.sync.get("esteiraConfig")).esteiraConfig || {}).entrada || "pdf";
   opcoes = { ...opcoes, ...((await chrome.storage.sync.get("opcoesLote")).opcoesLote || {}) };
   $("conteudo").addEventListener("change", (e) => {
     const t = e.target, dado = t.dataset || {};
+    if (dado.entrada !== undefined) { entradaStudio = t.value; chrome.storage.sync.get("esteiraConfig").then(({ esteiraConfig = {} }) => chrome.storage.sync.set({ esteiraConfig: { ...esteiraConfig, entrada: t.value } })); return; }
     if (dado.serv !== undefined) { automacao[dado.serv] = { ...automacao[dado.serv], ativa: t.checked }; salvarAuto(); }
     else if (dado.promptagaia !== undefined) { automacao[dado.promptagaia] = { ...automacao[dado.promptagaia], promptAgaia: t.value.trim() }; salvarAuto(); return; }
     else if (dado.promptia !== undefined) { automacao[dado.promptia] = { ...automacao[dado.promptia], prompt: t.value.trim() }; salvarAuto(); return; }

@@ -111,9 +111,9 @@
   };
   const executando = () => { const b = document.getElementById("tour-execute-btn"); return !b || b.disabled || !/Gerar Minuta/i.test(texto(b)); };
 
-  async function analisar({ arquivoId, nome, prompt, tipo }) {
+  async function analisar({ arquivoId, nome, prompt, tipo, texto: textoAutos }) {
     const bytes = arquivos.get(arquivoId);
-    if (!bytes) throw new Error("arquivo não recebido");
+    if (!bytes && !textoAutos) throw new Error("arquivo não recebido");
     fecharJanelas();
     botao(/^Nova An[aá]lise$/i)?.click(); await dorme(600);
     const painel = await esperar(() => document.getElementById("tour-input-panel"), 20000);
@@ -122,13 +122,21 @@
     if (prompt && (!sel || !escolherPrompt(sel, prompt))) throw new Error(`não achei o prompt “${prompt}” na lista do app`);
     await dorme(400);
     if (tipo && !/auto/i.test(tipo)) { const bt = botao(new RegExp("^" + tipo + "$", "i"), painel); if (bt) bt.click(); }
-    const bpdf = [...painel.querySelectorAll("button")].find((b) => /^PDF$/.test(texto(b))); if (bpdf) bpdf.click();
-    await dorme(300);
-    const input = painel.querySelector("input[type=file]");
-    if (!input) throw new Error("não achei o campo de envio do PDF do processo");
-    const dt = new DataTransfer(); dt.items.add(new File([bytes], nome, { type: "application/pdf" }));
-    input.files = dt.files; input.dispatchEvent(new Event("change", { bubbles: true }));
-    await esperar(() => texto(painel).includes(nome.slice(0, 18)), 20000);
+    if (textoAutos) {      // entrada “Texto / Casos”: cola o texto do PDF com OCR (bem mais rápido que enviar o PDF)
+      const bt = [...painel.querySelectorAll("button")].find((b) => /^Texto/i.test(texto(b)) && visivel(b)); if (bt) bt.click();
+      const ta = await esperar(() => [...painel.querySelectorAll("textarea")].find(visivel), 10000);
+      if (!ta) throw new Error("não achei o campo de texto da entrada “Texto / Casos” do app");
+      definirValor(ta, textoAutos); await dorme(500);
+      if (ta.value.length < textoAutos.length * 0.98) throw new Error("o campo de texto do app não aceitou o texto completo");
+    } else {
+      const bpdf = [...painel.querySelectorAll("button")].find((b) => /^PDF$/.test(texto(b))); if (bpdf) bpdf.click();
+      await dorme(300);
+      const input = painel.querySelector("input[type=file]");
+      if (!input) throw new Error("não achei o campo de envio do PDF do processo");
+      const dt = new DataTransfer(); dt.items.add(new File([bytes], nome, { type: "application/pdf" }));
+      input.files = dt.files; input.dispatchEvent(new Event("change", { bubbles: true }));
+      await esperar(() => texto(painel).includes(nome.slice(0, 18)), 20000);
+    }
     const exec = await esperar(() => { const b = document.getElementById("tour-execute-btn"); return b && !b.disabled ? b : null; }, 60000);
     if (!exec) throw new Error("o botão “Gerar Minuta Judicial” não ficou disponível");
     exec.click();

@@ -29,8 +29,10 @@ async function analisar(it) {
   try {
     const bytes = await lerPdf(it.id);
     if (!bytes) throw new Error("o PDF deste processo não está mais guardado");
-    const texto = it.modo === "turbo" ? await textoDoPdf(bytes) : "";      // o Módulo Turbo recebe o texto dos autos (PDF com OCR), não o arquivo
-    if (it.modo === "turbo" && texto.replace(/\[Página \d+\]|\s/g, "").length < 200) throw new Error("não consegui extrair texto do PDF (o OCR pode não ter funcionado)");
+    const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig");
+    const comTexto = it.modo === "turbo" || (it.modo === "analise" && esteiraConfig.entrada === "txt");      // Turbo: sempre texto; esteira principal: conforme a escolha do usuário (txt ou PDF)
+    const texto = comTexto ? await textoDoPdf(bytes) : "";
+    if (comTexto && texto.replace(/\[Página \d+\]|\s/g, "").length < 200) throw new Error("não consegui extrair texto do PDF (o OCR pode não ter funcionado)");
     const r = await analisarNoStudio(bytes, { nome: it.pdfNome, prompt: it.prompt, modo: it.modo, tipo: "", processo: it.processo, minuta: it.minutaAssessor, texto });
     if (!(await valida())) return;
     await entregar(it, bytes, r.minuta, r.mensagem, r.minutaHtml || "");
@@ -108,7 +110,8 @@ $("linhas").addEventListener("click", async (ev) => {
   if (a === "projudi") { const it = (await todos()).find((x) => x.id === id), t = await chrome.tabs.create({ url: absoluta(it.urlPre || it.url) }); await atualizar(id, { abas: { ...(it.abas || {}), projudi: t.id } }); }
   passo();
 });
-chrome.storage.sync.get("esteiraConfig").then(({ esteiraConfig = {} }) => { $("abrirEm").value = esteiraConfig.abrirEm || "abas"; });
+chrome.storage.sync.get("esteiraConfig").then(({ esteiraConfig = {} }) => { $("abrirEm").value = esteiraConfig.abrirEm || "abas"; $("entrada").value = esteiraConfig.entrada || "pdf"; });
+$("entrada").onchange = async () => { const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig"); chrome.storage.sync.set({ esteiraConfig: { ...esteiraConfig, entrada: $("entrada").value } }); };
 $("abrirEm").onchange = async () => { const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig"); chrome.storage.sync.set({ esteiraConfig: { ...esteiraConfig, abrirEm: $("abrirEm").value } }); };
 // Recuperação: coloca na fila PDFs "número-OCR.pdf" que já estão no computador (a fila foi perdida ou os PDFs vieram de fora).
 chrome.storage.sync.get("automacao").then(({ automacao = {} }) => {

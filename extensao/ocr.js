@@ -1,5 +1,6 @@
 // Página de OCR: tela, arrastar/soltar e OCR automático dos PDFs baixados do Projudi. O trabalho pesado está em ocr-motor.js.
 import { fazerOcr, fmt } from "./ocr-motor.js";
+import { textoDoPdf } from "./pdf-texto.js";
 import { analisarNoStudio } from "./studio-cliente.js";
 import { enfileirar } from "./esteira-banco.js";
 
@@ -140,6 +141,7 @@ async function interceptado(idJob) {
     };
     $("status").textContent = "Salvando o PDF…";
     const arqPdf = await salvar(new Blob([res.bytes], { type: "application/pdf" }), num + "-OCR.pdf");
+    try { await salvar(new Blob([await textoDoPdf(res.bytes)], { type: "text/plain;charset=utf-8" }), num + "-OCR.txt"); log("Texto do PDF salvo: " + num + "-OCR.txt"); } catch (e) { log("⚠ não consegui salvar o .txt: " + e.message); }      // o texto de cada processo baixado fica ao lado do PDF
     $("status").textContent = `Pronto: ${arqPdf}`;
     document.body.dataset.salvo = arqPdf;
     avisar("PDF do processo pronto", `${num}-OCR.pdf salvo (${res.ocr} de ${res.total} páginas com OCR).`);
