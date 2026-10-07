@@ -87,6 +87,15 @@
   }
   const seletorDePrompt = (raiz, prompt) => [...raiz.querySelectorAll("select")].find((s) => [...s.options].some((o) => /Área Judicial|Area Judicial/i.test(o.text)) && (!prompt || [...s.options].some((o) => normal(o.text).includes(normal(prompt)))));
   const erroNaTela = () => { const t = document.querySelector("[data-rht-toaster]"); const x = t ? texto(t) : ""; return /erro|falha|inv[aá]lid|limite|quota|n[aã]o foi poss/i.test(x) ? x : ""; };
+  // Falha passageira dos servidores de IA (alta demanda, 503, tempo de fila): espera 5 s e aperta o botão de novo (até 6 vezes).
+  const transitorio = (msg) => /alta demanda|503|timeout de fila|reten[cç][aã]o em fila|tente novamente|tentar novamente|sobrecarg|indispon[ií]vel/i.test(msg || "");
+  function repetirSePassageiro(estado, e, apertar) {
+    if (!transitorio(e) || estado.vezes >= 6) return false;
+    if (Date.now() < estado.ate) return true;       // o mesmo aviso ainda está na tela
+    estado.vezes++; estado.ate = Date.now() + 12000;
+    setTimeout(() => { try { (botao(/^Tentar Novamente$/i) || null)?.click(); apertar(); } catch (x) { /* tela mudou */ } }, 5000);
+    return true;
+  }
   function fecharJanelas() {
     for (let i = 0; i < 3; i++) {
       const f = botao(/^Fechar$/i) || [...document.querySelectorAll("button[title=Fechar]")].find(visivel);
@@ -124,9 +133,11 @@
     if (!exec) throw new Error("o botão “Gerar Minuta Judicial” não ficou disponível");
     exec.click();
     if (!(await esperar(() => executando() || resultadoPronto() || erroNaTela(), 60000))) throw new Error("a análise não começou");
-    const t0 = Date.now();
+    const t0 = Date.now(), rep = { vezes: 0, ate: 0 };
     for (;;) {
-      const e = erroNaTela(); if (e) throw new Error("o app avisou: " + e);
+      const e = erroNaTela();
+      if (e && repetirSePassageiro(rep, e, () => { const b = document.getElementById("tour-execute-btn"); if (b && !b.disabled && /Gerar Minuta/i.test(texto(b))) b.click(); })) { await dorme(1000); continue; }
+      if (e) throw new Error("o app avisou: " + e);
       if (!executando() && resultadoPronto()) break;
       if (Date.now() - t0 > 20 * 60000) throw new Error("a análise demorou mais de 20 minutos");
       await dorme(1000);
@@ -303,11 +314,13 @@
     if (!exec) throw new Error("o botão “Executar Análise Turbo” não ficou disponível");
     const rotulo = texto(exec); exec.click();
     // 1) começou (o botão muda ou some) 2) terminou (aparece o resultado: “Abrir no Editor” + aba “Minuta Completa”)
-    const t0 = Date.now();
+    const t0 = Date.now(), rep = { vezes: 0, ate: 0 };
     await esperar(() => { const b = botaoExecutarTurbo(raiz); return erroNaTela() || !b || b.disabled || texto(b) !== rotulo || resultadoTurbo(); }, 20000);
     for (;;) {
       if (resultadoTurbo()) break;
-      const e = erroNaTela(); if (e) throw new Error("o app avisou: " + e);
+      const e = erroNaTela();
+      if (e && repetirSePassageiro(rep, e, () => { const r2 = painelTurbo(), b = r2 && botaoExecutarTurbo(r2); if (b && !b.disabled && /Executar/i.test(texto(b))) b.click(); })) { await dorme(1000); continue; }
+      if (e) throw new Error("o app avisou: " + e);
       if (Date.now() - t0 > 10 * 60000) throw new Error("o Módulo Turbo demorou mais de 10 minutos");
       await dorme(1000);
     }

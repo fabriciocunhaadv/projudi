@@ -16,10 +16,10 @@ async function entregar(it, bytes, minuta, mensagem, html = "") {
   const tipo = tipoDaMinuta(minuta), titulo = nomeDoc(it.processo, tipo), ps = html ? paragrafosDeHtml(html) : null, doc = await criarDocumento(titulo, minuta, ps && ps.length ? ps : null);
   const urlPdf = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
   const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig");
-  await abrirLadoALado(doc.url, urlPdf, esteiraConfig.abrirEm || "abas");
+  const abas = await abrirLadoALado(doc.url, urlPdf, esteiraConfig.abrirEm || "abas");
   const aviso = doc.via === "colar" ? "Sem o login do Google configurado, a extensão cola a minuta no documento (sem a configuração de página de monografia). Se o documento ficar em branco, use o botão da barra azul." : "";
   chrome.notifications?.create({ type: "basic", iconUrl: "icone.png", title: "Minuta pronta para conferência", message: `${it.processo} — ${tipo}: Google Docs e PDF abertos.` });
-  await atualizar(it.id, { estado: "conferindo", minuta, minutaHtml: html, tipo, titulo, docUrl: doc.url, via: doc.via, aviso, htmlColar: doc.html || "", colado: false, inserido: false });
+  await atualizar(it.id, { estado: "conferindo", minuta, minutaHtml: html, tipo, titulo, docUrl: doc.url, via: doc.via, abas: { ...abas, janelas: (esteiraConfig.abrirEm || "abas") === "janelas" }, aviso, htmlColar: doc.html || "", colado: false, inserido: false });
 }
 
 async function analisar(it) {
@@ -70,6 +70,12 @@ async function passo() {
   } finally { ocupado = false; desenhar(); }
 }
 
+// Fecha as abas (ou janelas) que a esteira abriu para este processo: Google Docs, PDF e Projudi.
+async function fecharAbas(it) {
+  const a = it?.abas; if (!a) return;
+  for (const id of [a.doc, a.pdf, a.projudi].filter(Boolean)) await (a.janelas && id !== a.projudi ? chrome.windows.remove(id) : chrome.tabs.remove(id)).catch(() => {});
+}
+
 async function desenhar() {
   const lista = await todos();
   $("linhas").innerHTML = lista.length ? lista.map((it, n) => {
@@ -90,15 +96,16 @@ $("linhas").addEventListener("click", async (ev) => {
   const id = b.dataset.id, a = b.dataset.a;
   if (a === "excluir") {
     if (!confirm("Excluir este processo da esteira? O PDF guardado pela extensão será apagado (o arquivo baixado no computador e o Projudi não são afetados).")) return;
+    await fecharAbas((await todos()).find((x) => x.id === id));
     await atualizar(id, { rodada: 0 });      // se estiver analisando, o resultado que chegar depois é descartado
     await remover([id]); desenhar(); passo(); return;
   }
-  if (a === "pular") await atualizar(id, { estado: "pulado" });
+  if (a === "pular") { await fecharAbas((await todos()).find((x) => x.id === id)); await atualizar(id, { estado: "pulado" }); }
   if (a === "repetir") await atualizar(id, { estado: "aguardando", erro: "", rodada: 0 });
   if (a === "usar") { usarMinutaDoStudio((await todos()).find((x) => x.id === id)); return; }
   if (a === "conferido") await atualizar(id, { estado: "conferido" });
-  if (a === "concluir") await atualizar(id, { estado: "concluido" });
-  if (a === "projudi") { const it = (await todos()).find((x) => x.id === id); chrome.tabs.create({ url: absoluta(it.urlPre || it.url) }); }
+  if (a === "concluir") { await fecharAbas((await todos()).find((x) => x.id === id)); await atualizar(id, { estado: "concluido" }); }
+  if (a === "projudi") { const it = (await todos()).find((x) => x.id === id), t = await chrome.tabs.create({ url: absoluta(it.urlPre || it.url) }); await atualizar(id, { abas: { ...(it.abas || {}), projudi: t.id } }); }
   passo();
 });
 chrome.storage.sync.get("esteiraConfig").then(({ esteiraConfig = {} }) => { $("abrirEm").value = esteiraConfig.abrirEm || "abas"; });

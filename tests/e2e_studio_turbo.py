@@ -15,7 +15,7 @@ const f=document.querySelector('input[type=file]'), g=document.getElementById('e
 document.querySelector('select').addEventListener('change',e=>{window.prompt_=e.target.selectedOptions[0].text});
 f.addEventListener('change',()=>{ pronto=true; pronto=true });
 document.getElementById('ta').addEventListener('input',e=>{window.colado=e.target.value});
-g.onclick=()=>{ g.disabled=true; g.innerHTML='<span>Analisando…</span>'; setTimeout(()=>{ document.getElementById('mod').innerHTML='<h4>DECISÃO INTERLOCUTÓRIA</h4><button>Copiar</button><button>Abrir no Editor</button><button>Nova Análise</button><button>Minuta Completa</button><button>I - Relatório</button><div class="overflow-y-auto"><p>PROCESSO Nº: 5923249-54.2025.8.09.0166</p><p>POLO ATIVO (AUTOR): FULANO</p><p>COMARCA / JUÍZO: Montes Claros</p><p>DECISÃO INTERLOCUTÓRIA</p><p>I - RELATÓRIO</p><p>' + 'Texto da minuta turbo. '.repeat(20) + '</p><p>Segundo parágrafo da decisão.</p></div>'; window.gerou=1 },2500) };
+g.onclick=()=>{ if(!window.tentou){ window.tentou=1; document.body.insertAdjacentHTML('beforeend','<div data-rht-toaster id="tt">Os servidores de IA estão em alta demanda (Erro 503 / Timeout de Fila). Tente novamente.</div>'); setTimeout(()=>document.getElementById('tt').remove(),3000); return } g.disabled=true; g.innerHTML='<span>Analisando…</span>'; setTimeout(()=>{ document.getElementById('mod').innerHTML='<h4>DECISÃO INTERLOCUTÓRIA</h4><button>Copiar</button><button>Abrir no Editor</button><button>Nova Análise</button><button>Minuta Completa</button><button>I - Relatório</button><div class="overflow-y-auto"><p>PROCESSO Nº: 5923249-54.2025.8.09.0166</p><p>POLO ATIVO (AUTOR): FULANO</p><p>COMARCA / JUÍZO: Montes Claros</p><p>DECISÃO INTERLOCUTÓRIA</p><p>I - RELATÓRIO</p><p>' + 'Texto da minuta turbo. '.repeat(20) + '</p><p>Segundo parágrafo da decisão.</p></div>'; window.gerou=1 },2500) };
 </script></body></html>"""
 
 with sync_playwright() as p:
@@ -33,6 +33,7 @@ with sync_playwright() as p:
     pg.evaluate("() => { window.__r2 = null; window.__ouvinte({ acao: 'studio-ler-minuta', processo: 'x' }, {}, (r) => { window.__r2 = r }) }")
     assert pg.evaluate("window.__r2 && window.__r2.ok")
     assert pg.evaluate("window.colado").startswith("[Página 1]") and len(pg.evaluate("window.colado")) > 500
+    assert pg.evaluate("window.tentou") == 1
     assert pg.evaluate("window.auto") == 1 and pg.evaluate("window.prompt_") == "Outros Área Judicial - Família e Sucessões • [FAMILIA]" and pg.evaluate("window.gerou") == 1
     b.close()
 print("OK")
