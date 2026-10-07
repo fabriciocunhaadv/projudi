@@ -299,8 +299,14 @@
       if (voltou || (comecou && !ocupado && Date.now() - desde > 12000) || (!comecou && Date.now() - t0 > 20000)) break;
       if (Date.now() - t0 > 8 * 60000) throw new Error("a auditoria da Lupa demorou mais de 8 minutos");
     }
-    const resumo = texto_().replace(/Auditar Minuta com Rigor do Magistrado.*$/i, "").slice(0, 500);
-    return { ok: true, mensagem: "auditoria concluída na Lupa do Magistrado" + (resumo ? " — " + resumo : ""), minuta: "" };
+    const resumo = texto_().replace(/Auditar Minuta com Rigor do Magistrado.*$/i, "").slice(0, 300);
+    // Confere em “Processos Auditados” se a auditoria ficou gravada (cada processo precisa aparecer na lista).
+    const dig = String(processo || "").replace(/\D/g, "").slice(0, 9);
+    botao(/^\s*Processos Auditados/i, modal)?.click(); await dorme(3000);
+    const lista = texto_(), qtd = (lista.match(/Processos Auditados\s*(\d+)/i) || [])[1];
+    const gravou = !dig || new RegExp(dig.slice(0, 7) + "[.\\-]?" + dig.slice(7, 9)).test(lista);
+    if (!gravou) throw new Error(`a auditoria terminou, mas ${processo} não aparece em “Processos Auditados” (a lista tem ${qtd ?? "?"} registro(s)). Tente de novo`);
+    return { ok: true, mensagem: `auditoria gravada em Processos Auditados (${qtd ?? "?"} registro(s); ${processo} ✔)` + (resumo ? " — " + resumo : ""), minuta: "" };
   }
 
 
