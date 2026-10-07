@@ -66,7 +66,11 @@ async function passo() {
     if (rec) { await atualizar(rec.id, { estado: "analisando", rodada: Date.now() + Math.random() }); try { await entregar(rec, await lerPdf(rec.id), rec.minutaRecebida, "", rec.htmlRecebido || ""); } catch (e) { await atualizar(rec.id, { estado: "erro", erro: e.message }); } return; }
     const conf = lista.find((i) => i.estado === "conferido");
     if (conf) { await cadastrar(conf); return; }
-    if (lista.some((i) => ATIVOS.includes(i.estado))) return;          // só um por vez nesta esteira
+    // Um por vez NO STUDIO. No modo contínuo (padrão) o próximo começa assim que o Studio devolve a conclusão; a conferência/lançamento no Projudi
+    // do anterior segue em paralelo. Com o modo contínuo desligado, espera o processo anterior ser concluído.
+    const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig");
+    const bloqueiam = esteiraConfig.continuo === false ? ATIVOS : ["analisando", "recebida", "pausado"];
+    if (lista.some((i) => bloqueiam.includes(i.estado))) return;
     const prox = lista.find((i) => i.estado === "aguardando");
     if (prox) await analisar(prox);
   } finally { ocupado = false; desenhar(); }
@@ -110,7 +114,8 @@ $("linhas").addEventListener("click", async (ev) => {
   if (a === "projudi") { const it = (await todos()).find((x) => x.id === id), t = await chrome.tabs.create({ url: absoluta(it.urlPre || it.url) }); await atualizar(id, { abas: { ...(it.abas || {}), projudi: t.id } }); }
   passo();
 });
-chrome.storage.sync.get("esteiraConfig").then(({ esteiraConfig = {} }) => { $("abrirEm").value = esteiraConfig.abrirEm || "abas"; $("entrada").value = esteiraConfig.entrada || "pdf"; });
+chrome.storage.sync.get("esteiraConfig").then(({ esteiraConfig = {} }) => { $("abrirEm").value = esteiraConfig.abrirEm || "abas"; $("entrada").value = esteiraConfig.entrada || "pdf"; $("continuo").checked = esteiraConfig.continuo !== false; });
+$("continuo").onchange = async () => { const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig"); chrome.storage.sync.set({ esteiraConfig: { ...esteiraConfig, continuo: $("continuo").checked } }); passo(); };
 $("entrada").onchange = async () => { const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig"); chrome.storage.sync.set({ esteiraConfig: { ...esteiraConfig, entrada: $("entrada").value } }); };
 $("abrirEm").onchange = async () => { const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig"); chrome.storage.sync.set({ esteiraConfig: { ...esteiraConfig, abrirEm: $("abrirEm").value } }); };
 // Recuperação: coloca na fila PDFs "número-OCR.pdf" que já estão no computador (a fila foi perdida ou os PDFs vieram de fora).

@@ -101,6 +101,7 @@ def main():
             args=["--headless=new", "--no-sandbox", f"--disable-extensions-except={ext}", f"--load-extension={ext}"])
         sw = ctx.service_workers[0] if ctx.service_workers else ctx.wait_for_event("serviceworker")
         ext_id = sw.url.split("/")[2]
+        sw.evaluate("() => chrome.storage.sync.set({ esteiraConfig: { continuo: false } })")      # este teste cobre o modo antigo (esperar a conferência); o modo contínuo é o padrão novo
         aux = ctx.new_page(); gerar_pdf(aux, tmp / "scan.pdf")      # página 1 nativa + 2 escaneadas
         aux.set_content("<html><body></body></html>"); aux.add_script_tag(path=str(RAIZ / "vendor" / "pdf-lib.min.js"))
         b64 = aux.evaluate("""async (b64) => { const { PDFDocument, StandardFonts, degrees, rgb } = PDFLib; const d = await PDFDocument.load(Uint8Array.from(atob(b64), c => c.charCodeAt(0)));
