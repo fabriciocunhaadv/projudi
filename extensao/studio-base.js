@@ -247,6 +247,14 @@
     botao(/Nova Auditoria/i, modal)?.click();      // a janela pode estar na aba “Processos Auditados”
     if (!(await esperar(() => modal.querySelector("textarea"), 10000))) throw new Error("não achei o formulário de nova auditoria da Lupa");
     await dorme(400);
+    // O formulário guarda a auditoria anterior; sem limpar, a nova sobrescreve a anterior. Aperta “Limpar Formulário” (aceitando a confirmação, se houver)
+    // e, por garantia, esvazia os campos de texto.
+    document.documentElement.dataset.projudiAutoConfirm = "1";
+    try { botao(/Limpar Formul[aá]rio/i, modal)?.click(); await dorme(600); } finally { delete document.documentElement.dataset.projudiAutoConfirm; }
+    botao(/Nova Auditoria/i, modal)?.click(); await dorme(300);
+    for (const ta of modal.querySelectorAll("textarea")) if (ta.value) definirValor(ta, "");
+    for (const i of modal.querySelectorAll("input[type=text]")) if (i.value && !/^\s*$/.test(i.value)) definirValor(i, "");
+    await dorme(300);
     const sel = seletorDePrompt(modal, prompt);
     if (prompt && (!sel || !escolherPrompt(sel, prompt))) throw new Error(`não achei o prompt “${prompt}” na Lupa`);
     const num = [...modal.querySelectorAll("input[type=text]")].find((i) => /5012345/.test(i.placeholder || ""));

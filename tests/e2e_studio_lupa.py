@@ -9,9 +9,9 @@ PAG = """<html><body><button id="btn-sidebar-minute-auditor" onclick="document.g
 <button id="tn" onclick="document.getElementById('f').style.display='block';document.getElementById('hist').style.display='none'">Nova Auditoria</button><button>Processos Auditados</button>
 <div id="hist">Nenhum processo auditado encontrado</div>
 <div id="f" style="display:none"><select><option>Outros Área Judicial - Criminal</option><option>Outros Área Judicial - Cível</option></select>
-<input type="text" placeholder="Ex: 5012345-88.2026.8.09.0051"><textarea id="min"></textarea>
+<input type="text" placeholder="Ex: 5012345-88.2026.8.09.0051"><button id="limpar" onclick="window.limpou=(window.limpou||0)+1;document.getElementById('min').value='';document.getElementById('ta2').value=''">Limpar Formulário</button><textarea id="min">AUDITORIA ANTERIOR</textarea>
 <button onclick="document.getElementById('up').style.display='block';document.getElementById('ta2').style.display='none'">Upload PDF</button><button onclick="document.getElementById('ta2').style.display='block';document.getElementById('up').style.display='none'">Colar Texto</button>
-<div id="up" style="display:none"><input type="file" class="hidden"></div><textarea id="ta2" style="display:block"></textarea>
+<div id="up" style="display:none"><input type="file" class="hidden"></div><textarea id="ta2" style="display:block">AUTOS ANTERIORES</textarea>
 <button id="aud"><span>Auditar Minuta com Rigor do Magistrado</span></button></div></div>
 <script>
 document.getElementById('aud').onclick=()=>{ const b=document.getElementById('aud'); window.auditou={min:document.getElementById('min').value, autos:document.getElementById('ta2').value, arq:(document.querySelector('input[type=file]').files[0]||{}).name||''}; b.disabled=true; b.innerHTML='<span>Auditando…</span>'; setTimeout(()=>{b.disabled=false;b.innerHTML='<span>Auditar Minuta com Rigor do Magistrado</span>'},2000) };
@@ -32,6 +32,7 @@ with sync_playwright() as p:
     pg.add_script_tag(path=str(RAIZ / "studio-base.js"))
     a = rodar(pg, {"dados": {"texto": "[Página 1]\nAutos em texto. " + "z" * 300}}, "texto")
     assert a["min"].startswith("Minuta do assessor") and a["autos"].startswith("[Página 1]") and a["arq"] == "", a
+    assert pg.evaluate("window.limpou") >= 1 and "ANTERIOR" not in a["min"] + a["autos"], a
     assert pg.evaluate("document.querySelector('select').selectedOptions[0].text").endswith("Cível")
     pg.evaluate("([b64]) => window.__ouvinte({ acao: 'studio-parte', id: 'a1', i: 0, n: 1, b64 }, {}, () => {})", [base64.b64encode(b"%PDF-1.4 t").decode()])
     a = rodar(pg, {"arq": "a1", "dados": {}}, "pdf")
