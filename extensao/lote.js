@@ -28,31 +28,57 @@ function esperarFim(chave, ms) {
 const registro = [];      // linha do tempo, para diagnóstico
 const limite = (promessa, ms, msg) => Promise.race([promessa, new Promise((_, no) => setTimeout(() => no(new Error(msg)), ms))]);
 
-// Minuta já escrita no editor da pré-análise (para a Lupa do Magistrado): abre a tela da pré-análise e lê o editor (CKEditor/TinyMCE).
-async function lerMinutaPre(urlPre) {
-  const tab = await chrome.tabs.create({ url: new URL(urlPre, BASE).href, active: false });
+// Minuta já escrita no editor da pré-análise (para a Lupa do Magistrado). Na “Busca de Pré-Análises” o ícone Visualizar é um BOTÃO (sem link):
+// abre a lista, acha a linha do processo, clica em Visualizar e lê o editor (CKEditor/TinyMCE) que abrir — na mesma aba ou em outra.
+const lerEditor = (tabId) => chrome.scripting.executeScript({ target: { tabId, allFrames: true }, world: "MAIN", func: () => {
   try {
-    await carregou(tab.id); await dorme(2000);
-    for (let k = 0; k < 10; k++) {
-      const r = await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, world: "MAIN", func: () => {
-        try {
-          const ck = window.CKEDITOR; if (ck && ck.instances) { const n = Object.keys(ck.instances)[0]; if (n) return ck.instances[n].getData(); }
-          if (window.tinymce && window.tinymce.activeEditor) return window.tinymce.activeEditor.getContent();
-        } catch (e) { /* sem editor neste quadro */ }
-        return null;
-      } }).catch(() => []);
-      const html = r.map((x) => x.result).filter(Boolean).sort((a, b) => b.length - a.length)[0];
-      if (html) {
-        const d = new DOMParser().parseFromString(html, "text/html");
-        d.querySelectorAll("br").forEach((b) => b.replaceWith("\n"));
-        d.querySelectorAll("p,div,li,h1,h2,h3,h4,h5,h6,blockquote").forEach((e) => e.append("\n"));
-        return d.body.textContent.replace(/\u00a0/g, " ").replace(/\n{3,}/g, "\n\n").trim();
-      }
-      await dorme(1000);
-    }
-    return "";
-  } finally { chrome.tabs.remove(tab.id).catch(() => {}); }
+    const ck = window.CKEDITOR; if (ck && ck.instances) { const n = Object.keys(ck.instances)[0]; if (n) return ck.instances[n].getData(); }
+    if (window.tinymce && window.tinymce.activeEditor) return window.tinymce.activeEditor.getContent();
+  } catch (e) { /* sem editor neste quadro */ }
+  return null;
+} }).catch(() => []);
+function htmlParaTexto(html) {
+  const d = new DOMParser().parseFromString(html, "text/html");
+  d.querySelectorAll("br").forEach((b) => b.replaceWith("\n"));
+  d.querySelectorAll("p,div,li,h1,h2,h3,h4,h5,h6,blockquote").forEach((e) => e.append("\n"));
+  return d.body.textContent.replace(/\u00a0/g, " ").replace(/\n{3,}/g, "\n\n").trim();
 }
+async function lerMinutaPre(item) {
+  const digitos = String(item.processo).replace(/\D/g, "").slice(0, 9), novas = [];
+  const aoCriar = (t) => novas.push(t.id); chrome.tabs.onCreated.addListener(aoCriar);
+  const tab = await chrome.tabs.create({ url: BASE + "PreAnalisarConclusao?PaginaAtual=2", active: false });
+  const motivo = { m: "" };
+  try {
+    await carregou(tab.id); await dorme(1500);
+    const clicar = (alvo) => chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, args: [alvo], func: (dig) => {
+      const linhas = [...document.querySelectorAll("tr")].filter((tr) => tr.querySelector("a[href*='Id_Processo']"));
+      const tr = linhas.find((r) => [...r.querySelectorAll("a[href*='Id_Processo']")].some((a) => (a.textContent || "").replace(/\D/g, "").slice(0, 9) === dig));
+      if (!tr) return linhas.length ? "linhas:" + linhas.length : "";
+      const b = tr.querySelector("button[title='Visualizar'],a[title='Visualizar'],[title='Visualizar']") || tr.querySelector("button.imgIcons");
+      if (!b) return "sem-botao"; b.click(); return "clicou";
+    } }).then((r) => r.map((x) => x.result).find((x) => x === "clicou" || x === "sem-botao") || r.map((x) => x.result).find(Boolean) || "").catch(() => "");
+    let r = await clicar(digitos);
+    if (r !== "clicou" && r !== "sem-botao") {      // a lista pode estar vazia até apertar “Consultar”
+      await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, func: () => document.getElementById("formLocalizarBotao")?.click() }).catch(() => {});
+      await carregou(tab.id, 20000); await dorme(2000); r = await clicar(digitos);
+    }
+    if (r === "sem-botao") { motivo.m = "não achei o botão Visualizar na linha do processo"; return { texto: "", motivo: motivo.m }; }
+    if (r !== "clicou") { motivo.m = "o processo não apareceu na Busca de Pré-Análises"; return { texto: "", motivo: motivo.m }; }
+    for (let k = 0; k < 40; k++) {      // o editor abre na mesma aba ou em outra
+      await dorme(1000);
+      for (const id of [tab.id, ...novas]) {
+        const html = (await lerEditor(id)).map((x) => x.result).filter(Boolean).sort((a, b) => b.length - a.length)[0];
+        if (html) { const t = htmlParaTexto(html); if (t) return { texto: t, motivo: "" }; }
+      }
+    }
+    return { texto: "", motivo: "cliquei em Visualizar, mas não achei o editor com a minuta (ou ele está vazio)" };
+  } finally {
+    chrome.tabs.onCreated.removeListener(aoCriar);
+    for (const id of [tab.id, ...novas]) chrome.tabs.remove(id).catch(() => {});
+  }
+}
+
+window.__lerMinutaPre = lerMinutaPre;      // usado nos testes
 
 async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
   const passo = (t) => { registro.push(new Date().toLocaleTimeString("pt-BR") + " " + item.processo + " — " + t); etapa(t); };
@@ -64,9 +90,12 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
     await carregou(tab.id); await dorme(1500);
     passo("procurando o botão Gerar PDF");
     await chrome.storage.local.remove(["lote_fim_" + chave, "lote_prog_" + chave, "gerarpdf_pedido"]);
-    let minuta = "";      // Lupa do Magistrado: usa a minuta que o assessor já escreveu na pré-análise
-    if (opcoes.studio?.ativo && opcoes.studio.modo === "lupa" && item.situacao === "preAnalisadas" && item.urlPre) { passo("lendo a minuta escrita na pré-análise"); minuta = await limite(lerMinutaPre(item.urlPre), 60000, "a minuta da pré-análise não carregou").catch(() => ""); }
-    await chrome.storage.local.set({ gerarpdf_pedido: { todos: true, processo: item.processo, pasta, lote: chave, ts: Date.now(), studio: opcoes.studio?.ativo ? { ativo: true, modo: opcoes.studio.modo, prompt: item.prompt || "", tipo: "", minuta, url: item.url, urlPre: item.urlPre || "", docs: !!opcoes.studio.docs && opcoes.studio.modo !== "lupa" } : null } });
+    let minuta = "", motivoMinuta = "";      // Lupa do Magistrado: usa a minuta que o assessor já escreveu na pré-análise
+    if (opcoes.studio?.ativo && opcoes.studio.modo === "lupa") {
+      if (item.situacao !== "preAnalisadas") motivoMinuta = "processo não está pré-analisado (sem minuta do assessor)";
+      else { passo("lendo a minuta do assessor (Visualizar)"); const r = await limite(lerMinutaPre(item), 120000, "a minuta da pré-análise não carregou").catch((e) => ({ texto: "", motivo: e.message })); minuta = r.texto; motivoMinuta = r.motivo; if (minuta) passo("minuta do assessor lida (" + minuta.length + " caracteres)"); else passo("⚠ " + motivoMinuta); }
+    }
+    await chrome.storage.local.set({ gerarpdf_pedido: { todos: true, processo: item.processo, pasta, lote: chave, ts: Date.now(), studio: opcoes.studio?.ativo ? { ativo: true, modo: opcoes.studio.modo, prompt: item.prompt || "", tipo: "", minuta, motivoMinuta, url: item.url, urlPre: item.urlPre || "", docs: !!opcoes.studio.docs && opcoes.studio.modo !== "lupa" } : null } });
     let r = await limite(GerarUtil.capturarGerar(tab.id), 45000, "a página do processo não respondeu (pode haver um aviso do Projudi aberto nela)");
     if (!r.achou) {   // o botão fica na aba "Navegação de Arquivos"
       await chrome.tabs.update(tab.id, { url: BASE + "BuscaProcesso?PaginaAtual=98&PassoBusca=4" });

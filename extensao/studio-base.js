@@ -236,8 +236,8 @@
     return true;
   }
 
-  async function lupa({ arquivoId, nome, prompt, processo, minuta, texto: textoAutos }) {
-    if (!minuta || !minuta.trim()) return { ok: true, parcial: true, mensagem: "a Lupa precisa da minuta elaborada pelo assessor: PDF baixado, auditoria não iniciada" };
+  async function lupa({ arquivoId, nome, prompt, processo, minuta, motivoMinuta, texto: textoAutos }) {
+    if (!minuta || !minuta.trim()) return { ok: true, parcial: true, mensagem: "a Lupa precisa da minuta elaborada pelo assessor: PDF baixado, auditoria não iniciada" + (motivoMinuta ? " — " + motivoMinuta : "") };
     const bytes = arquivos.get(arquivoId);
     if (!bytes && !textoAutos) throw new Error("arquivo não recebido");
     fecharJanelas();

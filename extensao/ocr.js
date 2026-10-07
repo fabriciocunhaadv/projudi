@@ -148,7 +148,7 @@ async function interceptado(idJob) {
     let studio = null;      // minuta no app de IA: entra na esteira (um processo por vez); o download não espera por ela
     if (job.studio && job.studio.ativo) {
       try {
-        await enfileirar({ processo: job.nome, url: job.studio.url || "", urlPre: job.studio.urlPre || "", prompt: job.studio.prompt, modo: job.studio.modo, docs: !!job.studio.docs, minutaAssessor: job.studio.minuta || "", pdfNome: num + "-OCR.pdf", pdf: arqPdf }, res.bytes);
+        await enfileirar({ processo: job.nome, url: job.studio.url || "", urlPre: job.studio.urlPre || "", prompt: job.studio.prompt, modo: job.studio.modo, docs: !!job.studio.docs, minutaAssessor: job.studio.minuta || "", motivoMinuta: job.studio.motivoMinuta || "", pdfNome: num + "-OCR.pdf", pdf: arqPdf }, res.bytes);
         await chrome.runtime.sendMessage({ acao: "esteira-abrir" });
         studio = { ok: true, fila: true, mensagem: "na esteira de minutas" };
       } catch (e) { studio = { ok: false, erro: e.message }; log("✖ esteira: " + e.message); }
