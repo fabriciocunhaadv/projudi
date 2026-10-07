@@ -7,13 +7,14 @@ RAIZ = Path(__file__).parent.parent / "extensao"
 PAG = """<html><body><script>setTimeout(()=>{const b=document.createElement('button');b.id='btn-header-turbo-top';b.textContent='Módulo Turbo';b.onclick=()=>{document.getElementById('mod').style.display='block'};document.body.prepend(b)},3000)</script><div><h2>Módulo Turbo Independente</h2></div><div class="flex-1" id="mod" style="display:none"><div class="p-3.5"><label><span>Prompt Especializado do Gabinete:</span><span>CRIMINAL</span></label>
 <select><option value="a">Outros Área Judicial - Juizado Especial Criminal • [CRIMINAL]</option><option value="b">Outros Área Judicial - Criminal • [CRIMINAL]</option><option value="c">Outros Área Judicial - Família e Sucessões • [FAMILIA]</option></select></div>
 <label><span>Tipo de Ato:</span></label><button type="button">⚖️ Sentença</button><button type="button">📝 Decisão</button><button type="button">📄 Despacho</button><button type="button" id="auto" onclick="window.auto=1">🔍 Auto-detectar</button>
-<button><span>Anexar PDF dos Autos</span></button><button><span>Digitar / Colar Texto</span></button>
+<button><span>Anexar PDF dos Autos</span></button><button onclick="document.getElementById('ta').style.display='block'"><span>Digitar / Colar Texto</span></button><textarea id="ta" style="display:none"></textarea>
 <div><input accept=".pdf" class="hidden" type="file"><p>Arraste o PDF dos autos ou clique para selecionar</p></div>
 <button id="exec"><span>Executar Análise Turbo (~15 a 30s)</span></button><div id="res"></div></div>
 <script>
 const f=document.querySelector('input[type=file]'), g=document.getElementById('exec'); let pronto=false;
 document.querySelector('select').addEventListener('change',e=>{window.prompt_=e.target.selectedOptions[0].text});
-f.addEventListener('change',()=>{ pronto=true; document.querySelector('.p-3\\.5').insertAdjacentHTML('beforeend','<i>'+f.files[0].name+'</i>') });
+f.addEventListener('change',()=>{ pronto=true; pronto=true });
+document.getElementById('ta').addEventListener('input',e=>{window.colado=e.target.value});
 g.onclick=()=>{ g.disabled=true; g.innerHTML='<span>Analisando…</span>'; setTimeout(()=>{ g.disabled=false; g.innerHTML='<span>Executar Análise Turbo (~15 a 30s)</span>'; document.getElementById('res').innerHTML='<h3>Resultado &amp; Análise</h3><div id="tour-result-tabs"></div><div class="font-serif"><div>x</div><div><h3>DISPOSITIVO</h3><div class="markdown-body"><p>' + 'Texto da minuta turbo. '.repeat(20) + '</p></div></div></div>'; window.gerou=1 },2500) };
 </script></body></html>"""
 
@@ -23,11 +24,12 @@ with sync_playwright() as p:
     pg.add_script_tag(path=str(RAIZ / "studio-base.js"))
     pdf = base64.b64encode(b"%PDF-1.4 teste").decode()
     pg.evaluate("([b64]) => { window.__r = null; window.__ouvinte({ acao: 'studio-parte', id: 'a1', i: 0, n: 1, b64 }, {}, () => {}); }", [pdf])
-    pg.evaluate("() => { window.__ouvinte({ acao: 'studio-analisar', modo: 'turbo', reqId: 'r1', arquivoId: 'a1', nome: '5001234-OCR.pdf', prompt: 'Outros Área Judicial - Família e Sucessões', tipo: '' }, {}, (r) => { window.__r = r }) }")
+    pg.evaluate("() => { window.__ouvinte({ acao: 'studio-analisar', modo: 'turbo', reqId: 'r1', arquivoId: 'a1', nome: '5001234-OCR.pdf', texto: '[Página 1]\\nAutos com texto completo. ' + 'x'.repeat(500), prompt: 'Outros Área Judicial - Família e Sucessões', tipo: '' }, {}, (r) => { window.__r = r }) }")
     pg.wait_for_function("window.__st", timeout=90000)
     assert pg.evaluate("window.__r.assincrono")
     r = pg.evaluate("window.__st.studio_res_r1"); print(r["ok"], r.get("erro"), r.get("mensagem"), len(r.get("minuta", "")))
     assert r["ok"] and "Texto da minuta turbo" in r["minuta"], r
+    assert pg.evaluate("window.colado").startswith("[Página 1]") and len(pg.evaluate("window.colado")) > 500
     assert pg.evaluate("window.auto") == 1 and pg.evaluate("window.prompt_") == "Outros Área Judicial - Família e Sucessões • [FAMILIA]" and pg.evaluate("window.gerou") == 1
     b.close()
 print("OK")

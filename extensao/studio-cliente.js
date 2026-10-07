@@ -42,7 +42,7 @@ export async function enviarBase(nome, bytes, substituir = false) {          // 
 // Opções: { nome, prompt, modo: "analise" | "lupa", tipo, processo, minuta }
 export async function analisarNoStudio(bytes, opcoes) {
   const aba = await acharStudio();
-  const arquivoId = await enviarArquivo(aba.id, bytes);
+  const arquivoId = opcoes.modo === "turbo" && opcoes.texto ? "" : await enviarArquivo(aba.id, bytes);
   if (opcoes.modo === "turbo") return analisarTurbo(aba, arquivoId, opcoes);
   const r = await chrome.tabs.sendMessage(aba.id, { acao: "studio-analisar", arquivoId, ...opcoes });
   if (!r?.ok) throw new Error(r?.erro || "o app não confirmou a análise");

@@ -2,6 +2,7 @@ import { todos, atualizar, lerPdf, remover, enfileirar, ROTULO, ATIVOS } from ".
 import { analisarNoStudio, lerMinutaAtual } from "./studio-cliente.js";
 import { criarDocumento, abrirLadoALado, lerDocumento, tipoDaMinuta, nomeDoc } from "./docs-api.js";
 import { paragrafosDeHtml } from "./docs-core.js";
+import { textoDoPdf } from "./pdf-texto.js";
 const BASE = "https://projudi.tjgo.jus.br/";
 const absoluta = (u) => (u ? new URL(u, BASE).href : BASE);
 
@@ -28,7 +29,9 @@ async function analisar(it) {
   try {
     const bytes = await lerPdf(it.id);
     if (!bytes) throw new Error("o PDF deste processo não está mais guardado");
-    const r = await analisarNoStudio(bytes, { nome: it.pdfNome, prompt: it.prompt, modo: it.modo, tipo: "", processo: it.processo, minuta: it.minutaAssessor });
+    const texto = it.modo === "turbo" ? await textoDoPdf(bytes) : "";      // o Módulo Turbo recebe o texto dos autos (PDF com OCR), não o arquivo
+    if (it.modo === "turbo" && texto.replace(/\[Página \d+\]|\s/g, "").length < 200) throw new Error("não consegui extrair texto do PDF (o OCR pode não ter funcionado)");
+    const r = await analisarNoStudio(bytes, { nome: it.pdfNome, prompt: it.prompt, modo: it.modo, tipo: "", processo: it.processo, minuta: it.minutaAssessor, texto });
     if (!(await valida())) return;
     await entregar(it, bytes, r.minuta, r.mensagem, r.minutaHtml || "");
   } catch (e) { if (await valida()) await atualizar(it.id, { estado: "erro", erro: e.message }); }

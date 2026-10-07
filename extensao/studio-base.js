@@ -246,9 +246,9 @@
     for (let e = rot; e && e !== document.body; e = e.parentElement) if (botaoExecutarTurbo(e)) return e;
     return null;
   }
-  async function turbo({ arquivoId, nome, prompt, tipo }) {
+  async function turbo({ arquivoId, nome, prompt, tipo, texto: textoAutos }) {
     const bytes = arquivos.get(arquivoId);
-    if (!bytes) throw new Error("arquivo não recebido");
+    if (!bytes && !textoAutos) throw new Error("arquivo não recebido");
     fecharJanelas();
     let raiz = painelTurbo();
     const abrir = () => {      // o app pode ainda estar carregando (aba aberta agora): tenta de novo até o botão do módulo existir
@@ -267,12 +267,20 @@
     }
     await dorme(300);
     const bt = botao(tipo && !/auto/i.test(tipo) ? new RegExp(tipo, "i") : /Auto-?detectar/i, raiz); if (bt) bt.click();
-    botao(/Anexar PDF/i, raiz)?.click(); await dorme(400);
-    const input = raiz.querySelector("input[type=file]");
-    if (!input) throw new Error("não achei o campo de envio do PDF no Módulo Turbo");
-    const dt = new DataTransfer(); dt.items.add(new File([bytes], nome, { type: "application/pdf" }));
-    input.files = dt.files; input.dispatchEvent(new Event("change", { bubbles: true }));
-    await esperar(() => texto(raiz).includes(nome.slice(0, 18)), 20000);
+    if (textoAutos) {       // aba “Digitar / Colar Texto”: cola o texto completo dos autos
+      botao(/Digitar\s*\/\s*Colar/i, raiz)?.click();
+      const ta = await esperar(() => raiz.querySelector("textarea"), 10000);
+      if (!ta) throw new Error("não achei o campo de texto do Módulo Turbo");
+      definirValor(ta, textoAutos); await dorme(500);
+      if (ta.value.length < textoAutos.length * 0.98) throw new Error("o campo de texto do Turbo não aceitou o texto completo");
+    } else {
+      botao(/Anexar PDF/i, raiz)?.click(); await dorme(400);
+      const input = raiz.querySelector("input[type=file]");
+      if (!input) throw new Error("não achei o campo de envio do PDF no Módulo Turbo");
+      const dt = new DataTransfer(); dt.items.add(new File([bytes], nome, { type: "application/pdf" }));
+      input.files = dt.files; input.dispatchEvent(new Event("change", { bubbles: true }));
+      await esperar(() => texto(raiz).includes(nome.slice(0, 18)), 20000);
+    }
     const exec = await esperar(() => { const b = botaoExecutarTurbo(raiz); return b && !b.disabled && /Executar/i.test(texto(b)) ? b : null; }, 60000);
     if (!exec) throw new Error("o botão “Executar Análise Turbo” não ficou disponível");
     const rotulo = texto(exec); exec.click();
