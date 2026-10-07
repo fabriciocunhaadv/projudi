@@ -38,6 +38,8 @@
   function ciclo() {
     const alvo = achar();
     if (!alvo) return;
+    const serv = serventiaDaPagina();
+    if (serv) chrome.storage.local.set({ processo_atual: { cnj: alvo.cnj, serventia: serv, ts: Date.now() } }).catch(() => {});      // a janela “Gerar PDF” usa isto para escolher o prompt
     const pai = alvo.no.parentElement;
     if (pai.parentElement.querySelector("[data-projudi-ext=agaia]")) return;
     const b = document.createElement("button");

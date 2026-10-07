@@ -88,11 +88,18 @@
     const botaoTurbo = sh.querySelector('[data-a="turbo"]');
     const rotuloT = () => { const n = marcadasPeloUsuario(), todos = document.getElementById("todos"); botaoTurbo.textContent = n && !(todos && todos.checked) ? `⚡ Gerar só os ${n} marcados e enviar à Análise Turbo` : "⚡ Gerar tudo e enviar à Análise Turbo"; };
     rotuloT(); setInterval(rotuloT, 600);
-    botaoTurbo.onclick = async () => {      // mesmo download com OCR; o PDF segue para o Módulo Turbo do app de IA (via esteira)
-      const rx = /\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/, num = (document.title.match(rx) || document.body.textContent.match(rx) || [""])[0];
+    botaoTurbo.onclick = async () => {      // mesmo download com OCR; o PDF segue para o Módulo Turbo do app de IA (via esteira), com o prompt da serventia
+      const { processo_atual: at } = await chrome.storage.local.get("processo_atual");
+      const rec = at && Date.now() - at.ts < 4 * 3600000 ? at : null;
+      let prompt = "";
+      if (rec) {
+        const { automacao = {} } = await chrome.storage.sync.get("automacao"), k = (x) => sem(x).replace(/\s*-\s*go\s*$/, "");
+        const ch = Object.keys(automacao).find((n) => k(n) === k(rec.serventia)) || Object.keys(automacao).find((n) => k(rec.serventia) && (k(n).includes(k(rec.serventia)) || k(rec.serventia).includes(k(n))));
+        prompt = automacao[ch]?.prompt || (globalThis.Sugestoes ? Sugestoes.prompt(rec.serventia) : "");
+      }
       const ped = botaoTodos.dataset.modo === "marcados" ? { marcados: true } : { todos: true };
-      const r = await executar({ ...ped, processo: num, studio: { ativo: true, modo: "turbo", prompt: "", tipo: "", minuta: "", url: "", urlPre: "", docs: false } });
-      msg(r.erro ? "✖ " + r.erro : `PDF pedido (${r.arquivos ?? r.marcadas} arquivo(s)); depois do OCR ele vai para a Análise Turbo na aba da extensão.`);
+      const r = await executar({ ...ped, processo: rec ? rec.cnj : "", studio: { ativo: true, modo: "turbo", prompt, tipo: "", minuta: "", url: "", urlPre: "", docs: false } });
+      msg(r.erro ? "✖ " + r.erro : `PDF pedido (${r.arquivos ?? r.marcadas} arquivo(s)) de ${rec ? rec.cnj + " — prompt: " + (prompt || "(não definido)") : "processo não identificado (abra a tela do processo antes)"}; depois do OCR ele vai para a Análise Turbo.`);
     };
     sh.querySelector('[data-a="diag"]').onclick = async () => {
       const c = document.documentElement.cloneNode(true);
