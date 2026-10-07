@@ -236,20 +236,10 @@
     return true;
   }
 
-  // Diário da Lupa: cada passo fica registrado (chrome.storage.local.lupa_diario) e pode ser copiado na esteira para diagnóstico.
-  const auditoriasSalvas = () => { const o = {}; try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (!/judge_audits/i.test(k)) continue; try { const j = JSON.parse(localStorage.getItem(k)); o[k] = Array.isArray(j) ? { n: j.length, ids: j.slice(0, 20).map((x) => [x.id, x.processNumber || x.numeroProcesso || x.processo || x.numero || ""]), campos: j[0] ? Object.keys(j[0]).slice(0, 14) : [] } : { chaves: Object.keys(j || {}).slice(0, 14) }; } catch (e) { o[k] = { tam: (localStorage.getItem(k) || "").length }; } } } catch (e) { /* sem acesso */ } return o; };
-  async function diario(passo, extra) {
-    try {
-      const { lupa_diario = [] } = await chrome.storage.local.get("lupa_diario");
-      lupa_diario.push({ t: new Date().toLocaleTimeString("pt-BR"), passo, ...(extra ? { extra } : {}) });
-      await chrome.storage.local.set({ lupa_diario: lupa_diario.slice(-300) });
-    } catch (e) { /* sem diário */ }
-  }
   async function lupa({ arquivoId, nome, prompt, processo, minuta, motivoMinuta, texto: textoAutos }) {
     if (!minuta || !minuta.trim()) return { ok: true, parcial: true, mensagem: "a Lupa precisa da minuta elaborada pelo assessor: PDF baixado, auditoria não iniciada" + (motivoMinuta ? " — " + motivoMinuta : "") };
     const bytes = arquivos.get(arquivoId);
     if (!bytes && !textoAutos) throw new Error("arquivo não recebido");
-    await diario("início " + processo, { antes: auditoriasSalvas(), unidade: document.getElementById("tour-header-unit")?.selectedOptions?.[0]?.text || "" });
     fecharJanelas();
     (document.getElementById("btn-sidebar-minute-auditor") || botao(/Auditoria Ouro/i))?.click();
     const modal = await esperar(() => [...document.querySelectorAll("h2")].find((h) => /Lupa do Magistrado/i.test(texto(h)))?.closest("div.fixed"), 20000);
@@ -294,9 +284,7 @@
     }
     const b = await esperar(() => { const x = botao(/Auditar Minuta/i, modal); return x && !x.disabled ? x : null; }, 15000);
     if (!b) throw new Error("não achei o botão “Auditar Minuta”");
-    const rotulo = texto(b);
-    await diario("antes de Auditar " + processo, { campoNumero: num ? num.value : null, minutaChars: (tas()[0] || {}).value?.length, autosChars: (tas()[1] || {}).value?.length, antes: auditoriasSalvas() });
-    b.click();
+    const rotulo = texto(b); b.click();
     // Espera a auditoria terminar. Sinais: o botão volta ao normal OU a janela deixa de mudar (texto estável por ~12 s, sem “auditando/aguarde”).
     const t0 = Date.now(), texto_ = () => (modal.innerText || "").replace(/\s+/g, " ").trim();
     let ultimo = texto_(), desde = Date.now(), comecou = false;
@@ -311,14 +299,12 @@
       if (voltou || (comecou && !ocupado && Date.now() - desde > 12000) || (!comecou && Date.now() - t0 > 20000)) break;
       if (Date.now() - t0 > 8 * 60000) throw new Error("a auditoria da Lupa demorou mais de 8 minutos");
     }
-    await diario("auditoria terminou " + processo, { depois: auditoriasSalvas(), gravacoes: JSON.parse(document.documentElement.dataset.projudiGravacoes || "[]").slice(-8) });
     const resumo = texto_().replace(/Auditar Minuta com Rigor do Magistrado.*$/i, "").slice(0, 300);
     // Confere em “Processos Auditados” se a auditoria ficou gravada (cada processo precisa aparecer na lista).
     const dig = String(processo || "").replace(/\D/g, "").slice(0, 9);
     botao(/^\s*Processos Auditados/i, modal)?.click(); await dorme(3000);
     const lista = texto_(), qtd = (lista.match(/Processos Auditados\s*(\d+)/i) || [])[1];
     const gravou = !dig || new RegExp(dig.slice(0, 7) + "[.\\-]?" + dig.slice(7, 9)).test(lista);
-    await diario("Processos Auditados " + processo, { gravou, qtd, lista: lista.slice(0, 600) });
     if (!gravou) throw new Error(`a auditoria terminou, mas ${processo} não aparece em “Processos Auditados” (a lista tem ${qtd ?? "?"} registro(s)). Tente de novo`);
     return { ok: true, mensagem: `auditoria gravada em Processos Auditados (${qtd ?? "?"} registro(s); ${processo} ✔)` + (resumo ? " — " + resumo : ""), minuta: "" };
   }
