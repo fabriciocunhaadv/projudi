@@ -50,7 +50,16 @@ async function lerMinutaPre(item) {
   const motivo = { m: "" };
   try {
     await carregou(tab.id); await dorme(1500);
-    const clicar = (alvo) => chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, args: [alvo], func: (dig) => {
+    const clicar = (alvo) => chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, world: "MAIN", args: [alvo], func: (dig) => {
+      // O Visualizar chama submeter2(...) e o Projudi abre o editor em NOVA aba; sem clique do usuário o Chrome bloquearia esse pop-up.
+      // Nesta aba (só nela) o envio passa a abrir na própria aba, e a extensão lê o editor aqui mesmo.
+      if (!window.__projudiMesmaAba) {
+        window.__projudiMesmaAba = true;
+        const sub = HTMLFormElement.prototype.submit; HTMLFormElement.prototype.submit = function () { this.target = "_self"; return sub.call(this); };
+        const rs = HTMLFormElement.prototype.requestSubmit; if (rs) HTMLFormElement.prototype.requestSubmit = function (...a) { this.target = "_self"; return rs.apply(this, a); };
+        document.addEventListener("submit", (e) => { if (e.target && e.target.tagName === "FORM") e.target.target = "_self"; }, true);
+        const abrir = window.open; window.open = function (u) { if (u) { location.href = u; return window; } return abrir.apply(this, arguments); };
+      }
       const linhas = [...document.querySelectorAll("tr")].filter((tr) => tr.querySelector("a[href*='Id_Processo']"));
       const tr = linhas.find((r) => [...r.querySelectorAll("a[href*='Id_Processo']")].some((a) => (a.textContent || "").replace(/\D/g, "").slice(0, 9) === dig));
       if (!tr) return linhas.length ? "linhas:" + linhas.length : "";

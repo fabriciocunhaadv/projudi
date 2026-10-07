@@ -4,9 +4,9 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 RAIZ = Path(__file__).parent.parent / "extensao"
-LISTA = """<html><body><form id="Formulario"><input id="formLocalizarBotao" type="submit" value="Consultar" onclick="return false"><table id="Tabela">
-<tr class="TabelaLinha1"><td>1</td><td><a href="BuscaProcesso?Id_Processo=1">5285460.70</a></td><td><button class="imgIcons" title="Visualizar" type="button" onclick="location.href='/editor?p=1'">v</button></td></tr>
-<tr class="TabelaLinha1"><td>2</td><td><a href="BuscaProcesso?Id_Processo=2">6006074.21</a></td><td><button class="imgIcons" title="Visualizar" type="button" onclick="location.href='/editor?p=2'">v</button></td></tr></table></form></body></html>"""
+LISTA = """<html><body><script>function abrirEd(p){ const f=document.createElement("form"); f.method="get"; f.action="/editor"; f.target="_blank"; const i=document.createElement("input"); i.name="p"; i.value=p; f.appendChild(i); document.body.appendChild(f); f.submit() }</script><form id="Formulario"><input id="formLocalizarBotao" type="submit" value="Consultar" onclick="return false"><table id="Tabela">
+<tr class="TabelaLinha1"><td>1</td><td><a href="BuscaProcesso?Id_Processo=1">5285460.70</a></td><td><button class="imgIcons" title="Visualizar" type="button" onclick="abrirEd(1);return false">v</button></td></tr>
+<tr class="TabelaLinha1"><td>2</td><td><a href="BuscaProcesso?Id_Processo=2">6006074.21</a></td><td><button class="imgIcons" title="Visualizar" type="button" onclick="abrirEd(2);return false">v</button></td></tr></table></form></body></html>"""
 EDITOR = """<html><body><div id="x"></div><script>
 const p=new URLSearchParams(location.search).get('p');
 setTimeout(()=>{ window.CKEDITOR={instances:{e:{getData:()=>'<p>Minuta do assessor '+p+'.</p><p>Segundo parágrafo&nbsp;aqui.</p>'}}} },800)</script></body></html>"""
