@@ -362,18 +362,18 @@
   async function atualizarBotao() {
     try {
       if (!host.isConnected) document.documentElement.appendChild(host);
-      const pend = await pendentes(), tem = minutaDoPainel().length > 200;
+      const pend = await pendentes(), tem = minutaDoPainel().length > 200 || !!resultadoTurbo();
       if (!pend.length || !tem) { caixa.style.display = "none"; return; }
-      const num = (document.getElementById("tour-meta-parties-box")?.innerText || "").match(/\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/)?.[0];
+      const num = ((document.getElementById("tour-meta-parties-box")?.innerText) || (resultadoTurbo()?.innerText) || "").match(/\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/)?.[0];
       const certo = pend.find((x) => x.processo === num) || pend[0];
       const chave = pend.map((x) => x.id).join() + "|" + certo.id;
       if (caixa.dataset.chave === chave && caixa.style.display === "flex") return;
       caixa.dataset.chave = chave; caixa.style.display = "flex";
       caixa.innerHTML = `<span>Esteira de minutas:</span><select>${pend.map((x) => `<option value="${x.id}" ${x.id === certo.id ? "selected" : ""}>${x.processo}</option>`).join("")}</select><button>Enviar a minuta aberta aqui para este processo</button><span class="r"></span>`;
       caixa.querySelector("button").onclick = async () => {
-        const id = caixa.querySelector("select").value, minuta = await lerMinuta();
+        const id = caixa.querySelector("select").value, turbo = resultadoTurbo() ? lerResultadoTurbo() : null, minuta = turbo ? turbo.texto : await lerMinuta();
         if (!minuta) { caixa.querySelector(".r").textContent = "não achei a minuta nesta tela"; return; }
-        await navigator.locks.request("esteira-item", async () => { const it = (await chrome.storage.local.get(K(id)))[K(id)]; if (it) await chrome.storage.local.set({ [K(id)]: { ...it, estado: "recebida", minutaRecebida: minuta, htmlRecebido: minutaHtmlDoPainel(), erro: "" } }); });
+        await navigator.locks.request("esteira-item", async () => { const it = (await chrome.storage.local.get(K(id)))[K(id)]; if (it) await chrome.storage.local.set({ [K(id)]: { ...it, estado: "recebida", minutaRecebida: minuta, htmlRecebido: turbo ? turbo.html : minutaHtmlDoPainel(), erro: "" } }); });
         caixa.querySelector(".r").textContent = "enviada! o Google Docs vai abrir.";
         setTimeout(atualizarBotao, 3000);
       };
