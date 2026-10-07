@@ -46,7 +46,7 @@ function htmlParaTexto(html) {
 async function lerMinutaPre(item) {
   const digitos = String(item.processo).replace(/\D/g, "").slice(0, 9), novas = [];
   const aoCriar = (t) => novas.push(t.id); chrome.tabs.onCreated.addListener(aoCriar);
-  const tab = await chrome.tabs.create({ url: BASE + "PreAnalisarConclusao?PaginaAtual=2", active: false });
+  const tab = await chrome.tabs.create({ url: BASE + "PreAnalisarConclusao?PaginaAtual=6&tipo=todas", active: false });
   const motivo = { m: "" };
   try {
     await carregou(tab.id); await dorme(1500);
