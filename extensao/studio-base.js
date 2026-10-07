@@ -118,7 +118,7 @@
     botao(/^Nova An[aá]lise$/i)?.click(); await dorme(600);
     const painel = await esperar(() => document.getElementById("tour-input-panel"), 20000);
     if (!painel) throw new Error("não achei a área de entrada dos autos do app");
-    const sel = seletorDePrompt(document, prompt);
+    const sel = prompt ? await esperar(() => seletorDePrompt(document, prompt), 30000) : seletorDePrompt(document, prompt);      // a lista de prompts do app carrega depois da página
     if (prompt && (!sel || !escolherPrompt(sel, prompt))) throw new Error(`não achei o prompt “${prompt}” na lista do app`);
     await dorme(400);
     if (tipo && !/auto/i.test(tipo)) { const bt = botao(new RegExp("^" + tipo + "$", "i"), painel); if (bt) bt.click(); }
@@ -289,8 +289,8 @@
     if (prompt) {      // a lista do Turbo mostra “Prompt • [TAG]”: compara sem a etiqueta e procura primeiro no próprio módulo
       const sem = (t) => normal(t).replace(/\s*•.*$/, ""), alvo = sem(prompt);
       const achar = (s) => [...s.options].find((o) => sem(o.text) === alvo) || [...s.options].find((o) => sem(o.text).includes(alvo)) || [...s.options].find((o) => alvo.includes(sem(o.text)) && sem(o.text).length > 8);
-      const selects = [...raiz.querySelectorAll("select"), ...document.querySelectorAll("select")];
-      const dono = selects.find((s) => achar(s));
+      const todosSelects = () => [...raiz.querySelectorAll("select"), ...document.querySelectorAll("select")];
+      const dono = await esperar(() => todosSelects().find((s) => achar(s)), 30000), selects = todosSelects();      // a lista de prompts carrega depois da página
       if (!dono) throw new Error(`não achei o prompt “${prompt}” no Módulo Turbo (opções vistas: ${(selects[0] ? [...selects[0].options].map((o) => texto(o)).slice(0, 4).join(" | ") : "nenhuma lista de prompts na tela")})`);
       definirValor(dono, achar(dono).value);
     }
