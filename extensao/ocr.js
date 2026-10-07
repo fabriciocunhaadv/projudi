@@ -128,7 +128,7 @@ async function interceptado(idJob) {
     clearTimeout(corte);
     if (!r.ok || !ehPdf(bytes)) throw new Error(`o Projudi não devolveu um PDF (HTTP ${r.status}). Use o botão Gerar normal da janela: o OCR automático cuida do arquivo baixado.`);
     log(`PDF recebido do Projudi: ${(bytes.length / 1048576).toFixed(1)} MB`);
-    const num = (job.nome || "").replace(/[^\w.\-]+/g, "_") || "processo", pasta = job.pasta ? job.pasta.replace(/[<>:"|?*\\]+/g, "_").replace(/^\/+|\/+$/g, "") + "/" : "";
+    const num = (job.nome || "").replace(/[^\w.\-]+/g, "_") || "processo", pasta = job.pasta ? job.pasta.replace(/[<>:"|?*\\]+/g, "_").split("/").map((x) => x.replace(/[\s.]+$/g, "").replace(/^\s+/, "")).filter(Boolean).join("/") + "/" : "";      // cada pasta sem espaço/ponto no fim (o Chrome recusa: “Invalid filename”)
     const res = await processar(new File([bytes], num + ".pdf", { type: "application/pdf" }), { escala: +$("escala").value, paralelo: +$("paralelo").value, forcar: false });
     const salvar = async (blob, nome) => {
       const url = URL.createObjectURL(blob);
