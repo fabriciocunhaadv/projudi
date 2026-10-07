@@ -244,14 +244,21 @@
     (document.getElementById("btn-sidebar-minute-auditor") || botao(/Auditoria Ouro/i))?.click();
     const modal = await esperar(() => [...document.querySelectorAll("h2")].find((h) => /Lupa do Magistrado/i.test(texto(h)))?.closest("div.fixed"), 20000);
     if (!modal) throw new Error("a janela da Lupa do Magistrado não abriu");
-    botao(/Nova Auditoria/i, modal)?.click();      // a janela pode estar na aba “Processos Auditados”
-    if (!(await esperar(() => modal.querySelector("textarea"), 10000))) throw new Error("não achei o formulário de nova auditoria da Lupa");
-    await dorme(400);
-    // O formulário guarda a auditoria anterior; sem limpar, a nova sobrescreve a anterior. Aperta “Limpar Formulário” (aceitando a confirmação, se houver)
-    // e, por garantia, esvazia os campos de texto.
+    // Leva a janela ao formulário de nova auditoria: depois de uma auditoria ela reabre na tela de resultado (“Bancada”/“Resultado & Análise”).
+    // Insiste nos botões que levam ao formulário até aparecer o botão “Auditar Minuta”.
+    const noForm = () => botao(/Auditar Minuta/i, modal) && modal.querySelector("textarea");
+    const caminhos = [/^\s*Nova Auditoria\s*$/i, /Iniciar Nova Auditoria/i, /Limpar Tudo|Novo Cadastro/i, /Limpar Formul[aá]rio/i, /Nova Auditoria/i];
     document.documentElement.dataset.projudiAutoConfirm = "1";
-    try { botao(/Limpar Formul[aá]rio/i, modal)?.click(); await dorme(600); } finally { delete document.documentElement.dataset.projudiAutoConfirm; }
-    botao(/Nova Auditoria/i, modal)?.click(); await dorme(300);
+    try {
+      for (let volta = 0; volta < 3 && !noForm(); volta++) {
+        for (const rx of caminhos) { if (noForm()) break; const bt = botao(rx, modal); if (bt) { bt.click(); await esperar(noForm, 2500); } }
+      }
+      if (!noForm()) throw new Error("não consegui abrir o formulário de nova auditoria da Lupa (botões vistos: " + [...modal.querySelectorAll("button")].filter(visivel).map((x) => texto(x).slice(0, 28)).filter(Boolean).slice(0, 14).join(" | ") + ")");
+      await dorme(400);
+      // O formulário guarda a auditoria anterior; sem limpar, a nova sobrescreve a anterior. Limpa (aceitando a confirmação) e esvazia os campos.
+      botao(/Limpar Formul[aá]rio/i, modal)?.click(); await dorme(600);
+      if (!noForm()) { botao(/^\s*Nova Auditoria\s*$/i, modal)?.click(); await esperar(noForm, 4000); }
+    } finally { delete document.documentElement.dataset.projudiAutoConfirm; }
     for (const ta of modal.querySelectorAll("textarea")) if (ta.value) definirValor(ta, "");
     for (const i of modal.querySelectorAll("input[type=text]")) if (i.value && !/^\s*$/.test(i.value)) definirValor(i, "");
     await dorme(300);
