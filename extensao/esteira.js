@@ -76,6 +76,7 @@ async function desenhar() {
     if (["pausado", "erro", "analisando"].includes(it.estado)) b.push(`<button data-a="repetir" data-id="${it.id}">${it.estado === "erro" ? "Tentar de novo" : "Analisar de novo"}</button>`);
     if (it.estado === "conferindo") { if (it.docUrl) b.push(`<a href="${esc(it.docUrl)}" target="_blank">Abrir Docs</a>`); b.push(`<button data-a="conferido" data-id="${it.id}">✔ Terminei a conferência — cadastrar no Projudi</button>`); }
     if (it.estado === "cadastrando") { b.push(`<button data-a="projudi" data-id="${it.id}">Abrir o processo</button>`, `<button data-a="concluir" data-id="${it.id}">✔ Lancei no Projudi — próximo processo</button>`); }
+    b.push(`<button data-a="excluir" data-id="${it.id}" title="Tira este processo da fila e apaga o PDF guardado (não mexe no Projudi nem nos arquivos já baixados)">🗑 Excluir</button>`);
     return `<tr><td>${n + 1}</td><td>${esc(it.processo)}<br><small>${esc(it.tipo || "")}</small></td><td class="e-${it.estado}">${esc(ROTULO[it.estado] || it.estado)}${it.erro ? "<br>" + esc(it.erro) : ""}${it.aviso ? `<br><small>${esc(it.aviso)}</small>` : ""}</td><td>${b.join(" ")}</td></tr>`;
   }).join("") : '<tr><td colspan="4">Fila vazia.</td></tr>';
   $("status").textContent = dono ? "" : "Outra aba da esteira já está em execução; esta mostra apenas o andamento.";
@@ -84,6 +85,11 @@ async function desenhar() {
 $("linhas").addEventListener("click", async (ev) => {
   const b = ev.target.closest("button[data-a]"); if (!b) return;
   const id = b.dataset.id, a = b.dataset.a;
+  if (a === "excluir") {
+    if (!confirm("Excluir este processo da esteira? O PDF guardado pela extensão será apagado (o arquivo baixado no computador e o Projudi não são afetados).")) return;
+    await atualizar(id, { rodada: 0 });      // se estiver analisando, o resultado que chegar depois é descartado
+    await remover([id]); desenhar(); passo(); return;
+  }
   if (a === "pular") await atualizar(id, { estado: "pulado" });
   if (a === "repetir") await atualizar(id, { estado: "aguardando", erro: "", rodada: 0 });
   if (a === "usar") { usarMinutaDoStudio((await todos()).find((x) => x.id === id)); return; }

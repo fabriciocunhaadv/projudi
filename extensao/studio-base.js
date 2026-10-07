@@ -253,8 +253,14 @@
     let raiz = painelTurbo();
     if (!raiz) { (botao(/Turbo/i) || [...document.querySelectorAll("[title*=Turbo i],[id*=turbo i]")].find(visivel))?.click(); raiz = await esperar(painelTurbo, 15000); }
     if (!raiz) throw new Error("não achei o Módulo Turbo no app (abra o módulo uma vez e tente de novo)");
-    const sel = seletorDePrompt(raiz, prompt);
-    if (prompt && (!sel || !escolherPrompt(sel, prompt))) throw new Error(`não achei o prompt “${prompt}” no Módulo Turbo`);
+    if (prompt) {      // a lista do Turbo mostra “Prompt • [TAG]”: compara sem a etiqueta e procura primeiro no próprio módulo
+      const sem = (t) => normal(t).replace(/\s*•.*$/, ""), alvo = sem(prompt);
+      const achar = (s) => [...s.options].find((o) => sem(o.text) === alvo) || [...s.options].find((o) => sem(o.text).includes(alvo)) || [...s.options].find((o) => alvo.includes(sem(o.text)) && sem(o.text).length > 8);
+      const selects = [...raiz.querySelectorAll("select"), ...document.querySelectorAll("select")];
+      const dono = selects.find((s) => achar(s));
+      if (!dono) throw new Error(`não achei o prompt “${prompt}” no Módulo Turbo (opções vistas: ${(selects[0] ? [...selects[0].options].map((o) => texto(o)).slice(0, 4).join(" | ") : "nenhuma lista de prompts na tela")})`);
+      definirValor(dono, achar(dono).value);
+    }
     await dorme(300);
     const bt = botao(tipo && !/auto/i.test(tipo) ? new RegExp(tipo, "i") : /Auto-?detectar/i, raiz); if (bt) bt.click();
     botao(/Anexar PDF/i, raiz)?.click(); await dorme(400);

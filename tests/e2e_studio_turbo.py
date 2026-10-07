@@ -23,11 +23,11 @@ with sync_playwright() as p:
     pg.add_script_tag(path=str(RAIZ / "studio-base.js"))
     pdf = base64.b64encode(b"%PDF-1.4 teste").decode()
     pg.evaluate("([b64]) => { window.__r = null; window.__ouvinte({ acao: 'studio-parte', id: 'a1', i: 0, n: 1, b64 }, {}, () => {}); }", [pdf])
-    pg.evaluate("() => { window.__ouvinte({ acao: 'studio-analisar', modo: 'turbo', reqId: 'r1', arquivoId: 'a1', nome: '5001234-OCR.pdf', prompt: 'Outros Área Judicial - Criminal', tipo: '' }, {}, (r) => { window.__r = r }) }")
+    pg.evaluate("() => { window.__ouvinte({ acao: 'studio-analisar', modo: 'turbo', reqId: 'r1', arquivoId: 'a1', nome: '5001234-OCR.pdf', prompt: 'Outros Área Judicial - Família e Sucessões', tipo: '' }, {}, (r) => { window.__r = r }) }")
     pg.wait_for_function("window.__st", timeout=60000)
     assert pg.evaluate("window.__r.assincrono")
     r = pg.evaluate("window.__st.studio_res_r1"); print(r["ok"], r.get("erro"), r.get("mensagem"), len(r.get("minuta", "")))
     assert r["ok"] and "Texto da minuta turbo" in r["minuta"], r
-    assert pg.evaluate("window.auto") == 1 and pg.evaluate("window.prompt_") == "Outros Área Judicial - Criminal • [CRIMINAL]" and pg.evaluate("window.gerou") == 1
+    assert pg.evaluate("window.auto") == 1 and pg.evaluate("window.prompt_") == "Outros Área Judicial - Família e Sucessões • [FAMILIA]" and pg.evaluate("window.gerou") == 1
     b.close()
 print("OK")
