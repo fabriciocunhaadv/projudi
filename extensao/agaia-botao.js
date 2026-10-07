@@ -25,7 +25,9 @@
     return a.promptAgaia || a.prompt || (globalThis.Sugestoes ? Sugestoes.prompt(serv) : "");
   }
 
+  const vivo = () => { try { return !!(chrome.runtime && chrome.runtime.id && chrome.storage); } catch (e) { return false; } };
   async function enviar(b, alvo) {
+    if (!vivo()) { b.textContent = "Extensão atualizada — recarregando…"; setTimeout(() => location.reload(), 600); return; }      // esta página ficou com uma cópia antiga da extensão
     const serv = serventiaDaPagina();
     b.disabled = true; b.textContent = "Abrindo…";
     try {
@@ -36,10 +38,11 @@
   }
 
   function ciclo() {
+    if (!vivo()) { clearInterval(timer); document.querySelectorAll("[data-projudi-ext=agaia]").forEach((e) => { e.textContent = "↻ Atualizar página"; e.title = "A extensão foi atualizada: clique para recarregar esta página"; e.onclick = () => location.reload(); }); return; }
     const alvo = achar();
     if (!alvo) return;
     const serv = serventiaDaPagina();
-    if (serv) chrome.storage.local.set({ processo_atual: { cnj: alvo.cnj, serventia: serv, ts: Date.now() } }).catch(() => {});      // a janela “Gerar PDF” usa isto para escolher o prompt
+    if (serv && vivo()) chrome.storage.local.set({ processo_atual: { cnj: alvo.cnj, serventia: serv, ts: Date.now() } }).catch(() => {});      // a janela “Gerar PDF” usa isto para escolher o prompt
     const pai = alvo.no.parentElement;
     if (pai.parentElement.querySelector("[data-projudi-ext=agaia]")) return;
     const b = document.createElement("button");
@@ -50,5 +53,5 @@
     pai.after(b);
   }
   window.__projudiAgaiaBotao = true;
-  ciclo(); setInterval(ciclo, 1500);
+  ciclo(); const timer = setInterval(ciclo, 1500);
 })();
