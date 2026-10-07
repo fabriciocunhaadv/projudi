@@ -251,7 +251,11 @@
     if (!bytes) throw new Error("arquivo não recebido");
     fecharJanelas();
     let raiz = painelTurbo();
-    if (!raiz) { (botao(/Turbo/i) || [...document.querySelectorAll("[title*=Turbo i],[id*=turbo i]")].find(visivel))?.click(); raiz = await esperar(painelTurbo, 15000); }
+    const abrir = () => {      // o app pode ainda estar carregando (aba aberta agora): tenta de novo até o botão do módulo existir
+      const ids = ["btn-header-turbo-top", "btn-header-turbo-top-mobile", "btn-header-turbo-dropdown"].map((i) => document.getElementById(i)).filter(Boolean);
+      (ids.find(visivel) || ids[0] || botao(/Turbo/i))?.click();
+    };
+    for (let t0 = Date.now(); !raiz && Date.now() - t0 < 60000;) { abrir(); raiz = await esperar(painelTurbo, 4000); }
     if (!raiz) throw new Error("não achei o Módulo Turbo no app (abra o módulo uma vez e tente de novo)");
     if (prompt) {      // a lista do Turbo mostra “Prompt • [TAG]”: compara sem a etiqueta e procura primeiro no próprio módulo
       const sem = (t) => normal(t).replace(/\s*•.*$/, ""), alvo = sem(prompt);

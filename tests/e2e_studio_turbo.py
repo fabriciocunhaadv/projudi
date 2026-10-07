@@ -4,7 +4,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 RAIZ = Path(__file__).parent.parent / "extensao"
-PAG = """<html><body><div><h2>Módulo Turbo Independente</h2></div><div class="flex-1"><div class="p-3.5"><label><span>Prompt Especializado do Gabinete:</span><span>CRIMINAL</span></label>
+PAG = """<html><body><script>setTimeout(()=>{const b=document.createElement('button');b.id='btn-header-turbo-top';b.textContent='Módulo Turbo';b.onclick=()=>{document.getElementById('mod').style.display='block'};document.body.prepend(b)},3000)</script><div><h2>Módulo Turbo Independente</h2></div><div class="flex-1" id="mod" style="display:none"><div class="p-3.5"><label><span>Prompt Especializado do Gabinete:</span><span>CRIMINAL</span></label>
 <select><option value="a">Outros Área Judicial - Juizado Especial Criminal • [CRIMINAL]</option><option value="b">Outros Área Judicial - Criminal • [CRIMINAL]</option><option value="c">Outros Área Judicial - Família e Sucessões • [FAMILIA]</option></select></div>
 <label><span>Tipo de Ato:</span></label><button type="button">⚖️ Sentença</button><button type="button">📝 Decisão</button><button type="button">📄 Despacho</button><button type="button" id="auto" onclick="window.auto=1">🔍 Auto-detectar</button>
 <button><span>Anexar PDF dos Autos</span></button><button><span>Digitar / Colar Texto</span></button>
@@ -24,7 +24,7 @@ with sync_playwright() as p:
     pdf = base64.b64encode(b"%PDF-1.4 teste").decode()
     pg.evaluate("([b64]) => { window.__r = null; window.__ouvinte({ acao: 'studio-parte', id: 'a1', i: 0, n: 1, b64 }, {}, () => {}); }", [pdf])
     pg.evaluate("() => { window.__ouvinte({ acao: 'studio-analisar', modo: 'turbo', reqId: 'r1', arquivoId: 'a1', nome: '5001234-OCR.pdf', prompt: 'Outros Área Judicial - Família e Sucessões', tipo: '' }, {}, (r) => { window.__r = r }) }")
-    pg.wait_for_function("window.__st", timeout=60000)
+    pg.wait_for_function("window.__st", timeout=90000)
     assert pg.evaluate("window.__r.assincrono")
     r = pg.evaluate("window.__st.studio_res_r1"); print(r["ok"], r.get("erro"), r.get("mensagem"), len(r.get("minuta", "")))
     assert r["ok"] and "Texto da minuta turbo" in r["minuta"], r
