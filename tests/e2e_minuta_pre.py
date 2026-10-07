@@ -7,9 +7,7 @@ RAIZ = Path(__file__).parent.parent / "extensao"
 LISTA = """<html><body><script>function abrirEd(p){ const f=document.createElement("form"); f.method="get"; f.action="/editor"; f.target="_blank"; const i=document.createElement("input"); i.name="p"; i.value=p; f.appendChild(i); document.body.appendChild(f); f.submit() }</script><form id="Formulario"><input id="formLocalizarBotao" type="submit" value="Consultar" onclick="return false"><table id="Tabela">
 <tr class="TabelaLinha1"><td>1</td><td><a href="BuscaProcesso?Id_Processo=1">5285460.70</a></td><td><button class="imgIcons" title="Visualizar" type="button" onclick="abrirEd(1);return false">v</button></td></tr>
 <tr class="TabelaLinha1"><td>2</td><td><a href="BuscaProcesso?Id_Processo=2">6006074.21</a></td><td><button class="imgIcons" title="Visualizar" type="button" onclick="abrirEd(2);return false">v</button></td></tr></table></form></body></html>"""
-EDITOR = """<html><body><div id="x"></div><script>
-const p=new URLSearchParams(location.search).get('p');
-setTimeout(()=>{ window.CKEDITOR={instances:{e:{getData:()=>'<p>Minuta do assessor '+p+'.</p><p>Segundo parágrafo&nbsp;aqui.</p>'}}} },800)</script></body></html>"""
+EDITOR = """<html><body><div id="divCorpo"><fieldset><legend> Texto Pré-Análise </legend><div id="divTextoEditor" class="divTextoEditor" style="display:block"><!--Configuracao_Projudi {"nomeArquivo":"despacho"} Configuracao_Projudi--><p style="text-align:center"><img src="data:image/png;base64,AAAA"><br><strong>PODER JUDICIÁRIO</strong><br>Juizado Especial Cível</p><hr><p>Natureza: CÍVEL<br>Processo nº: 5285460-70.2025.8.09.0166<br>Autor(es): Fulano</p><p style="text-align:center"><strong>DESPACHO</strong></p><p>Intime-se a parte autora&nbsp;para manifestar-se.</p><p>Segundo parágrafo.</p></div></fieldset></div></body></html>"""
 
 
 class H(http.server.BaseHTTPRequestHandler):
@@ -30,7 +28,7 @@ with sync_playwright() as p:
     sw = ctx.service_workers[0] if ctx.service_workers else ctx.wait_for_event("serviceworker")
     pg = ctx.new_page(); pg.goto(f"chrome-extension://{sw.url.split('/')[2]}/lote.html"); pg.wait_for_function("!!window.__lerMinutaPre")
     r = pg.evaluate("(proc) => window.__lerMinutaPre({ processo: proc })", "5285460-70.2026.8.09.0166"); print(r)
-    assert r["texto"] == "Minuta do assessor 1.\nSegundo parágrafo aqui." and not r["motivo"], r
+    assert r["texto"].startswith("DESPACHO") and "Intime-se a parte autora para manifestar-se." in r["texto"] and "PODER" not in r["texto"] and "Segundo parágrafo." in r["texto"] and not r["motivo"], r
     r2 = pg.evaluate("() => window.__lerMinutaPre({ processo: '9999999-99.2026.8.09.0000' })"); print(r2)
     assert not r2["texto"] and "não apareceu" in r2["motivo"], r2
     ctx.close()

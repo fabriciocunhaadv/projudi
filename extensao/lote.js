@@ -34,6 +34,8 @@ const lerEditor = (tabId) => chrome.scripting.executeScript({ target: { tabId, a
   try {
     const ck = window.CKEDITOR; if (ck && ck.instances) { const n = Object.keys(ck.instances)[0]; if (n) return ck.instances[n].getData(); }
     if (window.tinymce && window.tinymce.activeEditor) return window.tinymce.activeEditor.getContent();
+    const fixo = document.getElementById("divTextoEditor");      // tela “Texto Pré-Análise”: a minuta já escrita fica em HTML fixo (não é um editor)
+    if (fixo && fixo.innerText && fixo.innerText.trim().length > 20) return fixo.innerHTML;
   } catch (e) { /* sem editor neste quadro */ }
   return null;
 } }).catch(() => []);
@@ -41,7 +43,12 @@ function htmlParaTexto(html) {
   const d = new DOMParser().parseFromString(html, "text/html");
   d.querySelectorAll("br").forEach((b) => b.replaceWith("\n"));
   d.querySelectorAll("p,div,li,h1,h2,h3,h4,h5,h6,blockquote").forEach((e) => e.append("\n"));
-  return d.body.textContent.replace(/\u00a0/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+  d.querySelectorAll("img,hr").forEach((e) => e.remove());
+  let t = d.body.textContent.replace(/\u00a0/g, " ").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  // a minuta começa no título do ato; o que vem antes é o timbre do gabinete e a identificação das partes
+  const ini = t.search(/^(DESPACHO|DECIS[ÃA]O( INTERLOCUT[ÓO]RIA)?|SENTEN[ÇC]A)\s*$/m);
+  if (ini > 0 && t.slice(0, ini).split("\n").length < 25) t = t.slice(ini);
+  return t;
 }
 async function lerMinutaPre(item) {
   const digitos = String(item.processo).replace(/\D/g, "").slice(0, 9), novas = [];
