@@ -56,6 +56,12 @@ async function lerMinutaPre(item) {
   const tab = await chrome.tabs.create({ url: BASE + "PreAnalisarConclusao?PaginaAtual=6&tipo=todas", active: false });
   const motivo = { m: "" };
   try {
+    // As listas do Projudi são da serventia ativa NA SESSÃO (e a verificação deixa a sessão na última serventia lida): escolhe a do processo antes.
+    if (item.serventiaUrl) {
+      await chrome.tabs.update(tab.id, { url: new URL(item.serventiaUrl, BASE).href }); await dorme(600);
+      await carregou(tab.id); await dorme(1200);
+      await chrome.tabs.update(tab.id, { url: BASE + "PreAnalisarConclusao?PaginaAtual=6&tipo=todas" }); await dorme(600);
+    }
     await carregou(tab.id); await dorme(1500);
     const clicar = (alvo) => chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, world: "MAIN", args: [alvo], func: (dig) => {
       // O Visualizar chama submeter2(...) e o Projudi abre o editor em NOVA aba; sem clique do usuário o Chrome bloquearia esse pop-up.

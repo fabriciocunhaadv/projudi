@@ -27,7 +27,7 @@ with sync_playwright() as p:
         args=["--headless=new", "--no-sandbox", f"--disable-extensions-except={ext}", f"--load-extension={ext}"])
     sw = ctx.service_workers[0] if ctx.service_workers else ctx.wait_for_event("serviceworker")
     pg = ctx.new_page(); pg.goto(f"chrome-extension://{sw.url.split('/')[2]}/lote.html"); pg.wait_for_function("!!window.__lerMinutaPre")
-    r = pg.evaluate("(proc) => window.__lerMinutaPre({ processo: proc })", "5285460-70.2026.8.09.0166"); print(r)
+    r = pg.evaluate("(proc) => window.__lerMinutaPre({ processo: proc, serventiaUrl: 'Usuario?PaginaAtual=7&a1=1&a2=6' })", "5285460-70.2026.8.09.0166"); print(r)
     assert r["texto"].startswith("DESPACHO") and "Intime-se a parte autora para manifestar-se." in r["texto"] and "PODER" not in r["texto"] and "Segundo parágrafo." in r["texto"] and not r["motivo"], r
     r2 = pg.evaluate("() => window.__lerMinutaPre({ processo: '9999999-99.2026.8.09.0000' })"); print(r2)
     assert not r2["texto"] and "não apareceu" in r2["motivo"], r2

@@ -88,7 +88,7 @@ function desenhar() {
   // 3a) Baixar PDFs para análise: o assessor marca as serventias (varas) em que trabalha; a extensão baixa os processos delas
   // e cada serventia usa o seu prompt no app de IA. Classificadores são um filtro opcional.
   {
-    const todosP = estado.serventias.flatMap((s) => todos(s).map((p) => ({ ...p, serventia: s.serventia })));
+    const todosP = estado.serventias.flatMap((s) => todos(s).map((p) => ({ ...p, serventia: s.serventia, serventiaUrl: s.url || "" })));
     const clsLista = [...new Set(todosP.filter((p) => automacao[p.serventia]?.ativa).map(nomeCls))].sort((a, b) => a.localeCompare(b, "pt-BR"));
     const cand = todosP.filter((p) => automacao[p.serventia]?.ativa && (!selCls.size || selCls.has(nomeCls(p))) && selSit.has(p.tipo) && p.url).sort(Ordenar.comparador($("modo").value));
     const fila = cand.filter((p) => !fora(p.processo));
@@ -215,7 +215,7 @@ function csv() {
     const fila = window.__candidatos || [];   // já na ordem de trabalho
     if (!fila.length) return;
     const hoje = new Date().toISOString().slice(0, 10), id = String(Date.now());
-    const itens = fila.map((p) => ({ processo: p.processo, url: p.url, classificador: nomeCls(p), serventia: p.serventia, situacao: p.tipo, urlPre: p.urlPre || "", arquivoModelos: automacao[p.serventia]?.arquivoModelos || "", prompt: automacao[p.serventia]?.prompt || "", pasta: `Projudi/${hoje}/${[p.serventia, nomeCls(p)].map((x) => String(x).replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60).replace(/[\s.]+$/g, "")).join("/")}` }));
+    const itens = fila.map((p) => ({ processo: p.processo, url: p.url, classificador: nomeCls(p), serventia: p.serventia, situacao: p.tipo, urlPre: p.urlPre || "", serventiaUrl: p.serventiaUrl || "", arquivoModelos: automacao[p.serventia]?.arquivoModelos || "", prompt: automacao[p.serventia]?.prompt || "", pasta: `Projudi/${hoje}/${[p.serventia, nomeCls(p)].map((x) => String(x).replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60).replace(/[\s.]+$/g, "")).join("/")}` }));
     await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/" + hoje, opcoes: { atualizarBase: opcoes.atualizarBase, studio: { ativo: opcoes.studio, modo: opcoes.modo, docs: opcoes.docs } } } });
     chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + id) });
   });
