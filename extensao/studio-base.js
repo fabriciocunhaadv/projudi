@@ -270,10 +270,22 @@
     const b = await esperar(() => { const x = botao(/Auditar Minuta/i, modal); return x && !x.disabled ? x : null; }, 15000);
     if (!b) throw new Error("não achei o botão “Auditar Minuta”");
     const rotulo = texto(b); b.click();
-    // espera a auditoria andar (botão muda/bloqueia) e terminar (volta ao normal) para a fila não atropelar a próxima
-    await esperar(() => { const x = botao(/Auditar Minuta/i, modal); return !x || x.disabled || texto(x) !== rotulo; }, 8000);
-    await esperar(() => { const x = botao(/Auditar Minuta/i, modal); return x && !x.disabled && texto(x) === rotulo; }, 6 * 60000);
-    return { ok: true, mensagem: "auditoria feita na Lupa do Magistrado" };
+    // Espera a auditoria terminar. Sinais: o botão volta ao normal OU a janela deixa de mudar (texto estável por ~12 s, sem “auditando/aguarde”).
+    const t0 = Date.now(), texto_ = () => (modal.innerText || "").replace(/\s+/g, " ").trim();
+    let ultimo = texto_(), desde = Date.now(), comecou = false;
+    for (;;) {
+      await dorme(1500);
+      const e = erroNaTela(); if (e) throw new Error("o app avisou: " + e);
+      const x = botao(/Auditar Minuta/i, modal), agora = texto_();
+      if (!x || x.disabled || texto(x) !== rotulo) comecou = true;
+      if (agora !== ultimo) { ultimo = agora; desde = Date.now(); }
+      const ocupado = /auditando|analisando|processando|aguarde|carregando|gerando/i.test(agora.slice(0, 4000));
+      const voltou = comecou && x && !x.disabled && texto(x) === rotulo;
+      if (voltou || (comecou && !ocupado && Date.now() - desde > 12000) || (!comecou && Date.now() - t0 > 20000)) break;
+      if (Date.now() - t0 > 8 * 60000) throw new Error("a auditoria da Lupa demorou mais de 8 minutos");
+    }
+    const resumo = texto_().replace(/Auditar Minuta com Rigor do Magistrado.*$/i, "").slice(0, 500);
+    return { ok: true, mensagem: "auditoria concluída na Lupa do Magistrado" + (resumo ? " — " + resumo : ""), minuta: "" };
   }
 
 
