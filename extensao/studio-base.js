@@ -239,6 +239,23 @@
     return { ok: true, mensagem: "auditoria iniciada na Lupa do Magistrado" };
   }
 
+  // Resultado do Módulo Turbo: o módulo troca o formulário por “DECISÃO/SENTENÇA/DESPACHO” + botões Copiar/Baixar/Abrir no Editor/Nova Análise + abas “Minuta Completa”.
+  const moduloTurbo = () => [...document.querySelectorAll("h2")].filter((h) => /M[oó]dulo Turbo Independente/i.test(texto(h)) && visivel(h)).map((h) => h.closest("div.fixed"))[0] || null;
+  const resultadoTurbo = () => { const m = moduloTurbo(); return m && botao(/Abrir no Editor/i, m) && [...m.querySelectorAll("button")].some((b) => /^Minuta Completa$/i.test(texto(b))) ? m : null; };
+  function lerResultadoTurbo() {
+    const m = resultadoTurbo(); if (!m) return { texto: "", html: "" };
+    const aba = [...m.querySelectorAll("button")].find((b) => /^Minuta Completa$/i.test(texto(b)));
+    aba?.click();
+    const rolagem = [...m.querySelectorAll("div")].filter((d) => /overflow-y-auto|overflow-auto/.test(d.className) && (d.innerText || "").length > 200 && !d.querySelector("h2"))
+      .sort((a, b) => (b.innerText || "").length - (a.innerText || "").length)[0];
+    let linhas = ((rolagem || m).innerText || "").split(/\n+/).map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean);
+    while (linhas.length && /^(PROCESSO N|POLO (ATIVO|PASSIVO)|COMARCA|JUIZO|JUÍZO)/i.test(linhas[0])) linhas.shift();      // cabeçalho de identificação: não faz parte da minuta
+    const esc = (x) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const titulo = (l) => l.length < 90 && (l === l.toUpperCase() && /[A-ZÁÉÍÓÚÂÊÔÃÕÇ]{4}/.test(l));
+    return { texto: linhas.join("\n"), html: linhas.map((l) => titulo(l) ? `<h3>${esc(l)}</h3>` : `<p>${esc(l)}</p>`).join("") };
+  }
+  window.__projudiLerTurbo = lerResultadoTurbo;      // usado nos testes
+
   // Módulo Turbo Independente: "Prompt Especializado do Gabinete", "Tipo de Ato", "Anexar PDF dos Autos" e "Executar Análise Turbo".
   const botaoExecutarTurbo = (raiz) => [...raiz.querySelectorAll("button")].find((x) => /Executar An[aá]lise Turbo/i.test(texto(x)) || /^(\W*)(Analisando|Executando|Gerando|Processando)/i.test(texto(x)));
   function painelTurbo() {
@@ -251,6 +268,7 @@
     if (!bytes && !textoAutos) throw new Error("arquivo não recebido");
     fecharJanelas();
     let raiz = painelTurbo();
+    if (!raiz && resultadoTurbo()) { botao(/^Nova An[aá]lise$/i, resultadoTurbo())?.click(); raiz = await esperar(painelTurbo, 10000); }      // resultado antigo na tela
     const abrir = () => {      // o app pode ainda estar carregando (aba aberta agora): tenta de novo até o botão do módulo existir
       const ids = ["btn-header-turbo-top", "btn-header-turbo-top-mobile", "btn-header-turbo-dropdown"].map((i) => document.getElementById(i)).filter(Boolean);
       (ids.find(visivel) || ids[0] || botao(/Turbo/i))?.click();
@@ -284,18 +302,19 @@
     const exec = await esperar(() => { const b = botaoExecutarTurbo(raiz); return b && !b.disabled && /Executar/i.test(texto(b)) ? b : null; }, 60000);
     if (!exec) throw new Error("o botão “Executar Análise Turbo” não ficou disponível");
     const rotulo = texto(exec); exec.click();
-    // 1) começou (o botão muda ou fica bloqueado) 2) terminou (volta a “Executar…” ou o resultado aparece)
+    // 1) começou (o botão muda ou some) 2) terminou (aparece o resultado: “Abrir no Editor” + aba “Minuta Completa”)
     const t0 = Date.now();
-    await esperar(() => { const b = botaoExecutarTurbo(raiz); return erroNaTela() || !b || b.disabled || texto(b) !== rotulo || resultadoPronto(); }, 20000);
+    await esperar(() => { const b = botaoExecutarTurbo(raiz); return erroNaTela() || !b || b.disabled || texto(b) !== rotulo || resultadoTurbo(); }, 20000);
     for (;;) {
+      if (resultadoTurbo()) break;
       const e = erroNaTela(); if (e) throw new Error("o app avisou: " + e);
-      const b = botaoExecutarTurbo(raiz);
-      if (resultadoPronto() || (b && !b.disabled && /Executar/i.test(texto(b)) && Date.now() - t0 > 3000)) break;
       if (Date.now() - t0 > 10 * 60000) throw new Error("o Módulo Turbo demorou mais de 10 minutos");
       await dorme(1000);
     }
-    await dorme(800);
-    return { ok: true, mensagem: "análise Turbo concluída", minuta: await lerMinuta(), minutaHtml: minutaHtmlDoPainel() };
+    await dorme(1500);
+    const r = lerResultadoTurbo();
+    if (r.texto.length < 200) throw new Error("o Módulo Turbo terminou, mas não consegui ler a minuta na tela");
+    return { ok: true, mensagem: "análise Turbo concluída", minuta: r.texto, minutaHtml: r.html };
   }
 
   chrome.runtime.onMessage.addListener((m, _s, responder) => {
@@ -313,6 +332,9 @@
       responder({ ok: true }); return false;
     }
     if (m?.acao === "studio-enviar-base") { enviar(m.nome, m.arquivoId, m.b64, !!m.substituir).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
+    if (m?.acao === "studio-ler-minuta" && resultadoTurbo()) {      // o resultado do Módulo Turbo está na tela: usa-o, sem procurar no histórico
+      const r = lerResultadoTurbo(); responder({ ok: !!r.texto, minuta: r.texto, minutaHtml: r.html, erro: r.texto ? "" : "não consegui ler a minuta do Turbo" }); return false;
+    }
     if (m?.acao === "studio-ler-minuta") { (m.processo ? carregarDoHistorico(m.processo) : Promise.resolve()).then(() => lerMinuta()).then((t) => responder({ ok: !!t, minuta: t, minutaHtml: minutaHtmlDoPainel(), erro: t ? "" : "não há minuta pronta na tela do app" })).catch((e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
     if (m?.acao === "studio-analisar" && m.modo === "turbo" && m.reqId) {      // análise longa: responde já e entrega o resultado pelo storage (o canal de mensagem pode cair no meio)
       const k = "studio_res_" + m.reqId;
