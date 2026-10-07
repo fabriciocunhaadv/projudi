@@ -158,6 +158,7 @@ $("impArq").onchange = async () => {
   $("impMsg").textContent = (n ? `${n} processo(s) adicionados à fila (${{ analise: "Análise", lupa: "Lupa do Magistrado", turbo: "Análise Turbo" }[modo]}). ` : "Nenhum arquivo novo. ") + msgs.join(" | ");
   $("impArq").value = ""; passo();
 };
+$("diarioLupa").onclick = async () => { const { lupa_diario = [] } = await chrome.storage.local.get("lupa_diario"); await navigator.clipboard.writeText(JSON.stringify(lupa_diario, null, 1)); $("diarioLupa").textContent = `Copiado (${lupa_diario.length} registros)! Cole no chat`; setTimeout(() => ($("diarioLupa").textContent = "Copiar diário da Lupa"), 4000); };
 $("limpar").onclick = async () => { await remover((await todos()).filter((i) => ["concluido", "pulado"].includes(i.estado)).map((i) => i.id)); desenhar(); };
 chrome.storage.onChanged.addListener((c, area) => { if (area === "local" && Object.keys(c).some((k) => k.startsWith("esteira_"))) { desenhar(); passo(); } });
 setInterval(passo, 3000);
