@@ -288,7 +288,9 @@
     const rotulo = texto(b); b.click();
     // Espera a auditoria terminar. Sinais: o botão volta ao normal OU a janela deixa de mudar (texto estável por ~12 s, sem “auditando/aguarde”).
     const t0 = Date.now(), texto_ = () => (modal.innerText || "").replace(/\s+/g, " ").trim();
-    let ultimo = texto_(), desde = Date.now(), comecou = false;
+    let ultimo = texto_(), desde = Date.now(), comecou = false, ultimaConf = 0, achouCedo = null;
+    const dig0 = String(processo || "").replace(/\D/g, "").slice(0, 9);
+    const rxProc0 = dig0 ? new RegExp(dig0.slice(0, 7) + "[.\\-]?" + dig0.slice(7, 9)) : null;
     for (;;) {
       await dorme(1500);
       const e = erroNaTela(); if (e) throw new Error("o app avisou: " + e);
@@ -297,6 +299,14 @@
       if (agora !== ultimo) { ultimo = agora; desde = Date.now(); }
       const ocupado = /auditando|analisando|processando|aguarde|carregando|gerando/i.test(agora.slice(0, 4000));
       const voltou = comecou && x && !x.disabled && texto(x) === rotulo;
+      // O registro aparece em “Processos Auditados” logo que a auditoria termina e some se a janela for para “Resultado & Análise”:
+      // por isso confere na lista assim que a tela se acalma, antes de qualquer outra aba.
+      if (rxProc0 && comecou && !ocupado && Date.now() - desde > 3000 && Date.now() - ultimaConf > 4000) {
+        ultimaConf = Date.now();
+        botao(/^\s*Processos Auditados/i, modal)?.click(); await dorme(1200);
+        const l0 = texto_();
+        if (rxProc0.test(l0)) { achouCedo = { qtd: (l0.match(/Processos Auditados\s*(\d+)/i) || [])[1] }; break; }
+      }
       if (voltou || (comecou && !ocupado && Date.now() - desde > 12000) || (!comecou && Date.now() - t0 > 20000)) break;
       if (Date.now() - t0 > 8 * 60000) throw new Error("a auditoria da Lupa demorou mais de 8 minutos");
     }
@@ -311,7 +321,7 @@
       const lista = texto_(), qtd = (lista.match(/Processos Auditados\s*(\d+)/i) || [])[1];
       return { ok: !rxProc || rxProc.test(lista), qtd };
     };
-    let conf = { ok: false, qtd: undefined };
+    let conf = achouCedo ? { ok: true, qtd: achouCedo.qtd } : { ok: false, qtd: undefined };
     for (let tent = 0; tent < 3 && !conf.ok; tent++) {
       if (tent > 0) {      // fecha e reabre o módulo
         (botao(/^\s*Fechar\s*$/i, modal) || modal.querySelector("button[aria-label*=echar]"))?.click();
