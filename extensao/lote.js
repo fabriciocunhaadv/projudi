@@ -73,13 +73,19 @@ async function lerMinutaPre(item) {
       const b = tr.querySelector("button[title='Visualizar'],a[title='Visualizar'],[title='Visualizar']") || tr.querySelector("button.imgIcons");
       if (!b) return "sem-botao"; b.click(); return "clicou";
     } }).then((r) => r.map((x) => x.result).find((x) => x === "clicou" || x === "sem-botao") || r.map((x) => x.result).find(Boolean) || "").catch(() => "");
-    let r = await clicar(digitos);
-    if (r !== "clicou" && r !== "sem-botao") {      // a lista pode estar vazia até apertar “Consultar”
-      await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, func: () => document.getElementById("formLocalizarBotao")?.click() }).catch(() => {});
-      await carregou(tab.id, 20000); await dorme(2000); r = await clicar(digitos);
+    // a lista pode demorar a carregar: tenta por até ~30 s; no meio do caminho aperta “Consultar” uma vez (a lista pode vir vazia até isso)
+    let r = "", viuLinhas = 0, consultou = false;
+    for (let k = 0; k < 30 && r !== "clicou" && r !== "sem-botao"; k++) {
+      r = await clicar(digitos);
+      if (/^linhas:/.test(r)) viuLinhas = +r.split(":")[1];
+      if (r !== "clicou" && r !== "sem-botao") {
+        if (k === 8 && !consultou) { consultou = true; await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, func: () => document.getElementById("formLocalizarBotao")?.click() }).catch(() => {}); }
+        await dorme(1000);
+      }
     }
+    const t = await chrome.tabs.get(tab.id).catch(() => null);
     if (r === "sem-botao") { motivo.m = "não achei o botão Visualizar na linha do processo"; return { texto: "", motivo: motivo.m }; }
-    if (r !== "clicou") { motivo.m = "o processo não apareceu na Busca de Pré-Análises"; return { texto: "", motivo: motivo.m }; }
+    if (r !== "clicou") { motivo.m = `o processo não apareceu na Busca de Pré-Análises (a lista tinha ${viuLinhas} linha(s); página: “${(t && t.title || "").slice(0, 60)}”)`; return { texto: "", motivo: motivo.m }; }
     for (let k = 0; k < 40; k++) {      // o editor abre na mesma aba ou em outra
       await dorme(1000);
       for (const id of [tab.id, ...novas]) {
