@@ -236,27 +236,46 @@
     return true;
   }
 
-  async function lupa({ arquivoId, nome, prompt, processo, minuta }) {
+  async function lupa({ arquivoId, nome, prompt, processo, minuta, texto: textoAutos }) {
     if (!minuta || !minuta.trim()) return { ok: true, parcial: true, mensagem: "a Lupa precisa da minuta elaborada pelo assessor: PDF baixado, auditoria não iniciada" };
     const bytes = arquivos.get(arquivoId);
+    if (!bytes && !textoAutos) throw new Error("arquivo não recebido");
     fecharJanelas();
     (document.getElementById("btn-sidebar-minute-auditor") || botao(/Auditoria Ouro/i))?.click();
     const modal = await esperar(() => [...document.querySelectorAll("h2")].find((h) => /Lupa do Magistrado/i.test(texto(h)))?.closest("div.fixed"), 20000);
     if (!modal) throw new Error("a janela da Lupa do Magistrado não abriu");
+    botao(/Nova Auditoria/i, modal)?.click();      // a janela pode estar na aba “Processos Auditados”
+    if (!(await esperar(() => modal.querySelector("textarea"), 10000))) throw new Error("não achei o formulário de nova auditoria da Lupa");
+    await dorme(400);
     const sel = seletorDePrompt(modal, prompt);
     if (prompt && (!sel || !escolherPrompt(sel, prompt))) throw new Error(`não achei o prompt “${prompt}” na Lupa`);
     const num = [...modal.querySelectorAll("input[type=text]")].find((i) => /5012345/.test(i.placeholder || ""));
     if (num && processo) definirValor(num, processo);
-    const ta = modal.querySelector("textarea"); definirValor(ta, minuta);
-    const input = [...modal.querySelectorAll("input[type=file]")][0];
-    const dt = new DataTransfer(); dt.items.add(new File([bytes], nome, { type: "application/pdf" }));
-    input.files = dt.files; input.dispatchEvent(new Event("change", { bubbles: true }));
-    await dorme(1000);
-    const b = await esperar(() => botao(/Auditar Minuta/i, modal), 10000);
-    if (!b) throw new Error("não achei o botão de auditar");
-    b.click();
-    return { ok: true, mensagem: "auditoria iniciada na Lupa do Magistrado" };
+    const tas = () => [...modal.querySelectorAll("textarea")].filter(visivel);
+    definirValor(tas()[0], minuta);      // 1. Minuta elaborada pelo assessor
+    if (textoAutos) {      // 2. Autos: aba “Colar Texto”
+      botao(/^Colar Texto$/i, modal)?.click();
+      const ta = await esperar(() => tas()[1], 10000);
+      if (!ta) throw new Error("não achei o campo de texto dos autos na Lupa");
+      definirValor(ta, textoAutos); await dorme(500);
+      if (ta.value.length < textoAutos.length * 0.98) throw new Error("o campo de texto da Lupa não aceitou o texto completo");
+    } else {      // 2. Autos: aba “Upload PDF”
+      botao(/^Upload PDF$/i, modal)?.click(); await dorme(400);
+      const input = [...modal.querySelectorAll("input[type=file]")][0];
+      if (!input) throw new Error("não achei o campo de envio do PDF na Lupa");
+      const dt = new DataTransfer(); dt.items.add(new File([bytes], nome, { type: "application/pdf" }));
+      input.files = dt.files; input.dispatchEvent(new Event("change", { bubbles: true }));
+      await dorme(1000);
+    }
+    const b = await esperar(() => { const x = botao(/Auditar Minuta/i, modal); return x && !x.disabled ? x : null; }, 15000);
+    if (!b) throw new Error("não achei o botão “Auditar Minuta”");
+    const rotulo = texto(b); b.click();
+    // espera a auditoria andar (botão muda/bloqueia) e terminar (volta ao normal) para a fila não atropelar a próxima
+    await esperar(() => { const x = botao(/Auditar Minuta/i, modal); return !x || x.disabled || texto(x) !== rotulo; }, 8000);
+    await esperar(() => { const x = botao(/Auditar Minuta/i, modal); return x && !x.disabled && texto(x) === rotulo; }, 6 * 60000);
+    return { ok: true, mensagem: "auditoria feita na Lupa do Magistrado" };
   }
+
 
   // Resultado do Módulo Turbo: o módulo troca o formulário por “DECISÃO/SENTENÇA/DESPACHO” + botões Copiar/Baixar/Abrir no Editor/Nova Análise + abas “Minuta Completa”.
   const moduloTurbo = () => [...document.querySelectorAll("h2")].filter((h) => /M[oó]dulo Turbo Independente/i.test(texto(h)) && visivel(h)).map((h) => h.closest("div.fixed"))[0] || null;

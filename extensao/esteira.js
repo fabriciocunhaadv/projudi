@@ -30,7 +30,7 @@ async function analisar(it) {
     const bytes = await lerPdf(it.id);
     if (!bytes) throw new Error("o PDF deste processo não está mais guardado");
     const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig");
-    const comTexto = it.modo === "turbo" || (it.modo === "analise" && esteiraConfig.entrada === "txt");      // Turbo: sempre texto; esteira principal: conforme a escolha do usuário (txt ou PDF)
+    const comTexto = it.modo === "turbo" || ((it.modo === "analise" || (it.modo === "lupa" && it.minutaAssessor)) && esteiraConfig.entrada === "txt");      // Turbo: sempre texto; esteira principal: conforme a escolha do usuário (txt ou PDF)
     const texto = comTexto ? await textoDoPdf(bytes) : "";
     if (comTexto && texto.replace(/\[Página \d+\]|\s/g, "").length < 200) throw new Error("não consegui extrair texto do PDF (o OCR pode não ter funcionado)");
     const r = await analisarNoStudio(bytes, { nome: it.pdfNome, prompt: it.prompt, modo: it.modo, tipo: "", processo: it.processo, minuta: it.minutaAssessor, texto });
