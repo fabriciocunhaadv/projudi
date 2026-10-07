@@ -84,24 +84,37 @@
     const botaoTodos = sh.querySelector('[data-a="todos"]');
     const rotulo = () => { const todos = document.getElementById("todos"), n = marcadasPeloUsuario(); botaoTodos.dataset.modo = n && !(todos && todos.checked) ? "marcados" : "todos"; botaoTodos.textContent = botaoTodos.dataset.modo === "marcados" ? `⬇ Gerar e baixar só os ${n} marcados (extensão)` : "⬇ Gerar e baixar tudo (extensão)"; };
     rotulo(); setInterval(rotulo, 600);
-    botaoTodos.onclick = async () => { const r = await executar(botaoTodos.dataset.modo === "marcados" ? { marcados: true } : { todos: true }); msg(r.erro ? "✖ " + r.erro : r.interceptado ? `PDF pedido (${r.arquivos} arquivo(s) em ${r.movimentacoes} movimentação(ões)); a extensão faz o OCR e salva em Downloads.` : "Gerando o PDF do Projudi…"); };
-    const botaoTurbo = sh.querySelector('[data-a="turbo"]');
-    const rotuloT = () => { const n = marcadasPeloUsuario(), todos = document.getElementById("todos"); botaoTurbo.textContent = n && !(todos && todos.checked) ? `⚡ Gerar só os ${n} marcados e enviar à Análise Turbo` : "⚡ Gerar tudo e enviar à Análise Turbo"; };
-    rotuloT(); setInterval(rotuloT, 600);
-    botaoTurbo.onclick = async () => {      // mesmo download com OCR; o PDF segue para o Módulo Turbo do app de IA (via esteira), com o prompt da serventia
+    // Processo e prompt da serventia: a tela do processo (agaia-botao.js) guarda a serventia; o número também sai do nome do arquivo na lista.
+    async function contexto() {
       const { processo_atual: at } = await chrome.storage.local.get("processo_atual");
       const rec = at && Date.now() - at.ts < 4 * 3600000 ? at : null;
-      const brutos = (document.body.textContent.match(/processo_n\.(\d{7})(\d{2})(\d{4})8(\d{2})(\d{4})/) || []);      // o arquivo “processo_n.<número>.pdf” da lista identifica o processo
-      const cnjDaLista = brutos[1] ? `${brutos[1]}-${brutos[2]}.${brutos[3]}.8.${brutos[4]}.${brutos[5]}` : "";
+      const b = (document.body.textContent.match(/processo_n\.(\d{7})(\d{2})(\d{4})8(\d{2})(\d{4})/) || []);
+      const cnjLista = b[1] ? `${b[1]}-${b[2]}.${b[3]}.8.${b[4]}.${b[5]}` : "";
+      const cnj = (rec && (!cnjLista || rec.cnj === cnjLista) ? rec.cnj : cnjLista) || (rec ? rec.cnj : "");
       let prompt = "";
       if (rec) {
         const { automacao = {} } = await chrome.storage.sync.get("automacao"), k = (x) => sem(x).replace(/\s*-\s*go\s*$/, "");
         const ch = Object.keys(automacao).find((n) => k(n) === k(rec.serventia)) || Object.keys(automacao).find((n) => k(rec.serventia) && (k(n).includes(k(rec.serventia)) || k(rec.serventia).includes(k(n))));
         prompt = automacao[ch]?.prompt || (globalThis.Sugestoes ? Sugestoes.prompt(rec.serventia) : "");
       }
-      const ped = botaoTodos.dataset.modo === "marcados" ? { marcados: true } : { todos: true };
-      const r = await executar({ ...ped, processo: rec ? rec.cnj : cnjDaLista, studio: { ativo: true, modo: "turbo", prompt, tipo: "", minuta: "", url: "", urlPre: "", docs: false } });
-      msg(r.erro ? "✖ " + r.erro : `PDF pedido (${r.arquivos ?? r.marcadas} arquivo(s)) de ${rec ? rec.cnj + " — prompt: " + (prompt || "(não definido)") : (cnjDaLista || "processo") + " — prompt não definido (atualize a tela do processo no Projudi para a extensão identificar a serventia)"}; depois do OCR ele vai para a Análise Turbo.`);
+      const d = cnj.replace(/\D/g, ""), url = d.length === 20 ? `BuscaProcesso?PaginaAtual=2&TipoConsultaProcesso=24&ProcessoNumero=${d.slice(0, 9)}-${d.slice(9)}` : "";
+      return { cnj, prompt, url, serventia: rec ? rec.serventia : "" };
+    }
+    const modoDoBotao = () => (botaoTodos.dataset.modo === "marcados" ? { marcados: true } : { todos: true });
+    // Botão normal: baixa com OCR e, se no painel estiver marcado “Iniciar a análise no Studio”, segue para a esteira de minutas (mesmo padrão da fila).
+    botaoTodos.onclick = async () => {
+      const c = await contexto(), { opcoesLote: o = {} } = await chrome.storage.sync.get("opcoesLote");
+      const seguir = !!o.studio && o.modo !== "lupa";
+      const r = await executar({ ...modoDoBotao(), processo: c.cnj, studio: seguir ? { ativo: true, modo: "analise", prompt: c.prompt, tipo: "", minuta: "", url: c.url, urlPre: "", docs: !!o.docs } : null });
+      msg(r.erro ? "✖ " + r.erro : r.interceptado ? `PDF pedido (${r.arquivos} arquivo(s) em ${r.movimentacoes} movimentação(ões)); a extensão faz o OCR e salva em Downloads.${seguir ? " Depois segue para a esteira de minutas (Studio)" + (c.cnj ? " — " + c.cnj : "") + (c.prompt ? ", prompt: " + c.prompt : " — prompt não definido (atualize a tela do processo)") + "." : ""}` : "Gerando o PDF do Projudi…");
+    };
+    const botaoTurbo = sh.querySelector('[data-a="turbo"]');
+    const rotuloT = () => { const n = marcadasPeloUsuario(), todos = document.getElementById("todos"); botaoTurbo.textContent = n && !(todos && todos.checked) ? `⚡ Gerar só os ${n} marcados e enviar à Análise Turbo` : "⚡ Gerar tudo e enviar à Análise Turbo"; };
+    rotuloT(); setInterval(rotuloT, 600);
+    botaoTurbo.onclick = async () => {      // mesmo download com OCR; o texto segue para o Módulo Turbo do app de IA (via esteira), com o prompt da serventia
+      const c = await contexto();
+      const r = await executar({ ...modoDoBotao(), processo: c.cnj, studio: { ativo: true, modo: "turbo", prompt: c.prompt, tipo: "", minuta: "", url: c.url, urlPre: "", docs: false } });
+      msg(r.erro ? "✖ " + r.erro : `PDF pedido (${r.arquivos ?? r.marcadas} arquivo(s)) de ${c.cnj || "processo não identificado"}${c.prompt ? " — prompt: " + c.prompt : " — prompt não definido (atualize a tela do processo no Projudi)"}; depois do OCR ele vai para a Análise Turbo.`);
     };
     sh.querySelector('[data-a="diag"]').onclick = async () => {
       const c = document.documentElement.cloneNode(true);
