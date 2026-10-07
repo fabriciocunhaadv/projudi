@@ -9,7 +9,7 @@ PAG = """<html><body><button id="btn-sidebar-minute-auditor" onclick="document.g
 <button id="tn" onclick="document.getElementById('f').style.display='block';document.getElementById('hist').style.display='none'">Nova Auditoria</button><button onclick="document.getElementById('hist').style.display='block'">Processos Auditados</button>
 <div id="hist" style="display:none">Nenhum processo auditado encontrado</div>
 <div id="f" style="display:none"><select><option>Outros Área Judicial - Criminal</option><option>Outros Área Judicial - Cível</option></select>
-<input type="text" placeholder="Ex: 5012345-88.2026.8.09.0051"><button id="limpar" onclick="window.limpou=(window.limpou||0)+1;document.getElementById('min').value='';document.getElementById('ta2').value=''">Limpar Formulário</button><textarea id="min">AUDITORIA ANTERIOR</textarea>
+<input type="text" placeholder="Ex: 5012345-88.2026.8.09.0051"><button id="limpar" onclick="window.limpou=(window.limpou||0)+1;document.getElementById('min').value='';document.getElementById('ta2').value=''">Limpar Tudo (Novo Cadastro)</button><textarea id="min">AUDITORIA ANTERIOR</textarea>
 <button onclick="document.getElementById('up').style.display='block';document.getElementById('ta2').style.display='none'">Upload PDF</button><button onclick="document.getElementById('ta2').style.display='block';document.getElementById('up').style.display='none'">Colar Texto</button>
 <div id="up" style="display:none"><input type="file" class="hidden"></div><textarea id="ta2" style="display:block">AUTOS ANTERIORES</textarea>
 <button id="aud"><span>Auditar Minuta com Rigor do Magistrado</span></button></div></div>

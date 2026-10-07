@@ -247,7 +247,7 @@
     // Leva a janela ao formulário de nova auditoria: depois de uma auditoria ela reabre na tela de resultado (“Bancada”/“Resultado & Análise”).
     // Insiste nos botões que levam ao formulário até aparecer o botão “Auditar Minuta”.
     const noForm = () => botao(/Auditar Minuta/i, modal) && modal.querySelector("textarea");
-    const caminhos = [/^\s*Nova Auditoria\s*$/i, /Iniciar Nova Auditoria/i, /Limpar Tudo|Novo Cadastro/i, /Limpar Formul[aá]rio/i, /Nova Auditoria/i];
+    const caminhos = [/^\s*Nova Auditoria\s*$/i, /Iniciar Nova Auditoria/i, /Limpar Tudo|Novo Cadastro/i, /Nova Auditoria/i];
     document.documentElement.dataset.projudiAutoConfirm = "1";
     try {
       for (let volta = 0; volta < 3 && !noForm(); volta++) {
@@ -255,8 +255,8 @@
       }
       if (!noForm()) throw new Error("não consegui abrir o formulário de nova auditoria da Lupa (botões vistos: " + [...modal.querySelectorAll("button")].filter(visivel).map((x) => texto(x).slice(0, 28)).filter(Boolean).slice(0, 14).join(" | ") + ")");
       await dorme(400);
-      // O formulário guarda a auditoria anterior; sem limpar, a nova sobrescreve a anterior. Limpa (aceitando a confirmação) e esvazia os campos.
-      botao(/Limpar Formul[aá]rio/i, modal)?.click(); await dorme(600);
+      // O formulário guarda a auditoria anterior; sem limpar, a nova sobrescreve a anterior. Usa o botão de baixo, “Limpar Tudo (Novo Cadastro)” (aceita a confirmação).
+      botao(/Limpar Tudo|Novo Cadastro/i, modal)?.click(); await dorme(600);
       if (!noForm()) { botao(/^\s*Nova Auditoria\s*$/i, modal)?.click(); await esperar(noForm, 4000); }
     } finally { delete document.documentElement.dataset.projudiAutoConfirm; }
     for (const ta of modal.querySelectorAll("textarea")) if (ta.value) definirValor(ta, "");
@@ -306,6 +306,12 @@
     const lista = texto_(), qtd = (lista.match(/Processos Auditados\s*(\d+)/i) || [])[1];
     const gravou = !dig || new RegExp(dig.slice(0, 7) + "[.\\-]?" + dig.slice(7, 9)).test(lista);
     if (!gravou) throw new Error(`a auditoria terminou, mas ${processo} não aparece em “Processos Auditados” (a lista tem ${qtd ?? "?"} registro(s)). Tente de novo`);
+    // Deixa a Lupa pronta para o próximo processo: volta em Nova Auditoria e clica em “Limpar Tudo (Novo Cadastro)”.
+    try {
+      document.documentElement.dataset.projudiAutoConfirm = "1";
+      botao(/^\s*Nova Auditoria\s*$/i, modal)?.click(); await esperar(() => botao(/Limpar Tudo|Novo Cadastro/i, modal), 5000);
+      botao(/Limpar Tudo|Novo Cadastro/i, modal)?.click(); await dorme(800);
+    } catch (e) { /* o próximo processo limpa de novo */ } finally { delete document.documentElement.dataset.projudiAutoConfirm; }
     return { ok: true, mensagem: `auditoria gravada em Processos Auditados (${qtd ?? "?"} registro(s); ${processo} ✔)` + (resumo ? " — " + resumo : ""), minuta: "" };
   }
 
