@@ -3,6 +3,7 @@ import { analisarNoStudio, lerMinutaAtual } from "./studio-cliente.js";
 import { criarDocumento, abrirLadoALado, lerDocumento, tipoDaMinuta, nomeDoc } from "./docs-api.js";
 import { paragrafosDeHtml } from "./docs-core.js";
 import { textoDoPdf } from "./pdf-texto.js";
+import { lerMinutaPre } from "./minuta-pre.js";
 const BASE = "https://projudi.tjgo.jus.br/";
 const absoluta = (u) => (u ? new URL(u, BASE).href : BASE);
 
@@ -125,17 +126,36 @@ chrome.storage.sync.get("automacao").then(({ automacao = {} }) => {
   if (prompts.length === 1) $("impPrompt").value = prompts[0];
 });
 $("impArq").onchange = async () => {
-  const prompt = $("impPrompt").value.trim(), docs = $("impDocs").checked, arqs = [...$("impArq").files];
-  if (!prompt) { $("impMsg").textContent = "Preencha antes o prompt do Studio."; $("impArq").value = ""; return; }
-  let n = 0; const ja = new Set((await todos()).map((i) => i.processo));
+  const modo = $("impModo").value, promptDigitado = $("impPrompt").value.trim(), docs = $("impDocs").checked && modo === "analise", arqs = [...$("impArq").files];
+  const { estado } = await chrome.storage.local.get("estado"), { automacao = {} } = await chrome.storage.sync.get("automacao");
+  const k = (x) => String(x || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s*-\s*go\s*$/, "").trim();
+  // procura o processo (pelos 9 primeiros dígitos) entre os que o painel já conhece: traz serventia, links e prompt cadastrado
+  const achar = (dig) => {
+    for (const sv of estado?.serventias || []) for (const grupo of ["naoAnalisadas", "preAnalisadas"]) for (const p of sv.processos?.[grupo] || [])
+      if (String(p.processo).replace(/\D/g, "").slice(0, 9) === dig) return { ...p, serventia: sv.serventia, serventiaUrl: sv.url || "", situacao: grupo };
+    return null;
+  };
+  const msgs = []; let n = 0; const ja = new Set((await todos()).map((i) => i.processo));
   for (const f of arqs) {
-    const proc = (f.name.match(/\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/) || [])[0];
-    if (!proc || ja.has(proc)) continue;
-    const num = proc.replace(/\D/g, ""), url = `BuscaProcesso?PaginaAtual=2&TipoConsultaProcesso=24&ProcessoNumero=${num.slice(0, -13)}-${num.slice(-13)}`;
-    await enfileirar({ processo: proc, url, urlPre: "", prompt, modo: "analise", docs, minutaAssessor: "", pdfNome: f.name, pdf: f.name }, new Uint8Array(await f.arrayBuffer()));
+    const cnj = (f.name.match(/\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/) || [])[0], curto = (f.name.match(/(\d{7})[-.](\d{2})(?!\d)/) || []);
+    const dig = cnj ? cnj.replace(/\D/g, "").slice(0, 9) : curto[1] ? curto[1] + curto[2] : "";
+    if (!dig) { msgs.push(`${f.name}: sem número de processo no nome`); continue; }
+    const conhecido = achar(dig), proc = conhecido?.processo || cnj || `${curto[1]}.${curto[2]}`;
+    if (ja.has(proc)) { msgs.push(`${proc}: já está na fila`); continue; }
+    const chaveServ = conhecido && Object.keys(automacao).find((x) => k(x) === k(conhecido.serventia));
+    const prompt = promptDigitado || (chaveServ && automacao[chaveServ]?.prompt) || (conhecido && globalThis.Sugestoes ? Sugestoes.prompt(conhecido.serventia) : "");
+    if (modo !== "turbo" && !prompt) { msgs.push(`${proc}: sem prompt (preencha o campo ou marque a serventia no painel)`); continue; }
+    let minutaAssessor = "", motivoMinuta = "";
+    if (modo === "lupa") {
+      if (!conhecido || conhecido.situacao !== "preAnalisadas") motivoMinuta = "o processo não está entre as pré-analisadas do painel (clique em “Verificar agora” no painel)";
+      else { $("impMsg").textContent = `Lendo a minuta do assessor de ${proc}…`; const r = await lerMinutaPre({ processo: proc, serventiaUrl: conhecido.serventiaUrl }).catch((e) => ({ texto: "", motivo: e.message })); minutaAssessor = r.texto; motivoMinuta = r.motivo; }
+    }
+    const num = proc.replace(/\D/g, ""), url = conhecido?.url || (cnj ? `BuscaProcesso?PaginaAtual=2&TipoConsultaProcesso=24&ProcessoNumero=${num.slice(0, -13)}-${num.slice(-13)}` : "");
+    await enfileirar({ processo: proc, url, urlPre: conhecido?.urlPre || "", prompt, modo, docs, minutaAssessor, motivoMinuta, pdfNome: f.name, pdf: f.name }, new Uint8Array(await f.arrayBuffer()));
     ja.add(proc); n++;
+    if (modo === "lupa" && !minutaAssessor) msgs.push(`${proc}: entrou na fila, mas sem a minuta do assessor (${motivoMinuta})`);
   }
-  $("impMsg").textContent = n ? `${n} processo(s) adicionados à fila.` : "Nenhum arquivo novo (o nome precisa conter o número do processo).";
+  $("impMsg").textContent = (n ? `${n} processo(s) adicionados à fila (${{ analise: "Análise", lupa: "Lupa do Magistrado", turbo: "Análise Turbo" }[modo]}). ` : "Nenhum arquivo novo. ") + msgs.join(" | ");
   $("impArq").value = ""; passo();
 };
 $("limpar").onclick = async () => { await remover((await todos()).filter((i) => ["concluido", "pulado"].includes(i.estado)).map((i) => i.id)); desenhar(); };

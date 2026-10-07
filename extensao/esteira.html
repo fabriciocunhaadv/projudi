@@ -18,9 +18,11 @@ Os downloads dos PDFs seguem em paralelo, sem esperar esta fila. Mantenha esta a
 <div id="status"></div>
 <table><thead><tr><th>#</th><th>Processo</th><th>Situação</th><th>Ações</th></tr></thead><tbody id="linhas"></tbody></table>
 <details id="importar"><summary><b>Recuperar processos já baixados</b> (se a fila veio vazia ou você baixou os PDFs por fora)</summary>
-  <p class="dica">Escolha os arquivos <b>número-OCR.pdf</b> que estão na sua pasta de downloads (Projudi/…). Eles entram no fim da fila, sem baixar de novo.</p>
-  <p>Prompt do Studio: <input id="impPrompt" list="impPrompts" size="48" placeholder="ex.: Outros Área Judicial - Família e Sucessões"><datalist id="impPrompts"></datalist>
+  <p class="dica">Escolha os arquivos <b>número-OCR.pdf</b> (o nome pode ter só o número curto, como 5285460.70-OCR.pdf) que estão na sua pasta de downloads (Projudi/…). Eles entram no fim da fila, sem baixar de novo.</p>
+  <p>Função: <select id="impModo"><option value="analise">Análise dos processos (Gerar Minuta Judicial)</option><option value="lupa">Lupa do Magistrado (usa a minuta do assessor das pré-analisadas)</option><option value="turbo">⚡ Análise Turbo</option></select></p>
+  <p>Prompt do Studio <small>(vazio = o prompt cadastrado para a serventia do processo)</small>: <input id="impPrompt" list="impPrompts" size="48" placeholder="ex.: Outros Área Judicial - Família e Sucessões"><datalist id="impPrompts"></datalist>
   <label><input type="checkbox" id="impDocs" checked> abrir no Google Docs</label></p>
   <p><input type="file" id="impArq" accept="application/pdf,.pdf" multiple> <span id="impMsg"></span></p></details>
 <p><button id="limpar">Limpar concluídos e pulados</button></p>
+<script src="sugestoes.js"></script>
 <script type="module" src="esteira.js"></script>
