@@ -257,7 +257,6 @@
       if (!noForm()) throw new Error("não consegui abrir o formulário de nova auditoria da Lupa (botões vistos: " + [...modal.querySelectorAll("button")].filter(visivel).map((x) => texto(x).slice(0, 28)).filter(Boolean).slice(0, 14).join(" | ") + ")");
       await dorme(400);
       // O formulário guarda a auditoria anterior; sem limpar, a nova sobrescreve a anterior. Usa só “Limpar Formulário”.
-      // NUNCA clicar em “Limpar Tudo (Novo Cadastro)”: ele apaga os Processos Auditados e os prompts personalizados.
       botao(/Limpar Formul[aá]rio/i, modal)?.click(); await dorme(600);
       if (!noForm()) { botao(/^\s*Nova Auditoria\s*$/i, modal)?.click(); await esperar(noForm, 4000); }
     } finally { delete document.documentElement.dataset.projudiAutoConfirm; }
@@ -265,13 +264,16 @@
     // Quantos registros havia (e se este processo já estava) antes da auditoria: serve para detectar sobrescrita.
     const digA = String(processo || "").replace(/\D/g, "").slice(0, 9);
     const rxA = digA ? new RegExp(digA.slice(0, 7) + "[.\\-]?" + digA.slice(7, 9)) : null;
-    let antes = null, jaTinha = false;
+    let antes = null, jaTinha = false, perdeu = null;
     try {
       botao(/^\s*Processos Auditados/i, modal)?.click(); await dorme(1200);
       const l = (modal.innerText || "").replace(/\s+/g, " "), n = (l.match(/Processos Auditados\s*(\d+)/i) || [])[1];
-      if (n != null) antes = Number(n); jaTinha = !!(rxA && rxA.test(l));
+      if (n != null) antes = Number(n);
+      if (antes != null && window.__lupaQtd && antes < window.__lupaQtd) perdeu = new Error(`os Processos Auditados tinham ${window.__lupaQtd} registro(s) e agora têm ${antes}: o registro anterior foi apagado (provavelmente pelo “Limpar Tudo”). Parei antes de auditar o próximo`);
+      jaTinha = !!(rxA && rxA.test(l));
       botao(/^\s*Nova Auditoria\s*$/i, modal)?.click(); await esperar(noForm, 4000);
     } catch (e) { /* segue sem a contagem */ }
+    if (perdeu) throw perdeu;
     for (const i of modal.querySelectorAll("input[type=text]")) if (i.value && !/^\s*$/.test(i.value)) definirValor(i, "");
     await dorme(300);
     const sel = seletorDePrompt(modal, prompt);
@@ -352,21 +354,15 @@
       }
     }
     let qtd = conf.qtd;
-    if (conf.ok) {
-      // Achou: não mexe em mais nada. Fecha e reabre o módulo para provar que o registro ficou guardado (e não só na tela).
-      await reabrir();
-      const c2 = await consulta();
-      if (!c2.ok) { conf = c2; }
-      else qtd = c2.qtd ?? qtd;
-    }
     if (!conf.ok) throw new Error(`a auditoria terminou, mas ${processo} não aparece em “Processos Auditados” mesmo após aguardar e reabrir o módulo (a lista tem ${qtd ?? "?"} registro(s)). Não passei para o próximo`);
-    // Deixa a Lupa pronta para o próximo processo: volta em Nova Auditoria e clica em “Limpar Formulário”.
+    // Confirmado: não navega mais. Só vai a Nova Auditoria e usa “Limpar Tudo (Novo Cadastro)” para o próximo processo.
     try {
       document.documentElement.dataset.projudiAutoConfirm = "1";
-      botao(/^\s*Nova Auditoria\s*$/i, modal)?.click(); await esperar(() => botao(/Limpar Formul[aá]rio/i, modal), 5000);
-      botao(/Limpar Formul[aá]rio/i, modal)?.click(); await dorme(800);
+      botao(/^\s*Nova Auditoria\s*$/i, modal)?.click(); await esperar(() => botao(/Limpar Tudo|Novo Cadastro/i, modal), 5000);
+      botao(/Limpar Tudo|Novo Cadastro/i, modal)?.click(); await dorme(800);
     } catch (e) { /* o próximo processo limpa de novo */ } finally { delete document.documentElement.dataset.projudiAutoConfirm; }
     if (antes != null && !jaTinha && qtd != null && Number(qtd) <= antes) throw new Error(`a auditoria de ${processo} substituiu outra em vez de entrar na lista (eram ${antes}, ficaram ${qtd}). Não passei para o próximo`);
+    window.__lupaQtd = Number(qtd) || window.__lupaQtd;
     return { ok: true, mensagem: `auditoria gravada em Processos Auditados (${qtd ?? "?"} registro(s); ${processo} ✔)` + (resumo ? " — " + resumo : ""), minuta: "" };
   }
 
