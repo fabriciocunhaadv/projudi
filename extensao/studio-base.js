@@ -248,7 +248,7 @@
     // Leva a janela ao formulário de nova auditoria: depois de uma auditoria ela reabre na tela de resultado (“Bancada”/“Resultado & Análise”).
     // Insiste nos botões que levam ao formulário até aparecer o botão “Auditar Minuta”.
     const noForm = () => (botao(/Auditar Minuta/i, modal) || botao(/^Colar Texto$/i, modal)) && [...modal.querySelectorAll("textarea")].filter(visivel).length >= 1;
-    const caminhos = [/^\s*Nova Auditoria\s*$/i, /Iniciar Nova Auditoria/i, /Limpar Tudo|Novo Cadastro/i, /Nova Auditoria/i];
+    const caminhos = [/^\s*Nova Auditoria\s*$/i, /Iniciar Nova Auditoria/i, /Nova Auditoria/i];
     document.documentElement.dataset.projudiAutoConfirm = "1";
     try {
       for (let volta = 0; volta < 3 && !noForm(); volta++) {
@@ -256,11 +256,22 @@
       }
       if (!noForm()) throw new Error("não consegui abrir o formulário de nova auditoria da Lupa (botões vistos: " + [...modal.querySelectorAll("button")].filter(visivel).map((x) => texto(x).slice(0, 28)).filter(Boolean).slice(0, 14).join(" | ") + ")");
       await dorme(400);
-      // O formulário guarda a auditoria anterior; sem limpar, a nova sobrescreve a anterior. Usa o botão de baixo, “Limpar Tudo (Novo Cadastro)” (aceita a confirmação).
-      botao(/Limpar Tudo|Novo Cadastro/i, modal)?.click(); await dorme(600);
+      // O formulário guarda a auditoria anterior; sem limpar, a nova sobrescreve a anterior. Usa só “Limpar Formulário”.
+      // NUNCA clicar em “Limpar Tudo (Novo Cadastro)”: ele apaga os Processos Auditados e os prompts personalizados.
+      botao(/Limpar Formul[aá]rio/i, modal)?.click(); await dorme(600);
       if (!noForm()) { botao(/^\s*Nova Auditoria\s*$/i, modal)?.click(); await esperar(noForm, 4000); }
     } finally { delete document.documentElement.dataset.projudiAutoConfirm; }
     for (const ta of modal.querySelectorAll("textarea")) if (ta.value) definirValor(ta, "");
+    // Quantos registros havia (e se este processo já estava) antes da auditoria: serve para detectar sobrescrita.
+    const digA = String(processo || "").replace(/\D/g, "").slice(0, 9);
+    const rxA = digA ? new RegExp(digA.slice(0, 7) + "[.\\-]?" + digA.slice(7, 9)) : null;
+    let antes = null, jaTinha = false;
+    try {
+      botao(/^\s*Processos Auditados/i, modal)?.click(); await dorme(1200);
+      const l = (modal.innerText || "").replace(/\s+/g, " "), n = (l.match(/Processos Auditados\s*(\d+)/i) || [])[1];
+      if (n != null) antes = Number(n); jaTinha = !!(rxA && rxA.test(l));
+      botao(/^\s*Nova Auditoria\s*$/i, modal)?.click(); await esperar(noForm, 4000);
+    } catch (e) { /* segue sem a contagem */ }
     for (const i of modal.querySelectorAll("input[type=text]")) if (i.value && !/^\s*$/.test(i.value)) definirValor(i, "");
     await dorme(300);
     const sel = seletorDePrompt(modal, prompt);
@@ -321,30 +332,39 @@
       const lista = texto_(), qtd = (lista.match(/Processos Auditados\s*(\d+)/i) || [])[1];
       return { ok: !rxProc || rxProc.test(lista), qtd };
     };
+    const reabrir = async () => {      // fecha e reabre o módulo
+      (botao(/^\s*Fechar\s*$/i, modal) || modal.querySelector("button[aria-label*=echar]"))?.click();
+      await dorme(1200); if (achaModal()) fecharJanelas();
+      await dorme(800);
+      (document.getElementById("btn-sidebar-minute-auditor") || botao(/Auditoria Ouro/i))?.click();
+      modal = await esperar(achaModal, 20000);
+      if (!modal) throw new Error("a Lupa não reabriu para conferir Processos Auditados");
+      await dorme(1500);
+    };
     let conf = achouCedo ? { ok: true, qtd: achouCedo.qtd } : { ok: false, qtd: undefined };
     for (let tent = 0; tent < 3 && !conf.ok; tent++) {
-      if (tent > 0) {      // fecha e reabre o módulo
-        (botao(/^\s*Fechar\s*$/i, modal) || modal.querySelector("button[aria-label*=echar]"))?.click();
-        await dorme(1200); if (achaModal()) fecharJanelas();
-        await dorme(800);
-        (document.getElementById("btn-sidebar-minute-auditor") || botao(/Auditoria Ouro/i))?.click();
-        modal = await esperar(achaModal, 20000);
-        if (!modal) throw new Error("a Lupa não reabriu para conferir Processos Auditados");
-        await dorme(1500);
-      }
+      if (tent > 0) await reabrir();
       for (let i = 0; i < 6 && !conf.ok; i++) {
         conf = await consulta();
         if (!conf.ok) { if (i % 2) { botao(/^\s*Nova Auditoria\s*$/i, modal)?.click(); await dorme(1000); } await dorme(i < 2 ? 3000 : 5000); }
       }
     }
-    const qtd = conf.qtd;
+    let qtd = conf.qtd;
+    if (conf.ok) {
+      // Achou: não mexe em mais nada. Fecha e reabre o módulo para provar que o registro ficou guardado (e não só na tela).
+      await reabrir();
+      const c2 = await consulta();
+      if (!c2.ok) { conf = c2; }
+      else qtd = c2.qtd ?? qtd;
+    }
     if (!conf.ok) throw new Error(`a auditoria terminou, mas ${processo} não aparece em “Processos Auditados” mesmo após aguardar e reabrir o módulo (a lista tem ${qtd ?? "?"} registro(s)). Não passei para o próximo`);
-    // Deixa a Lupa pronta para o próximo processo: volta em Nova Auditoria e clica em “Limpar Tudo (Novo Cadastro)”.
+    // Deixa a Lupa pronta para o próximo processo: volta em Nova Auditoria e clica em “Limpar Formulário”.
     try {
       document.documentElement.dataset.projudiAutoConfirm = "1";
-      botao(/^\s*Nova Auditoria\s*$/i, modal)?.click(); await esperar(() => botao(/Limpar Tudo|Novo Cadastro/i, modal), 5000);
-      botao(/Limpar Tudo|Novo Cadastro/i, modal)?.click(); await dorme(800);
+      botao(/^\s*Nova Auditoria\s*$/i, modal)?.click(); await esperar(() => botao(/Limpar Formul[aá]rio/i, modal), 5000);
+      botao(/Limpar Formul[aá]rio/i, modal)?.click(); await dorme(800);
     } catch (e) { /* o próximo processo limpa de novo */ } finally { delete document.documentElement.dataset.projudiAutoConfirm; }
+    if (antes != null && !jaTinha && qtd != null && Number(qtd) <= antes) throw new Error(`a auditoria de ${processo} substituiu outra em vez de entrar na lista (eram ${antes}, ficaram ${qtd}). Não passei para o próximo`);
     return { ok: true, mensagem: `auditoria gravada em Processos Auditados (${qtd ?? "?"} registro(s); ${processo} ✔)` + (resumo ? " — " + resumo : ""), minuta: "" };
   }
 
