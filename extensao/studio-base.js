@@ -236,6 +236,22 @@
     return true;
   }
 
+  // Foto passiva do que o app guardou no navegador (chaves agaia_judge_audits_*): só leitura, sem mexer na tela.
+  function fotoAuditorias() {
+    const r = {};
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!/judge_audits|auditor|audit/i.test(k)) continue;
+        const v = localStorage.getItem(k) || "";
+        r[k.replace(/^agaia_judge_audits_/, "")] = [...new Set(v.match(/\d{7}[.\-]\d{2}/g) || [])];
+      }
+    } catch (e) { /* sem acesso */ }
+    return r;
+  }
+  const fotoTxt = (f) => Object.entries(f).map(([k, v]) => `${k}=[${v.join(",")}]`).join(" ; ") || "(nada no navegador)";
+  const temNaFoto = (f, rx) => Object.values(f).some((v) => v.some((n) => rx.test(n)));
+
   async function lupa({ arquivoId, nome, prompt, processo, minuta, motivoMinuta, texto: textoAutos }) {
     if (!minuta || !minuta.trim()) return { ok: true, parcial: true, mensagem: "a Lupa precisa da minuta elaborada pelo assessor: PDF baixado, auditoria não iniciada" + (motivoMinuta ? " — " + motivoMinuta : "") };
     const bytes = arquivos.get(arquivoId);
@@ -298,7 +314,7 @@
     }
     const b = await esperar(() => { const x = botao(/Auditar Minuta/i, modal); return x && !x.disabled ? x : null; }, 15000);
     if (!b) throw new Error("não achei o botão “Auditar Minuta”");
-    const rotulo = texto(b); b.click();
+    const rotulo = texto(b); const foto0 = fotoAuditorias(); b.click();
     // Espera a auditoria terminar. Sinais: o botão volta ao normal OU a janela deixa de mudar (texto estável por ~12 s, sem “auditando/aguarde”).
     const t0 = Date.now(), texto_ = () => (modal.innerText || "").replace(/\s+/g, " ").trim();
     let ultimo = texto_(), desde = Date.now(), comecou = false, ultimaConf = 0, achouCedo = null;
@@ -355,15 +371,19 @@
     }
     let qtd = conf.qtd;
     if (!conf.ok) throw new Error(`a auditoria terminou, mas ${processo} não aparece em “Processos Auditados” mesmo após aguardar e reabrir o módulo (a lista tem ${qtd ?? "?"} registro(s)). Não passei para o próximo`);
+    const foto1 = fotoAuditorias();
     // Confirmado: não navega mais. Só vai a Nova Auditoria e usa “Limpar Tudo (Novo Cadastro)” para o próximo processo.
     try {
       document.documentElement.dataset.projudiAutoConfirm = "1";
       botao(/^\s*Nova Auditoria\s*$/i, modal)?.click(); await esperar(() => botao(/Limpar Tudo|Novo Cadastro/i, modal), 5000);
       botao(/Limpar Tudo|Novo Cadastro/i, modal)?.click(); await dorme(800);
     } catch (e) { /* o próximo processo limpa de novo */ } finally { delete document.documentElement.dataset.projudiAutoConfirm; }
+    await dorme(1500);
+    const foto2 = fotoAuditorias(), trilha = `navegador: antes=${fotoTxt(foto0)} | após auditar=${fotoTxt(foto1)} | após Limpar Tudo=${fotoTxt(foto2)}`;
+    if (rxProc && temNaFoto(foto1, rxProc) && !temNaFoto(foto2, rxProc)) throw new Error(`o botão “Limpar Tudo” apagou ${processo} dos Processos Auditados. Parei para não perder mais registros. ${trilha}`);
     if (antes != null && !jaTinha && qtd != null && Number(qtd) <= antes) throw new Error(`a auditoria de ${processo} substituiu outra em vez de entrar na lista (eram ${antes}, ficaram ${qtd}). Não passei para o próximo`);
     window.__lupaQtd = Number(qtd) || window.__lupaQtd;
-    return { ok: true, mensagem: `auditoria gravada em Processos Auditados (${qtd ?? "?"} registro(s); ${processo} ✔)` + (resumo ? " — " + resumo : ""), minuta: "" };
+    return { ok: true, mensagem: `auditoria gravada em Processos Auditados (${qtd ?? "?"} registro(s); ${processo} ✔) — ${trilha}` + (resumo ? " — " + resumo : ""), minuta: "" };
   }
 
 
