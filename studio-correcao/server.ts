@@ -4479,6 +4479,7 @@ if (executionStage === 2 && stage1Snapshot && typeof stage1Snapshot === "object"
         res,
         primaryModel: "gemini-3.8-flash",
         fallbackModel: "gemini-3.7-flash",
+        customModelQueue: ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"],      // etapa 1: profundidade primeiro; reservas mais rápidas depois
         timeoutMs: 180000,
         contents: [{ role: "user", parts: stage1ContentsParts }],
         config: {
@@ -5052,6 +5053,7 @@ try {
         res,
         primaryModel: "gemini-3.8-flash",
         fallbackModel: "gemini-3.7-flash",
+        customModelQueue: ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"],      // etapa 2: profundidade primeiro; reservas mais rápidas depois
         timeoutMs: 180000,
         contents: [{ role: "user", parts: [{ text: stage2Prompt }] }],
         config: {
