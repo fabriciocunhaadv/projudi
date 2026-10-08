@@ -285,7 +285,7 @@
       botao(/^\s*Processos Auditados/i, modal)?.click(); await dorme(1200);
       const l = (modal.innerText || "").replace(/\s+/g, " "), n = (l.match(/Processos Auditados\s*(\d+)/i) || [])[1];
       if (n != null) antes = Number(n);
-      if (antes != null && window.__lupaQtd && antes < window.__lupaQtd) perdeu = new Error(`os Processos Auditados tinham ${window.__lupaQtd} registro(s) e agora têm ${antes}: o registro anterior foi apagado (provavelmente pelo “Limpar Tudo”). Parei antes de auditar o próximo`);
+      if (antes != null && window.__lupaQtd && antes < window.__lupaQtd && !(window.__lupaRx && temNaFoto(fotoAuditorias(), window.__lupaRx))) perdeu = new Error(`os Processos Auditados tinham ${window.__lupaQtd} registro(s) e agora têm ${antes}: o registro anterior foi apagado (provavelmente pelo “Limpar Tudo”). Parei antes de auditar o próximo`);
       jaTinha = !!(rxA && rxA.test(l));
       botao(/^\s*Nova Auditoria\s*$/i, modal)?.click(); await esperar(noForm, 4000);
     } catch (e) { /* segue sem a contagem */ }
@@ -382,7 +382,7 @@
     const foto2 = fotoAuditorias(), trilha = `navegador: antes=${fotoTxt(foto0)} | após auditar=${fotoTxt(foto1)} | após Limpar Tudo=${fotoTxt(foto2)}`;
     if (rxProc && temNaFoto(foto1, rxProc) && !temNaFoto(foto2, rxProc)) throw new Error(`o botão “Limpar Tudo” apagou ${processo} dos Processos Auditados. Parei para não perder mais registros. ${trilha}`);
     if (antes != null && !jaTinha && qtd != null && Number(qtd) <= antes) throw new Error(`a auditoria de ${processo} substituiu outra em vez de entrar na lista (eram ${antes}, ficaram ${qtd}). Não passei para o próximo`);
-    window.__lupaQtd = Number(qtd) || window.__lupaQtd;
+    window.__lupaQtd = Number(qtd) || window.__lupaQtd; window.__lupaRx = rxProc;
     return { ok: true, mensagem: `auditoria gravada em Processos Auditados (${qtd ?? "?"} registro(s); ${processo} ✔) — ${trilha}` + (resumo ? " — " + resumo : ""), minuta: "" };
   }
 
