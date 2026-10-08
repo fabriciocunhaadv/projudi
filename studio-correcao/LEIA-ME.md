@@ -10,3 +10,4 @@ Dois arquivos do Assessor Judicial alterados (copie por cima dos originais, mesm
 - Linhas 624–625 (`/api/chat-agaia`, o chat/refino da minuta, "Assistente do Fabricio"): `primaryModel` para `gemini-3.1-flash-lite` e `fallbackModel` para `gemini-flash-latest` (antes 3.8 e 3.7).
 - O Copiloto lateral (`/api/lateral-agent-chat`, linha ~772) já usava `gemini-3.1-flash-lite`; não foi alterado.
 - Reserva no 3.8: linha 625 (chat da minuta) e linha 1440 (Lupa) com `fallbackModel: "gemini-3.8-flash"`; se o 3.1 falhar, tenta o 3.8 e depois o restante da esteira (3.7, 3.6, 3.5, latest, lite).
+- Chat da minuta (linha 626, nova): `customModelQueue: ["gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-flash-latest"]` — principal 3.1 e duas reservas (3.8 e 3.7), com o latest como último recurso. Com `customModelQueue` o servidor usa só essa fila (ignora primaryModel/fallbackModel).
