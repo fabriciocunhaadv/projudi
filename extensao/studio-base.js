@@ -78,14 +78,15 @@
     el.dispatchEvent(new Event(el.tagName === "SELECT" ? "change" : "input", { bubbles: true }));
     if (el.tagName !== "SELECT") el.dispatchEvent(new Event("change", { bubbles: true }));
   }
+  const pnormal = (t) => normal(t).replace(/\bcivil\b/g, "civel");      // “Civil” (grafia antiga das sugestões) = “Cível” do app
   function escolherPrompt(sel, prompt) {
     if (!prompt) return true;
-    const op = [...sel.options].find((o) => normal(o.text) === normal(prompt)) || [...sel.options].find((o) => normal(o.text).includes(normal(prompt)));
+    const op = [...sel.options].find((o) => pnormal(o.text) === pnormal(prompt)) || [...sel.options].find((o) => pnormal(o.text).includes(pnormal(prompt)));
     if (!op) return false;
     definirValor(sel, op.value);
     return true;
   }
-  const seletorDePrompt = (raiz, prompt) => [...raiz.querySelectorAll("select")].find((s) => [...s.options].some((o) => /Área Judicial|Area Judicial/i.test(o.text)) && (!prompt || [...s.options].some((o) => normal(o.text).includes(normal(prompt)))));
+  const seletorDePrompt = (raiz, prompt) => [...raiz.querySelectorAll("select")].find((s) => [...s.options].some((o) => /Área Judicial|Area Judicial/i.test(o.text)) && (!prompt || [...s.options].some((o) => pnormal(o.text).includes(pnormal(prompt)))));
   const erroNaTela = () => { const t = document.querySelector("[data-rht-toaster]"); const x = t ? texto(t) : ""; return /erro|falha|inv[aá]lid|limite|quota|n[aã]o foi poss/i.test(x) ? x : ""; };
   // Falha passageira dos servidores de IA (alta demanda, 503, tempo de fila): espera 5 s e aperta o botão de novo (até 6 vezes).
   const transitorio = (msg) => /alta demanda|503|timeout de fila|reten[cç][aã]o em fila|tente novamente|tentar novamente|sobrecarg|indispon[ií]vel/i.test(msg || "");

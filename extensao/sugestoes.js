@@ -12,7 +12,7 @@
     [/fazenda/, "Fazenda Pública Comum", "Fazenda Pública"],
     [/eleitoral/, "Eleitoral", "Eleitoral"],
     [/criminal|penal/, "Criminal", "Criminal"],
-    [/civel|civil/, "Civil", "Cível"],
+    [/civel|civil/, "Cível", "Cível"],
   ];
   const area = (serv) => { const t = sem(serv); return AREAS.find((a) => a[0].test(t)); };
   globalThis.Sugestoes = {
