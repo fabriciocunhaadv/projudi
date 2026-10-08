@@ -109,7 +109,11 @@
     const barra = h.parentElement.parentElement.lastElementChild;     // botões Editar / Copiar / Gerar PDF: ficam bloqueados enquanto não há resultado
     return !(barra && /pointer-events-none/.test(barra.className)) && !/Aguardando Execu/i.test(texto(h.closest("div.border") || document.body));
   };
-  const executando = () => { const b = document.getElementById("tour-execute-btn"); return !b || b.disabled || !/Gerar Minuta/i.test(texto(b)); };
+  const executando = () => { const b = document.getElementById("tour-execute-btn"); return !b || b.disabled || !/Gerar (Minuta|1ª Etapa)/i.test(texto(b)); };
+  // O app passou a vir com “Execução em 2 Etapas” ligada: o resultado sai só com a 1ª etapa e o botão muda de nome. Para a esteira (minuta completa)
+  // desliga a opção durante a análise e devolve ao que o usuário tinha.
+  const caixaDuasEtapas = () => [...document.querySelectorAll("label")].find((l) => /Execu[cç][aã]o em 2 Etapas/i.test(texto(l)) && visivel(l))?.querySelector("input[type=checkbox]");
+  const prosseguirEtapa2 = () => botao(/Prosseguir para (a )?2ª Etapa/i);
 
   async function analisar({ arquivoId, nome, prompt, tipo, texto: textoAutos }) {
     const bytes = arquivos.get(arquivoId);
@@ -137,18 +141,26 @@
       input.files = dt.files; input.dispatchEvent(new Event("change", { bubbles: true }));
       await esperar(() => texto(painel).includes(nome.slice(0, 18)), 20000);
     }
-    const exec = await esperar(() => { const b = document.getElementById("tour-execute-btn"); return b && !b.disabled ? b : null; }, 60000);
-    if (!exec) throw new Error("o botão “Gerar Minuta Judicial” não ficou disponível");
-    exec.click();
-    if (!(await esperar(() => executando() || resultadoPronto() || erroNaTela(), 60000))) throw new Error("a análise não começou");
-    const t0 = Date.now(), rep = { vezes: 0, ate: 0 };
-    for (;;) {
-      const e = erroNaTela();
-      if (e && repetirSePassageiro(rep, e, () => { const b = document.getElementById("tour-execute-btn"); if (b && !b.disabled && /Gerar Minuta/i.test(texto(b))) b.click(); })) { await dorme(1000); continue; }
-      if (e) throw new Error("o app avisou: " + e);
-      if (!executando() && resultadoPronto()) break;
-      if (Date.now() - t0 > 20 * 60000) throw new Error("a análise demorou mais de 20 minutos");
-      await dorme(1000);
+    const duas = caixaDuasEtapas(); let religar = false;
+    if (duas && duas.checked) { duas.click(); religar = true; await dorme(400); }
+    try {
+      const exec = await esperar(() => { const b = document.getElementById("tour-execute-btn"); return b && !b.disabled ? b : null; }, 60000);
+      if (!exec) throw new Error("o botão “Gerar Minuta Judicial” não ficou disponível");
+      exec.click();
+      if (!(await esperar(() => executando() || resultadoPronto() || erroNaTela(), 60000))) throw new Error("a análise não começou");
+      const t0 = Date.now(), rep = { vezes: 0, ate: 0 };
+      for (;;) {
+        const e = erroNaTela();
+        if (e && repetirSePassageiro(rep, e, () => { const b = document.getElementById("tour-execute-btn"); if (b && !b.disabled && /Gerar (Minuta|1ª Etapa)/i.test(texto(b))) b.click(); })) { await dorme(1000); continue; }
+        if (e) throw new Error("o app avisou: " + e);
+        const pro = prosseguirEtapa2();      // se a 1ª etapa saiu mesmo assim, segue para a 2ª (minuta completa)
+      if (pro && !pro.disabled && !rep.etapa2) { rep.etapa2 = pro; pro.click(); await dorme(1500); continue; }
+      if (!executando() && resultadoPronto() && !prosseguirEtapa2() && !(rep.etapa2 && rep.etapa2.isConnected)) break;      // com a 2ª etapa em curso o botão fica na tela (“Executando…”) até terminar
+        if (Date.now() - t0 > 20 * 60000) throw new Error("a análise demorou mais de 20 minutos");
+        await dorme(1000);
+      }
+    } finally {
+      if (religar) { const c = caixaDuasEtapas(); if (c && !c.checked) c.click(); }
     }
     return { ok: true, mensagem: "análise concluída", minuta: await lerMinuta(), minutaHtml: minutaHtmlDoPainel() };
   }
