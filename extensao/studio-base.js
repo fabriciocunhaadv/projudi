@@ -280,10 +280,14 @@
   const fotoTxt = (f) => Object.entries(f).map(([k, v]) => `${k}=[${v.join(",")}]`).join(" ; ") || "(nada no navegador)";
   const temNaFoto = (f, rx) => Object.values(f).some((v) => v.some((n) => rx.test(n)));
 
-  async function lupa({ arquivoId, nome, prompt, processo, minuta, motivoMinuta, texto: textoAutos }) {
+  async function lupa({ arquivoId, nome, prompt, processo, minuta, motivoMinuta, texto: textoAutosOrig }) {
     if (!minuta || !minuta.trim()) return { ok: true, parcial: true, mensagem: "a Lupa precisa da minuta elaborada pelo assessor: PDF baixado, auditoria não iniciada" + (motivoMinuta ? " — " + motivoMinuta : "") };
+    let textoAutos = textoAutosOrig;
     const bytes = arquivos.get(arquivoId);
     if (!bytes && !textoAutos) throw new Error("arquivo não recebido");
+    // O Studio grava a auditoria inteira (com os autos) na nuvem, que rejeita documento acima de 1 MiB — e o registro some.
+    // Autos muito longos: mantém início e fim (o servidor do Studio já resume autos acima de ~90 mil caracteres).
+    if (textoAutos && textoAutos.length > 300000) textoAutos = textoAutos.slice(0, 150000) + "\n\n[... trecho intermediário omitido por tamanho ...]\n\n" + textoAutos.slice(-150000);
     restaurarAuditorias();      // devolve ao navegador o que o app tenha perdido de auditorias anteriores
     fecharJanelas();
     (document.getElementById("btn-sidebar-minute-auditor") || botao(/Auditoria Ouro/i))?.click();
