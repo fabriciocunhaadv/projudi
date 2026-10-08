@@ -622,7 +622,7 @@ ${cabinetTesesText ? `\n# CADERNO DE TESES E DIRETRIZES DO GABINETE:\n${cabinetT
             isNativeAllowed: isRequestNativeAllowed(req),
             res,
             primaryModel: "gemini-3.1-flash-lite",
-            fallbackModel: "gemini-flash-latest",
+            fallbackModel: "gemini-3.8-flash",
             contents: [
                 { role: "user", parts: [{ text: systemPrompt + "\n\n" + userPrompt }] }
             ],
@@ -1437,7 +1437,7 @@ Realize a conferência completa e gere o JSON rigoroso conforme o esquema acima.
             isNativeAllowed: isRequestNativeAllowed(req),
             res,
             primaryModel: "gemini-3.1-flash-lite",
-            fallbackModel: "gemini-flash-latest",
+            fallbackModel: "gemini-3.8-flash",
             contents: [{ role: "user", parts: [{ text: auditSystemInstruction + "\n\n" + auditUserPrompt }] }],
             config: {
                 systemInstruction: "Você é um juiz de direito auditor rigoroso. Responda apenas com JSON válido e completo.",
