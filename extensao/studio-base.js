@@ -534,7 +534,7 @@
   async function pendentes() {
     const { esteira_ordem = [] } = await chrome.storage.local.get("esteira_ordem");
     const d = await chrome.storage.local.get(esteira_ordem.map(K));
-    return esteira_ordem.map((i) => d[K(i)]).filter((x) => x && PENDENTES.includes(x.estado));
+    return esteira_ordem.map((i) => d[K(i)]).filter((x) => x && PENDENTES.includes(x.estado) && x.modo !== "turbo" && x.modo !== "lupa");      // Turbo/Lupa devolvem o resultado sozinhos (não usam Google Docs)
   }
   const host = document.createElement("div"); host.setAttribute("data-projudi-ext", "studio-envio");
   const sh = host.attachShadow({ mode: "open" });
@@ -557,7 +557,7 @@
         const id = caixa.querySelector("select").value, turbo = resultadoTurbo() ? lerResultadoTurbo() : null, minuta = turbo ? turbo.texto : await lerMinuta();
         if (!minuta) { caixa.querySelector(".r").textContent = "não achei a minuta nesta tela"; return; }
         await navigator.locks.request("esteira-item", async () => { const it = (await chrome.storage.local.get(K(id)))[K(id)]; if (it) await chrome.storage.local.set({ [K(id)]: { ...it, estado: "recebida", minutaRecebida: minuta, htmlRecebido: turbo ? turbo.html : minutaHtmlDoPainel(), erro: "" } }); });
-        caixa.querySelector(".r").textContent = "enviada! o Google Docs vai abrir.";
+        caixa.querySelector(".r").textContent = pend.find((x) => x.id === id)?.docs ? "enviada! o Google Docs vai abrir." : "enviada à esteira.";
         setTimeout(atualizarBotao, 3000);
       };
     } catch (e) { /* extensão recarregada: esta cópia do script morreu */ }
