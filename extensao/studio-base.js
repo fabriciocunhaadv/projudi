@@ -249,6 +249,34 @@
     } catch (e) { /* sem acesso */ }
     return r;
   }
+  // Guardião: guarda cópia das auditorias já gravadas e, se o app as perder, devolve ao navegador antes da próxima auditoria.
+  function guardarAuditorias() {
+    try {
+      window.__lupaBackup = window.__lupaBackup || {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!/^agaia_judge_audits_/.test(k)) continue;
+        const arr = JSON.parse(localStorage.getItem(k) || "[]");
+        if (!Array.isArray(arr)) continue;
+        const m = new Map((window.__lupaBackup[k] || []).map((a) => [a.id, a]));
+        for (const a of arr) if (a && a.id) m.set(a.id, a);
+        window.__lupaBackup[k] = [...m.values()];
+      }
+    } catch (e) { /* sem acesso */ }
+  }
+  function restaurarAuditorias() {
+    let n = 0;
+    try {
+      for (const [k, lista] of Object.entries(window.__lupaBackup || {})) {
+        const atual = JSON.parse(localStorage.getItem(k) || "[]"), ids = new Set((Array.isArray(atual) ? atual : []).map((a) => a.id));
+        const faltam = lista.filter((a) => a && !ids.has(a.id));
+        if (!faltam.length) continue;
+        localStorage.setItem(k, JSON.stringify([...(Array.isArray(atual) ? atual : []), ...faltam].sort((a, b) => (b.date || 0) - (a.date || 0))));
+        n += faltam.length;
+      }
+    } catch (e) { /* cheio ou sem acesso */ }
+    return n;
+  }
   const fotoTxt = (f) => Object.entries(f).map(([k, v]) => `${k}=[${v.join(",")}]`).join(" ; ") || "(nada no navegador)";
   const temNaFoto = (f, rx) => Object.values(f).some((v) => v.some((n) => rx.test(n)));
 
@@ -256,6 +284,7 @@
     if (!minuta || !minuta.trim()) return { ok: true, parcial: true, mensagem: "a Lupa precisa da minuta elaborada pelo assessor: PDF baixado, auditoria não iniciada" + (motivoMinuta ? " — " + motivoMinuta : "") };
     const bytes = arquivos.get(arquivoId);
     if (!bytes && !textoAutos) throw new Error("arquivo não recebido");
+    restaurarAuditorias();      // devolve ao navegador o que o app tenha perdido de auditorias anteriores
     fecharJanelas();
     (document.getElementById("btn-sidebar-minute-auditor") || botao(/Auditoria Ouro/i))?.click();
     const achaModal = () => [...document.querySelectorAll("h2")].find((h) => /Lupa do Magistrado/i.test(texto(h)))?.closest("div.fixed");
@@ -371,7 +400,7 @@
     }
     let qtd = conf.qtd;
     if (!conf.ok) throw new Error(`a auditoria terminou, mas ${processo} não aparece em “Processos Auditados” mesmo após aguardar e reabrir o módulo (a lista tem ${qtd ?? "?"} registro(s)). Não passei para o próximo`);
-    const foto1 = fotoAuditorias();
+    const foto1 = fotoAuditorias(); guardarAuditorias();
     // Confirmado: não navega mais. Só vai a Nova Auditoria e usa “Limpar Tudo (Novo Cadastro)” para o próximo processo.
     try {
       document.documentElement.dataset.projudiAutoConfirm = "1";
