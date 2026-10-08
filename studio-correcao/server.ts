@@ -624,6 +624,8 @@ ${cabinetTesesText ? `\n# CADERNO DE TESES E DIRETRIZES DO GABINETE:\n${cabinetT
             primaryModel: "gemini-3.1-flash-lite",
             fallbackModel: "gemini-3.8-flash",
             customModelQueue: ["gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-flash-latest"],      // 1º 3.1; reservas: 3.8 e 3.7; por último o latest
+            timeoutMs: 45000,
+            maxCycles: 1,
             contents: [
                 { role: "user", parts: [{ text: systemPrompt + "\n\n" + userPrompt }] }
             ],
@@ -1193,7 +1195,7 @@ ATENÇÃO MÁXIMA AO HISTÓRICO, PROVAS E CITAÇÃO DE FONTES: O processo não p
             stats: {
                 elapsedMs,
                 elapsedSeconds: (elapsedMs / 1000).toFixed(1),
-                modelUsed: response.modelVersion || "Gemini 3.8 Flash (Turbo)",
+                modelUsed: response.modelVersion || "Gemini Flash (Turbo)",
                 tokensUsed: response.usageMetadata?.totalTokenCount || 0,
                 promptTokens: response.usageMetadata?.promptTokenCount || 0,
                 candidatesTokens: response.usageMetadata?.candidatesTokenCount || 0
@@ -1439,6 +1441,9 @@ Realize a conferência completa e gere o JSON rigoroso conforme o esquema acima.
             res,
             primaryModel: "gemini-3.1-flash-lite",
             fallbackModel: "gemini-3.8-flash",
+            customModelQueue: ["gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-flash-latest"],      // para priorizar rigor: ponha "gemini-3.8-flash" em 1º
+            timeoutMs: 120000,
+            maxCycles: 2,
             contents: [{ role: "user", parts: [{ text: auditSystemInstruction + "\n\n" + auditUserPrompt }] }],
             config: {
                 systemInstruction: "Você é um juiz de direito auditor rigoroso. Responda apenas com JSON válido e completo.",
@@ -2087,6 +2092,48 @@ async function extractTextFromPdfBuffer(buffer) {
     }
 }
 
+// ========================================================================
+// CONTROLE DE CONSUMO POR CHAVE E POR MODELO (chaves gratuitas / pool de chaves)
+// Evita estourar tokens por minuto: escolhe a chave com mais folga em cada modelo,
+// lembra chaves que deram 429 (usando o retryDelay informado pelo Google) e só espera
+// quando NENHUMA chave tem folga. Só modelos Flash. Ajuste os limites ao seu painel.
+// ========================================================================
+const TPM_POR_MODELO: Record<string, number> = {
+    "gemini-3.8-flash": 3_000_000, "gemini-3.7-flash": 3_000_000, "gemini-3.6-flash": 3_000_000,
+    "gemini-3.5-flash": 3_000_000, "gemini-3-flash": 3_000_000,
+    "gemini-3.5-flash-lite": 10_000_000, "gemini-3.1-flash-lite": 10_000_000
+};
+const TPM_PADRAO = Number(process.env.FREE_TPM_LIMIT || 1_000_000);     // modelos fora da tabela
+const tpmDe = (m: string) => Math.floor((TPM_POR_MODELO[m] || TPM_PADRAO) * 0.85);      // 15% de margem
+const usoJanela: Map<string, { t: number; n: number }[]> = ((globalThis as any).__usoTokens ||= new Map());
+const cotaAte: Map<string, number> = ((globalThis as any).__cotaAte ||= new Map());
+const usadoNoMinuto = (k: string, m: string) => {
+    const a = (usoJanela.get(k + "|" + m) || []).filter(x => Date.now() - x.t < 60000);
+    usoJanela.set(k + "|" + m, a);
+    return a.reduce((acc, x) => acc + x.n, 0);
+};
+const registrarUso = (k: string, m: string, n: number) => {
+    const a = usoJanela.get(k + "|" + m) || [];
+    a.push({ t: Date.now(), n });
+    usoJanela.set(k + "|" + m, a);
+};
+const estimarTokens = (contents: any, sys?: any) => {
+    try { return Math.ceil((JSON.stringify(contents || "").length + String(typeof sys === "string" ? sys : JSON.stringify(sys || "")).length) / 3.2); } catch { return 0; }
+};
+async function prepararChaves(pool: string[], modelo: string, est: number): Promise<string[]> {
+    if (pool.length === 0) return pool;
+    const emCota = (k: string) => Math.max(0, (cotaAte.get(k + "|" + modelo) || 0) - Date.now());
+    const ordenadas = [...pool].sort((a, b) => (emCota(a) > 0 ? 1 : 0) - (emCota(b) > 0 ? 1 : 0) || usadoNoMinuto(a, modelo) - usadoNoMinuto(b, modelo));
+    const melhor = ordenadas[0];
+    const folga = tpmDe(modelo) - usadoNoMinuto(melhor, modelo);
+    if (emCota(melhor) > 0 || est > folga) {
+        const espera = Math.min(65000, Math.max(emCota(melhor), 8000));      // só espera se nenhuma chave tem folga
+        console.log(`[Cota] nenhuma chave com folga em ${modelo} (estimado ${est} tokens); aguardando ${Math.round(espera / 1000)}s`);
+        await new Promise(r => setTimeout(r, espera));
+    }
+    return ordenadas;
+}
+
 async function generateWithFallbackAndRetry(options) {
     // 1. Constrói o pool de chaves em ordem de prioridade (ativa primeiro, depois reservas)
     let keyPool: string[] = [];
@@ -2113,16 +2160,16 @@ async function generateWithFallbackAndRetry(options) {
 
     // ESTEIRA DE MÁXIMA PROFUNDIDADE PRIMEIRO:
     // Todos os modelos de raciocínio profundo primeiro (3.8, 3.7, 3.6, 3.5), acionando ao final os modelos latest e lite
-    let pModel = options.primaryModel || 'gemini-3.8-flash';
-    let fbModel = options.fallbackModel || 'gemini-3.7-flash';
+    let pModel = options.primaryModel || 'gemini-3.1-flash-lite';
+    let fbModel = options.fallbackModel || 'gemini-3.8-flash';
     const defaultFlashQueue = [
+        "gemini-3.1-flash-lite",
         "gemini-3.8-flash",
         "gemini-3.7-flash",
         "gemini-3.6-flash",
         "gemini-3.5-flash",
         "gemini-flash-latest",
         "gemini-3.5-flash-lite",
-        "gemini-3.1-flash-lite",
         "gemini-flash-lite-latest"
     ];
     const initialList = [pModel];
@@ -2144,6 +2191,7 @@ async function generateWithFallbackAndRetry(options) {
         delete activeConfig.responseSchema;
     }
     let activeContents = options.contents ? JSON.parse(JSON.stringify(options.contents)) : [];
+    const estTokensChamada = estimarTokens(activeContents, activeConfig?.systemInstruction);
 
     // CICLOS COMPLETOS DA ESTEIRA: Se toda a esteira de modelos sofrer indisponibilidade temporária (503 / timeout na fila do Google),
     // o sistema reinicia a esteira desde o primeiro modelo, realizando os intervalos preventivos necessários para não estourar a cota nem sobrecarregar o cluster.
@@ -2171,6 +2219,7 @@ async function generateWithFallbackAndRetry(options) {
         // assegurando que cotas isoladas por modelo não impeçam o assessor de concluir a minuta com sucesso!
         for (let mIdx = 0; mIdx < modelsToTry.length; mIdx++) {
             const modelName = modelsToTry[mIdx];
+            keyPool = await prepararChaves(keyPool, modelName, estTokensChamada);      // chave com mais folga primeiro
 
             for (let kIdx = 0; kIdx < keyPool.length; kIdx++) {
                 const currentKey = keyPool[kIdx];
@@ -2224,6 +2273,8 @@ async function generateWithFallbackAndRetry(options) {
 
                     // Sucesso absoluto! Registra metadados da chave vencedora
                     (response as any).usedKey = currentKey;
+                    (response as any).usedModel = modelName;
+                    registrarUso(currentKey, modelName, (response as any)?.usageMetadata?.totalTokenCount || estTokensChamada);
                     (response as any).usedKeyIndex = kIdx;
                     (response as any).wasRotated = kIdx > 0;
 
@@ -2276,6 +2327,7 @@ async function generateWithFallbackAndRetry(options) {
                     if (isDemandOverloaded) {
                         anyDemandOverloadedInCycle = true;
                     }
+                    if (isTimeout) registrarUso(currentKey, modelName, estTokensChamada);      // tempo esgotado: o Google pode ter contado os tokens da tentativa
 
                     const statusReason = isTimeout ? `Fila do Google retida (Timeout ${modelTimeoutMs / 1000}s)` :
                                          errMsg.includes("503") || errMsg.includes("high demand") ? "Alta demanda temporária no cluster Google (503)" :
@@ -2302,6 +2354,8 @@ async function generateWithFallbackAndRetry(options) {
 
                     // Se for erro de cota / rate limit (429):
                     if (isQuotaError) {
+                        const mr = errMsg.match(/retry in ([\d.]+)s/i) || errMsg.match(/"retryDelay":\s*"(\d+)s"/i);
+                        cotaAte.set(currentKey + "|" + modelName, Date.now() + (mr ? Math.ceil(Number(mr[1])) * 1000 : 60000));
                         if (kIdx < keyPool.length - 1) {
                             console.log(`[Assessor Judicial - FAILOVER AUTOMÁTICO DE COTA] Cota da chave ${kIdx + 1}/${keyPool.length} esgotada no modelo ${modelName}. Pausa suave (1.5s) e alternando para chave reserva ${kIdx + 2}/${keyPool.length}...`);
                             await new Promise(r => setTimeout(r, 1500));
@@ -3680,7 +3734,7 @@ Retorne de 1 a 3 precedentes oficiais aplicáveis (informando o tribunal, númer
         if (effectiveKey) {
             const groundingAi = new GoogleGenAI({ apiKey: effectiveKey });
             const groundingRes = await groundingAi.models.generateContent({
-                model: "gemini-3.8-flash",
+                model: "gemini-3.1-flash-lite",
                 contents: groundingPrompt,
                 config: {
                     tools: [{ googleSearch: {} }]
@@ -4472,6 +4526,7 @@ if (executionStage === 2 && stage1Snapshot && typeof stage1Snapshot === "object"
 } else {
     console.log("[Assessor Judicial] Disparando ETAPA 1: Assessor Fático (Extração e Confronto Probatório Bruto)...");
     const stage1StartTimer = Date.now();
+    const TIMEOUT_ETAPA = Math.min(300000, 60000 + Math.ceil(estimarTokens(stage1ContentsParts, stage1SystemInstruction) / 10000) * 1000);      // maior para autos grandes
     stage1Response = await generateWithFallbackAndRetry({
         apiKey: userApiKey,
         keyPool: extractApiKeyPool(req),
@@ -4479,8 +4534,9 @@ if (executionStage === 2 && stage1Snapshot && typeof stage1Snapshot === "object"
         res,
         primaryModel: "gemini-3.8-flash",
         fallbackModel: "gemini-3.7-flash",
-        customModelQueue: ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"],      // etapa 1: profundidade primeiro; reservas mais rápidas depois
-        timeoutMs: 180000,
+        customModelQueue: ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"],      // somente Flash; profundidade primeiro, reservas mais rápidas depois
+        timeoutMs: TIMEOUT_ETAPA,
+        maxCycles: 2,
         contents: [{ role: "user", parts: stage1ContentsParts }],
         config: {
             systemInstruction: stage1SystemInstruction,
@@ -4647,7 +4703,7 @@ if (executionStage === 1) {
         relatorio: stage1Json.relatorio || "Relatório fático em processamento nos autos.",
         fundamentacao: stage1Json.fundamentacao || "Análise fático-probatória inicial consolidada pelo Assessor Fático (Etapa 1).",
         dispositivo: stage1Json.dispositivo || "Dispositivo preliminar: aguardando confirmação da 2ª Etapa para fundamentação jurídica magistral e julgamento definitivo.",
-        closing: "Mineiros - GO, data da assinatura digital.\n\nAssessor(a) / Gabinete Judicante",
+        closing: `${(processInfo?.comarca || "Montes Claros de Goiás").replace(/^Comarca de\s+/i, "").replace(/\s*-\s*TJGO$/i, "")} - GO, data da assinatura digital.\n\nAssessor(a) / Gabinete Judicante`,
         pendingMatter: stage1Json.pendingMatter || "Análise inicial dos autos",
         proceduralPhase: proceduralPhase || "conhecimento"
     };
@@ -4734,7 +4790,7 @@ if (executionStage === 1) {
             alertasProcessuais: ["1ª Etapa concluída. Clique no botão de avanço para executar a 2ª Etapa (Fundamentação Jurídica & Dispositivo Final)."]
         },
         usage: stage1Usage,
-        modelUsed: "Gemini 3.8 Flash (1ª Etapa: Assessor Fático & Provas)",
+        modelUsed: `${(stage1Response as any)?.usedModel || "Gemini"} (1ª Etapa: Assessor Fático & Provas)`,
         indicacaoTpuCnj: sovereignTpuStage1,
         holisticSynopsis: generatedHolisticSynopsis || undefined,
         deduplicationStats: {
@@ -4783,7 +4839,7 @@ if (executionStage === 1) {
             candidateTokens: stage1Tokens.candidatesTokenCount || 0,
             charsAnalyzed: (safeProcessText.length || 0) + (accumulatedPdfText.length || 0),
             pdfCount: targetPdfFiles.length,
-            model: "gemini-3.8-flash"
+            model: (stage1Response as any)?.usedModel || "n/d"
         };
         writeJsonFile("latest_run_telemetry.json", telemetry1);
         console.log(`[TELEMETRIA AO VIVO] Etapa 1 finalizada em ${telemetry1.totalDurationSec}s (IA levou ${telemetry1.aiDurationSec}s para ${telemetry1.promptTokens} tokens de entrada e ${telemetry1.candidateTokens} tokens gerados).`);
@@ -4806,7 +4862,7 @@ if (executionStage === 1) {
 }
 
 console.log("[Assessor Judicial] Etapa 1 (Assessor Fático) concluída com êxito. Intervalo preventivo de resfriamento de cota (2.5s)...");
-await new Promise(resolve => setTimeout(resolve, 2500));
+if (executionStage !== 2) await new Promise(resolve => setTimeout(resolve, 500));      // o controle de consumo por chave já distribui a carga
 console.log("[Assessor Judicial] Disparando ETAPA 2: Juiz Revisor (Teses, Precedentes & Matriz Forense)...");
 
 const stage2Prompt = `
@@ -4844,7 +4900,7 @@ ${stage1Json.dispositivo || "(Não informado)"}
 
 ACERVO PROBATÓRIO E DOCUMENTOS RELEVANTES DOS AUTOS (CONFRONTO DIRETO COM O PDF):
 ======================================================
-${(accumulatedPdfText || safeProcessText || "").substring(0, 10000)}
+${(() => { const t = (accumulatedPdfText || safeProcessText || ""); return t.length > 14000 ? t.substring(0, 6000) + "\n\n[... trecho intermediário omitido (já analisado na Etapa 1) ...]\n\n" + t.slice(-8000) : t; })()}
 ======================================================
 
 COMANDOS PARA O JUIZ REVISOR (ETAPA 2):
@@ -5024,9 +5080,10 @@ const stage2ResponseSchema = {
 // PAUSA PREVENTIVA INTELIGENTE (Anti-Rate Limit & Recomposição de Tokens):
 // Dá um intervalo técnico de resfriamento para recomposição do bucket de tokens por minuto (TPM/RPM) no cluster do Google após o término da Etapa 1
 const isNativeActiveForCooldown = isRequestNativeAllowed(req);
-const cooldownMs = isNativeActiveForCooldown ? 2500 : 5000;
+const rawStage2KeyPoolSize = extractApiKeyPool(req).length;
+const cooldownMs = (executionStage === 2 || rawStage2KeyPoolSize > 1) ? 0 : (isNativeActiveForCooldown ? 2500 : 5000);      // com várias chaves, a etapa 2 já usa outra chave com folga
 console.log(`[Assessor Judicial] Etapa 1 concluída com sucesso. Pausa preventiva inteligente (${cooldownMs / 1000}s) para recomposição de tokens por minuto antes da Etapa 2...`);
-await new Promise(r => setTimeout(r, cooldownMs));
+if (cooldownMs > 0) await new Promise(r => setTimeout(r, cooldownMs));
 
 // ROTAÇÃO INTELIGENTE DE CHAVES ENTRE ETAPA 1 E ETAPA 2 (PREVENÇÃO DE ESTOURO DE TPM EM CHAVES GRATUITAS):
 const rawStage2KeyPool = extractApiKeyPool(req);
@@ -5046,6 +5103,7 @@ let stage2ErrorMsg = "";
 
 try {
     const stage2StartTimer = Date.now();
+    const TIMEOUT_ETAPA = Math.min(300000, 60000 + Math.ceil(estimarTokens(stage2Prompt, stage2SystemInstruction) / 10000) * 1000);
     response = await generateWithFallbackAndRetry({
         apiKey: stage2KeyPool[0] || userApiKey,
         keyPool: stage2KeyPool,
@@ -5053,8 +5111,9 @@ try {
         res,
         primaryModel: "gemini-3.8-flash",
         fallbackModel: "gemini-3.7-flash",
-        customModelQueue: ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"],      // etapa 2: profundidade primeiro; reservas mais rápidas depois
-        timeoutMs: 180000,
+        customModelQueue: ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"],      // somente Flash; profundidade primeiro, reservas mais rápidas depois
+        timeoutMs: TIMEOUT_ETAPA,
+        maxCycles: 2,
         contents: [{ role: "user", parts: [{ text: stage2Prompt }] }],
         config: {
             systemInstruction: stage2SystemInstruction,
@@ -5381,7 +5440,7 @@ const usage = (totalTotalTokens > 0 || totalPromptTokens > 0) ? {
     cachedContentTokenCount: totalCachedTokens
 } : void 0;
 parsed.usage = usage;
-parsed.modelUsed = "Gemini 3.8 Flash (Two-Stage Pipeline: Assessor Fático -> Juiz Revisor & Matriz Forense)";
+parsed.modelUsed = `${(response as any)?.usedModel || "Gemini"} (2 etapas: Assessor Fático → Juiz Revisor)`;
 parsed.currentStage = 2;
 parsed.canProceedToStage2 = false;
 parsed.holisticSynopsis = generatedHolisticSynopsis || undefined;
@@ -5514,7 +5573,7 @@ if (wasRotated && rotatedKey) {
             candidateTokens: totalCandidatesTokens || 0,
             charsAnalyzed: (safeProcessText.length || 0) + (accumulatedPdfText.length || 0),
             pdfCount: targetPdfFiles.length,
-            model: "gemini-3.8-flash"
+            model: `${(stage1Response as any)?.usedModel || "n/d"} -> ${(response as any)?.usedModel || "n/d"}`
         };
         writeJsonFile("latest_run_telemetry.json", telemetry2);
         console.log(`[TELEMETRIA AO VIVO] Execução concluída em ${telemetry2.totalDurationSec}s (Etapa 2 levou ${telemetry2.stage2DurationSec}s para ${telemetry2.candidateTokens} tokens gerados).`);
