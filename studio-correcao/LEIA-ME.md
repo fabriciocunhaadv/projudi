@@ -7,3 +7,5 @@ Dois arquivos do Assessor Judicial alterados (copie por cima dos originais, mesm
 
 ## Lupa mais rápida (`server.ts`, base: assessor-judicial-fabr_cio_5)
 - Linha 1439 (`/api/audit-assessor-draft`): `primaryModel` de `gemini-3.8-flash` para `gemini-3.1-flash-lite`. O restante do arquivo é o mesmo da versão fabr_cio_5. Se você já alterou o `server.ts` depois, aplique só essa troca de uma linha.
+- Linhas 624–625 (`/api/chat-agaia`, o chat/refino da minuta, "Assistente do Fabricio"): `primaryModel` para `gemini-3.1-flash-lite` e `fallbackModel` para `gemini-flash-latest` (antes 3.8 e 3.7).
+- O Copiloto lateral (`/api/lateral-agent-chat`, linha ~772) já usava `gemini-3.1-flash-lite`; não foi alterado.

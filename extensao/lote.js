@@ -108,6 +108,34 @@ async function lerMinutaPre(item) {
 
 window.__lerMinutaPre = lerMinutaPre;      // usado nos testes
 
+// O link do processo guardado no painel (BuscaProcesso?Id_Processo=…) expira ou fica preso à sessão: o Projudi responde “Código inválido, não foi possível validar o ID”.
+async function paginaInvalida(tabId) {
+  try { const r = await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, func: () => /C[oó]digo inv[aá]lido|n[aã]o foi poss[ií]vel validar o ID/i.test(document.body?.innerText || "") }); return r.some((x) => x.result); } catch (e) { return false; }
+}
+// Pega um link NOVO do processo na lista da serventia (a lista é da serventia ativa na sessão: escolhe a do processo antes).
+async function urlFresca(item) {
+  const dig = String(item.processo || "").replace(/\D/g, "").slice(0, 9), lista = BASE + (item.situacao === "preAnalisadas" ? "PreAnalisarConclusao?PaginaAtual=6&tipo=todas" : "PreAnalisarConclusao?PaginaAtual=2");
+  const tab = await chrome.tabs.create({ url: lista, active: false });
+  try {
+    if (item.serventiaUrl) {
+      await chrome.tabs.update(tab.id, { url: new URL(item.serventiaUrl, BASE).href }); await dorme(600);
+      await carregou(tab.id); await dorme(1200);
+      await chrome.tabs.update(tab.id, { url: lista }); await dorme(600);
+    }
+    await carregou(tab.id); await dorme(1500);
+    for (let k = 0; k < 10; k++) {
+      const r = await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, args: [dig], func: (d) => {
+        const a = [...document.querySelectorAll("a[href*='Id_Processo']")].find((x) => (x.textContent || "").replace(/\D/g, "").slice(0, 9) === d);
+        return a ? a.href : "";
+      } }).catch(() => []);
+      const h = r.map((x) => x.result).find(Boolean); if (h) return h;
+      await dorme(1000);
+    }
+    return "";
+  } finally { chrome.tabs.remove(tab.id).catch(() => {}); }
+}
+window.__urlFresca = urlFresca;      // usado nos testes
+
 async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
   const passo = (t) => { registro.push(new Date().toLocaleTimeString("pt-BR") + " " + item.processo + " — " + t); etapa(t); };
   passo("abrindo o processo");
@@ -116,6 +144,13 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
   let popup = null;
   try {
     await carregou(tab.id); await dorme(1500);
+    if (await paginaInvalida(tab.id)) {
+      passo("o link guardado do processo expirou (“Código inválido”); pegando um novo na lista");
+      const nova = await urlFresca(item);
+      if (!nova) throw new Error("o link do processo expirou e não achei o processo na lista da serventia (clique em “Verificar agora” no painel e tente de novo)");
+      await chrome.tabs.update(tab.id, { url: nova }); await carregou(tab.id); await dorme(1500);
+      if (await paginaInvalida(tab.id)) throw new Error("o Projudi recusou o link do processo (“Código inválido”)");
+    }
     passo("procurando o botão Gerar PDF");
     await chrome.storage.local.remove(["lote_fim_" + chave, "lote_prog_" + chave, "gerarpdf_pedido"]);
     let minuta = "", motivoMinuta = "";      // Lupa do Magistrado: usa a minuta que o assessor já escreveu na pré-análise
