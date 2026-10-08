@@ -312,11 +312,11 @@
       const voltou = comecou && x && !x.disabled && texto(x) === rotulo;
       // O registro aparece em “Processos Auditados” logo que a auditoria termina e some se a janela for para “Resultado & Análise”:
       // por isso confere na lista assim que a tela se acalma, antes de qualquer outra aba.
-      if (rxProc0 && comecou && !ocupado && Date.now() - desde > 3000 && Date.now() - ultimaConf > 4000) {
+      if (rxProc0 && comecou && !ocupado && Date.now() - desde > 2000 && Date.now() - ultimaConf > 3000) {
         ultimaConf = Date.now();
         botao(/^\s*Processos Auditados/i, modal)?.click(); await dorme(1200);
         const l0 = texto_();
-        if (rxProc0.test(l0)) { achouCedo = { qtd: (l0.match(/Processos Auditados\s*(\d+)/i) || [])[1] }; break; }
+        if (rxProc0.test(l0)) { achouCedo = { qtd: (l0.match(/Processos Auditados\s*(\d+)/i) || [])[1] }; botao(/^\s*Nova Auditoria\s*$/i, modal)?.click(); await dorme(500); break; }
       }
       if (voltou || (comecou && !ocupado && Date.now() - desde > 12000) || (!comecou && Date.now() - t0 > 20000)) break;
       if (Date.now() - t0 > 8 * 60000) throw new Error("a auditoria da Lupa demorou mais de 8 minutos");
@@ -330,7 +330,9 @@
       botao(/^\s*Processos Auditados/i, modal)?.click();
       await dorme(2500);
       const lista = texto_(), qtd = (lista.match(/Processos Auditados\s*(\d+)/i) || [])[1];
-      return { ok: !rxProc || rxProc.test(lista), qtd };
+      const ok = !rxProc || rxProc.test(lista);
+      if (ok) { botao(/^\s*Nova Auditoria\s*$/i, modal)?.click(); await dorme(500); }      // achou: sai da lista sem passar por “Resultado & Análise”
+      return { ok, qtd };
     };
     const reabrir = async () => {      // fecha e reabre o módulo
       (botao(/^\s*Fechar\s*$/i, modal) || modal.querySelector("button[aria-label*=echar]"))?.click();
