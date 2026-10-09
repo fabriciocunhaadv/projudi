@@ -61,3 +61,6 @@ O 503 ("alta demanda") é do **modelo**, não da chave. Agora (`generateWithFall
 - Modelo que falha em sequência (503/timeout/429 em todas as chaves) fica em resfriamento crescente (45 s → 90 s → 3 min → 6 min → 10 min) e é pulado nas próximas análises; volta ao normal no primeiro sucesso. Com isso 3.8/3.7/3.6 deixam de gastar ~1–2 min por etapa quando estão indisponíveis para suas chaves.
 - "Cumprimento de Sentença" na questão pendente não classifica mais o ato como sentença.
 - `sessionDraft.ts`: ao estourar o localStorage, limpa caches dispensáveis e salva um rascunho mínimo (sem o texto dos autos).
+
+## Fila das etapas 1 e 2 (linhas ~4559 e ~5151)
+`gemini-3.5-flash` passou a ser o 1º; reservas: 3.8 → 3.7 → 3.6 → 3.1 Flash-Lite → flash-latest. Para voltar ao 3.8 na frente, mova-o para o início da lista `customModelQueue` nessas duas linhas.

@@ -4556,7 +4556,7 @@ if (executionStage === 2 && stage1Snapshot && typeof stage1Snapshot === "object"
         res,
         primaryModel: "gemini-3.8-flash",
         fallbackModel: "gemini-3.7-flash",
-        customModelQueue: ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"],      // somente Flash; profundidade primeiro, reservas mais rápidas depois
+        customModelQueue: ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"],      // somente Flash; 3.5 primeiro (estável nas chaves); 3.8/3.7/3.6 de reserva
         timeoutMs: TIMEOUT_ETAPA,
         maxCycles: 2,
         contents: [{ role: "user", parts: stage1ContentsParts }],
@@ -5148,7 +5148,7 @@ try {
         res,
         primaryModel: "gemini-3.8-flash",
         fallbackModel: "gemini-3.7-flash",
-        customModelQueue: ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"],      // somente Flash; profundidade primeiro, reservas mais rápidas depois
+        customModelQueue: ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"],      // somente Flash; 3.5 primeiro (estável nas chaves); 3.8/3.7/3.6 de reserva
         timeoutMs: TIMEOUT_ETAPA,
         maxCycles: 2,
         contents: [{ role: "user", parts: [{ text: stage2Prompt }] }],
