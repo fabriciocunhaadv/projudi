@@ -50,3 +50,9 @@ O 503 ("alta demanda") é do **modelo**, não da chave. Agora (`generateWithFall
 - o modelo sobrecarregado fica em **resfriamento (45–60 s)** para todas as chamadas seguintes (pulado direto);
 - modelo com 429 em todas as chaves também é pulado enquanto durar a cota;
 - pausas entre chaves/modelos reduzidas (0,3–0,5 s). Contexto do processo continua integral.
+
+## Correção: papéis da Etapa 1 e da Etapa 2
+- **Etapa 1** recebe tudo o que é do gabinete: prompt temático, Caderno de Teses, Base de Conhecimento, taxonomia e Minuta Paradigma (vinculada pelo usuário no lançamento). É ela quem decide o tipo de ato (inclusive embargos).
+- **Etapa 2** só revisa: confronto com os autos, auditoria forense, súmulas/precedentes (+ grounding), coerência com a cadeia decisória e preclusão. Não recebe mais teses, paradigma, base de conhecimento nem o prompt temático (que a levava a "forçar" embargos).
+- O tipo de ato da Etapa 2 passa a ser o `actType` entregue pela Etapa 1 (log: "Etapa 2 segue o tipo de ato entregue pela Etapa 1").
+- Despacho na Etapa 2 não sai mais curto (4 a 8 parágrafos motivados).

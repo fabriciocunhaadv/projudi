@@ -3899,6 +3899,19 @@ DIRETRIZ MANDATÓRIA E SOBERANA DE APLICAÇÃO DE TODAS AS TESES NORMATIVAS NA E
 }
 
 // ETAPA 2 - System Instruction do Juiz Revisor (Teses, Precedentes Vinculantes, Paradigma & Auditoria Forense):
+// Minuta Paradigma, taxonomia e Base de Conhecimento entram na ETAPA 1 (a minuta já nasce com o estilo e as teses do gabinete)
+if (hasActiveParadigm) {
+    stage1SystemInstruction += `\n\n[ESTRUTURA DE CASO IDÊNTICO E MINUTA PARADIGMA DE REFERÊNCIA - CLONAGEM ESTRUTURAL E DE ESTILO OBRIGATÓRIA]:\nO magistrado titular e o assessor vincularam a seguinte MINUTA PARADIGMA ${paradigmModelTitle ? `("${paradigmModelTitle}")` : ""} como padrão oficial e imutável de entendimento, estilo, formatação, redação, tópicos, fundamentação integral e dispositivo para este tipo de demanda idêntica:\n"""\n${paradigmModelText}\n"""\n\nREGRAS MANDATÓRIAS DE ESPELHAMENTO DE FORMATAÇÃO, ESTILO E ENTENDIMENTO (COM ISOLAMENTO FÁTICO):\n1. REPRODUÇÃO DA TESE JURÍDICA E JURISPRUDÊNCIA DO JUIZ (PROIBIDO RESUMIR A TESE): Espelhe e copie fielmente toda a TESE JURÍDICA, legislação, precedentes, acórdãos citados, súmulas e doutrina do modelo paradigma.\n2. PROIBIÇÃO ABSOLUTA DE ALUCINAÇÃO FÁTICA E ISOLAMENTO DO MODELO (REGRA DE OURO): Descarte os fatos antigos do paradigma e utilize ESTRITAMENTE os fatos e provas reais do processo em exame narrados na Minuta Preliminar Factual da Etapa 1.\n3. ESPELHAMENTO ESTRUTURAL: Mantenha rigorosamente a divisão de tópicos e subtópicos (I - RELATÓRIO, II - FUNDAMENTAÇÃO, 1. PRELIMINAR, 2. MÉRITO, etc.) e formatação Markdown.\n4. ADOÇÃO INTEGRAL DA LINHA DECISÓRIA E DISPOSITIVO: Aplique a mesma ratio decidendi e preserve a estrutura de comandos do dispositivo.\n`;
+}
+
+if (taxonomySummary) {
+    stage1SystemInstruction += `\n\n[MAPEAMENTO TAXONÔMICO NORMATIVO & MICROSSISTEMAS]:\n${taxonomySummary}\n`;
+}
+
+if (knowledgeBaseText) {
+    stage1SystemInstruction += `\n\n[BASE DE CONHECIMENTO DO GABINETE]:\n${knowledgeBaseText}\n`;
+}
+
 let stage2SystemInstruction = SYSTEM_INSTRUCTION_FABRICIO + `
 
 DIRETRIZ DA ETAPA 2 (JUIZ REVISOR ESPECIALISTA & AUDITOR FORENSE):
@@ -3906,8 +3919,8 @@ Você é o Juiz de Direito Titular e Juiz Revisor do Gabinete.
 Você recebeu a Minuta Preliminar Factual gerada na Etapa 1 pelo Assessor Forense.
 Sua missão é:
 1. LER a Minuta Preliminar Factual com atenção máxima aos eventos probatórios da Etapa 1;
-2. CONFRONTÁ-LA com o CADERNO DE TESES DO GABINETE, as SÚMULAS VINCULANTES (STF, STJ, TNU e TJGO) e a MINUTA PARADIGMA (se ativada);
-3. REESCREVER e ADENSAR magistralmente a fundamentação ('fundamentacao') e o dispositivo ('dispositivo') aplicando as teses consolidadas do magistrado, o estilo da Minuta Paradigma e a jurisprudência vinculante, sem perder a riqueza fática da Etapa 1;
+2. CONFRONTÁ-LA com os AUTOS, a AUDITORIA FORENSE, as SÚMULAS VINCULANTES (STF, STJ, TNU e TJGO) e a COERÊNCIA COM A CADEIA DECISÓRIA DO PROCESSO. O Caderno de Teses, a Base de Conhecimento e a Minuta Paradigma já foram aplicados pela Etapa 1: PRESERVE-OS integralmente (estilo, estrutura, teses e comandos do dispositivo) e NÃO os descarte nem os substitua. O TIPO DE ATO é o definido pela Etapa 1 (campo 'actType' da minuta preliminar): mantenha-o; não converta o ato em outro tipo (ex.: embargos, despacho) por conta própria;
+3. REVISAR e ADENSAR a fundamentação ('fundamentacao') e o dispositivo ('dispositivo') corrigindo omissões, contradições e erros de fato, harmonizando com a jurisprudência vinculante, sem perder a riqueza fática nem o estilo e as teses aplicados na Etapa 1;
 4. ESTRUTURAÇÃO SUBSTANTIVA DA FUNDAMENTAÇÃO CONFORME O ATO (ART. 489 DO CPC):
    - É expressamente PROIBIDO sintetizar a fundamentação em parágrafos genéricos ou superficiais.
    - Mesmo operando sob modelos ágeis de contingência (Flash-Lite) ou chaves gratuitas, você DEVE preservar a divisão em subtópicos Markdown ('### 1. ...', '### 2. ...'), com formatação rica (negrito, itálico, citações em bloco '>' e indicação de Mov., Arq., Pág.).
@@ -3948,9 +3961,6 @@ Sua missão é:
      * Transcrever com fidelidade cirúrgica exclusivamente os telefones e DDDs informados nos autos, sem criar terceiros números ou alterar prefixos.
      * Em petições intercorrentes de localização/intimação, deliberar estritamente sobre os meios requeridos, sem repetir indevidamente ordens preclusas de pagamento sob pena de multa do art. 523 do CPC.`;
 
-if (activeTeses && typeof activeTeses === "string" && activeTeses.trim().length > 0) {
-    stage2SystemInstruction += `\n\n[CADERNO DE TESES E DIRETRIZES VINCULANTES DO GABINETE (PRIORIDADE MÁXIMA & CUMPRIMENTO OBRIGATÓRIO)]:\n${activeTeses.trim()}\n\nDIRETRIZ MANDATÓRIA SOBRE AS TESES DO GABINETE:\n- Confronte a minuta preliminar com as teses acima. Se o caso se enquadrar em qualquer tese ou enunciado do Gabinete (ex.: suspeição por foro íntimo em razão de atuação de advogada(o) ou parte específica como Tuanny Alves Carneiro - OAB/GO nº 34.196; extinção pelo pagamento do art. 924, II do CPC; alvará para levantamento sem aguardar trânsito em julgado; condenação em custas processuais e honorários advocatícios sucumbenciais de 10% pelo art. 85, § 2º; intimação em 15 dias; penhora online de custas em 20 dias pelo Provimento 58/21 da Corregedoria e protesto extrajudicial), AS TESES DO MAGISTRADO SÃO SOBERANAS E PREVALECEM OBRIGATORIAMENTE sobre entendimentos doutrinários genéricos e sobre o tipo de ato sugerido. Em caso de suspeição por foro íntimo, NUNCA gere sentença de mérito, mantendo a DECISÃO DE SUSPEIÇÃO POR FORO ÍNTIMO (art. 145, § 1º, do CPC) com remessa ao substituto legal. REESCREVA a fundamentação e o dispositivo aplicando com fidelidade estrita os comandos do magistrado adaptados aos dados dos autos.\n`;
-}
 
 if (matchedPrecedents.length > 0) {
     stage2SystemInstruction += `\n\n[ALIMENTAÇÃO AUTOMÁTICA DE SÚMULAS, TESES VINCULANTES E INFORMATIVOS (STF • STJ • TNU • TJGO)]:\n` +
@@ -3962,21 +3972,9 @@ if (liveGroundingPrecedents) {
     stage2SystemInstruction += `\n\n[PESQUISA OFICIAL AO VIVO VIA GROUNDING (TJGO • STJ • STF)]:\n${liveGroundingPrecedents}\n\nDIRETRIZ DE INCORPORAÇÃO DO GROUNDING: Incorpore os precedentes oficiais e teses atualizadas obtidos na pesquisa ao vivo acima diretamente na fundamentação jurídica.\n`;
 }
 
-if (hasActiveParadigm) {
-    stage2SystemInstruction += `\n\n[ESTRUTURA DE CASO IDÊNTICO E MINUTA PARADIGMA DE REFERÊNCIA - CLONAGEM ESTRUTURAL E DE ESTILO OBRIGATÓRIA]:\nO magistrado titular e o assessor vincularam a seguinte MINUTA PARADIGMA ${paradigmModelTitle ? `("${paradigmModelTitle}")` : ""} como padrão oficial e imutável de entendimento, estilo, formatação, redação, tópicos, fundamentação integral e dispositivo para este tipo de demanda idêntica:\n"""\n${paradigmModelText}\n"""\n\nREGRAS MANDATÓRIAS DE ESPELHAMENTO DE FORMATAÇÃO, ESTILO E ENTENDIMENTO (COM ISOLAMENTO FÁTICO):\n1. REPRODUÇÃO DA TESE JURÍDICA E JURISPRUDÊNCIA DO JUIZ (PROIBIDO RESUMIR A TESE): Espelhe e copie fielmente toda a TESE JURÍDICA, legislação, precedentes, acórdãos citados, súmulas e doutrina do modelo paradigma.\n2. PROIBIÇÃO ABSOLUTA DE ALUCINAÇÃO FÁTICA E ISOLAMENTO DO MODELO (REGRA DE OURO): Descarte os fatos antigos do paradigma e utilize ESTRITAMENTE os fatos e provas reais do processo em exame narrados na Minuta Preliminar Factual da Etapa 1.\n3. ESPELHAMENTO ESTRUTURAL: Mantenha rigorosamente a divisão de tópicos e subtópicos (I - RELATÓRIO, II - FUNDAMENTAÇÃO, 1. PRELIMINAR, 2. MÉRITO, etc.) e formatação Markdown.\n4. ADOÇÃO INTEGRAL DA LINHA DECISÓRIA E DISPOSITIVO: Aplique a mesma ratio decidendi e preserve a estrutura de comandos do dispositivo.\n`;
-}
 
-if (taxonomySummary) {
-    stage2SystemInstruction += `\n\n[MAPEAMENTO TAXONÔMICO NORMATIVO & MICROSSISTEMAS]:\n${taxonomySummary}\n`;
-}
 
-if (knowledgeBaseText) {
-    stage2SystemInstruction += `\n\n[BASE DE CONHECIMENTO DO GABINETE]:\n${knowledgeBaseText}\n`;
-}
 
-if (customPromptText && typeof customPromptText === "string" && customPromptText.trim().length > 0) {
-    stage2SystemInstruction += `\n\n[DIRETRIZES E PROMPT ATUAL SELECIONADO PELO ASSESSOR]:\n${customPromptText}\n`;
-}
 
 if (processActsSummary && typeof processActsSummary === "string" && processActsSummary.trim().length > 0) {
     stage2SystemInstruction += `\n\n[MEMÓRIA PROCESSUAL DO GABINETE • EVOLUÇÃO DOS ATOS PRÉVIOS DESTE MESMO PROCESSO]:\n${processActsSummary.trim()}\n`;
@@ -4670,6 +4668,22 @@ if (isSuspeicaoTeseMatched || isStage1DispositivoSuspeicao) {
     actTypeGuidance = buildActTypeGuidance(resolvedActType, isSaneamentoDecision);
 }
 
+// O TIPO DE ATO DA ETAPA 2 É O QUE A ETAPA 1 ENTREGOU (campo actType): a Etapa 2 não decide, por conta própria, que é embargos/despacho.
+if (!(isSuspeicaoTeseMatched || isStage1DispositivoSuspeicao || isStage1DispositivoSentenca)) {
+    const s1Tipo = String(stage1Json.actType || "").toLowerCase();
+    let tipoEtapa1 = "";
+    if (s1Tipo.includes("embargo")) tipoEtapa1 = "embargos";
+    else if (s1Tipo.includes("saneam")) { tipoEtapa1 = "decisao"; isSaneamentoDecision = true; }
+    else if (s1Tipo.includes("decis")) { tipoEtapa1 = "decisao"; isSaneamentoDecision = false; }
+    else if (s1Tipo.includes("despach")) tipoEtapa1 = "despacho";
+    else if (s1Tipo.includes("senten")) tipoEtapa1 = "sentenca";
+    if (tipoEtapa1 && tipoEtapa1 !== resolvedActType) {
+        console.log(`[Assessor Judicial] Etapa 2 segue o tipo de ato entregue pela Etapa 1: ${tipoEtapa1.toUpperCase()} (antes: ${resolvedActType.toUpperCase()}).`);
+        resolvedActType = tipoEtapa1;
+        actTypeGuidance = buildActTypeGuidance(resolvedActType, isSaneamentoDecision);
+    }
+}
+
 // Reconciliação fidedigna imediata dos metadados (CNJ do arquivo/capa e partes do Projudi) antes da Etapa 2:
 const earlyRawCaseText = [accumulatedPdfText, safeProcessText].filter(Boolean).join("\n");
 const earlyReconciled = extractProcessMetadata(stage1Json, processInfo, earlyRawCaseText, earlyRawCaseText, targetPdfFiles);
@@ -4889,8 +4903,6 @@ DADOS DO PROCESSO:
 - Tipo de Ato Requerido: ${resolvedActType === "embargos" ? "JULGAMENTO DE EMBARGOS DE DECLARAÇÃO" : resolvedActType.toUpperCase()}
 - Subtipo / Enquadramento: ${actSubtype || "Análise integral de pedidos"}
 - Diretrizes Adicionais: ${specificInstructions || "Confronto probatório e regras do TJGO."}
-${customPromptText && typeof customPromptText === "string" && customPromptText.trim().length > 0 ? `- DIRETRIZES DO PROMPT TEMÁTICO SELECIONADO: """\n${customPromptText.trim()}\n"""` : ""}
-${activeTeses && typeof activeTeses === "string" && activeTeses.trim().length > 0 ? `- CADERNO DE TESES E DIRETRIZES VINCULANTES DO GABINETE (APLICAÇÃO OBRIGATÓRIA E SOBERANA): """\n${activeTeses.trim()}\n"""` : ""}
 
 ${actTypeGuidance}
 
@@ -4918,15 +4930,16 @@ ${(() => { const t = (accumulatedPdfText || safeProcessText || ""); return t.len
 ======================================================
 
 COMANDOS PARA O JUIZ REVISOR (ETAPA 2):
-1. REVISÃO, HARMONIZAÇÃO E ADENSAMENTO MAGISTRAL (COM MINUTA PARADIGMA & SÚMULAS VINCULANTES):
+1. REVISÃO, HARMONIZAÇÃO E ADENSAMENTO MAGISTRAL (SÚMULAS VINCULANTES, AUDITORIA E COERÊNCIA DECISÓRIA):
    - Leia atentamente o Relatório e a Fundamentação Preliminar gerados na Etapa 1;
-   - Confronte com o Caderno de Teses do Gabinete, as Súmulas Vinculantes (STF, STJ, TNU e TJGO) e a Minuta Paradigma (se ativada);
-   - CLONAGEM DA MINUTA PARADIGMA: Se a Minuta Paradigma estiver ativada, espelhe rigorosamente a estrutura de tópicos, o estilo da redação, as teses e a fundamentação do modelo paradigma do juiz, aplicando estritamente as provas e fatos reais do processo da Etapa 1;
-   - SOBERANIA DAS TESES DO GABINETE NO DISPOSITIVO: Havendo no Caderno de Teses diretriz ou enunciado aplicável (como extinção pelo Art. 924, II pelo pagamento, alvará para levantamento sem aguardar trânsito em julgado, condenação em custas e honorários sucumbenciais de 10% pelo art. 85, § 2º, intimação em 15 dias, penhora online de custas pelo Provimento 58/21 da Corregedoria e protesto extrajudicial), essa diretriz prevalece obrigatoriamente sobre praxes genéricas e DEVE constar com máxima fidelidade do Dispositivo e da Fundamentação;
+   - Confronte com os autos, as Súmulas Vinculantes (STF, STJ, TNU e TJGO) e a cadeia das decisões anteriores;
+   - O Caderno de Teses, a Base de Conhecimento e a Minuta Paradigma já foram aplicados na Etapa 1: MANTENHA a estrutura, o estilo, as teses e os comandos do dispositivo da minuta preliminar, corrigindo apenas o que a auditoria apontar;
+   - TIPO DE ATO: o definido pela Etapa 1; não o altere;
+   - PRESERVAÇÃO DAS TESES NO DISPOSITIVO: Se a minuta da Etapa 1 aplicou diretriz do gabinete (como extinção pelo Art. 924, II pelo pagamento, alvará para levantamento sem aguardar trânsito em julgado, condenação em custas e honorários sucumbenciais de 10% pelo art. 85, § 2º, intimação em 15 dias, penhora online de custas pelo Provimento 58/21 da Corregedoria e protesto extrajudicial), essa diretriz prevalece obrigatoriamente sobre praxes genéricas e DEVE constar com máxima fidelidade do Dispositivo e da Fundamentação;
    - COERÊNCIA COM A MARCHA PROCESSUAL: A decisão deve ser estritamente coerente com o andamento do processo (dar continuidade às últimas decisões, resolver incidentes pendentes ou sentenciar o mérito se maduro, sem nunca regredir a liminares do início da lide);
    - Adense, expanda e formate com riqueza:
      * 'relatorio': Mínimo de 4 a 6 parágrafos substanciais e encadeados narrando toda a marcha com tríplice citação (Mov. X, Arq. Y, Pág. Z), com aspas literais nos trechos centrais;
-     * 'fundamentacao': ${resolvedActType === "decisao" ? "Mínimo de 8 a 14 parágrafos judiciais densos e analíticos estruturados em subtópicos Markdown ('### 1. ...', '### 2. ...'), enfrentando circunstanciadamente 100% dos pedidos preliminares ou urgentes pendentes de apreciação formulados pelas partes (gratuidade da justiça, fumus boni iuris, periculum in mora, e análise probatória pormenorizada de cada medida postulada com fixação de valores, percentuais, contas, obrigações de fazer/não fazer, prazos cominatórios e astreintes, além de teses vinculantes e precedentes), com transcrição literal entre aspas e tríplice localização processual (Mov. X, Arq. Y, Pág. Z);" : resolvedActType === "embargos" ? "Mínimo de 6 a 10 parágrafos judiciais densos estruturados nos subtópicos do art. 1.022 do CPC (admissibilidade/tempestividade de 5 dias úteis, exame analítico de cada vício ou omissão alegada em confronto com a decisão embargada, e precedentes dos tribunais superiores);" : resolvedActType === "despacho" ? "Fundamentação pontual e precisa indicando os motivos fáticos e legais da determinação judicial ou da emenda ordenada (art. 321 CPC);" : "Mínimo de 14 a 20+ parágrafos judiciais profundos distribuídos nos 7 blocos obrigatórios em subtópicos (### 1. a ### 7.), com transcrição literal entre aspas de trechos da exordial, contestação, laudos e parecer ministerial, além de artigos de lei e súmulas em bloco destacado (>);"}
+     * 'fundamentacao': ${resolvedActType === "decisao" ? "Mínimo de 8 a 14 parágrafos judiciais densos e analíticos estruturados em subtópicos Markdown ('### 1. ...', '### 2. ...'), enfrentando circunstanciadamente 100% dos pedidos preliminares ou urgentes pendentes de apreciação formulados pelas partes (gratuidade da justiça, fumus boni iuris, periculum in mora, e análise probatória pormenorizada de cada medida postulada com fixação de valores, percentuais, contas, obrigações de fazer/não fazer, prazos cominatórios e astreintes, além de teses vinculantes e precedentes), com transcrição literal entre aspas e tríplice localização processual (Mov. X, Arq. Y, Pág. Z);" : resolvedActType === "embargos" ? "Mínimo de 6 a 10 parágrafos judiciais densos estruturados nos subtópicos do art. 1.022 do CPC (admissibilidade/tempestividade de 5 dias úteis, exame analítico de cada vício ou omissão alegada em confronto com a decisão embargada, e precedentes dos tribunais superiores);" : resolvedActType === "despacho" ? "Mínimo de 4 a 8 parágrafos motivados, estruturados em subtópicos Markdown, indicando os motivos fáticos e legais de cada determinação (sem síntese telegráfica), com tríplice localização processual (Mov. X, Arq. Y, Pág. Z);" : "Mínimo de 14 a 20+ parágrafos judiciais profundos distribuídos nos 7 blocos obrigatórios em subtópicos (### 1. a ### 7.), com transcrição literal entre aspas de trechos da exordial, contestação, laudos e parecer ministerial, além de artigos de lei e súmulas em bloco destacado (>);"}
      * 'dispositivo': Comandos operacionais claros, discriminados pedido por pedido, com deliberação de eventuais requerimentos intercorrentes e fixação dos consectários legais da Lei 14.905/2024;
    - Preencha o cabeçalho, comarca/vara e fecho judicante oficial;
 
