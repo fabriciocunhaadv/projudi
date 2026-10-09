@@ -3,6 +3,7 @@ import { analisarNoStudio, lerMinutaAtual } from "./studio-cliente.js";
 import { criarDocumento, abrirLadoALado, lerDocumento, tipoDaMinuta, nomeDoc } from "./docs-api.js";
 import { paragrafosDeHtml } from "./docs-core.js";
 import { textoDoPdf } from "./pdf-texto.js";
+import { vigiarAcordado, conferirAcordado } from "./acordado.js";
 import { lerMinutaPre } from "./minuta-pre.js";
 const BASE = "https://projudi.tjgo.jus.br/";
 const absoluta = (u) => (u ? new URL(u, BASE).href : BASE);
@@ -195,3 +196,7 @@ setInterval(async () => {
   if (Date.now() - pulso_esteira < 25000) return;      // a aba dona está viva
   navigator.locks.request("esteira-executor", { steal: true }, assumir).catch(() => { dono = false; });
 }, 6000);
+
+// O computador não entra em espera enquanto houver processo na fila ou em análise (só a aba dona da fila dá o sinal).
+vigiarAcordado("esteira", async () => dono && (await todos()).some((i) => ["aguardando", "analisando", "recebida"].includes(i.estado)));
+setInterval(conferirAcordado, 60000);

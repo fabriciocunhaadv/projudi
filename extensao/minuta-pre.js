@@ -1,3 +1,4 @@
+import { abaProjudi } from "./aba-projudi.js";
 // Leitura da minuta que o assessor escreveu na pré-análise (botão Visualizar da Busca de Pré-Análises). Mesma lógica usada pela fila de download (lote.js),
 // aqui disponível também para a esteira (processos já baixados).
 const BASE = "https://projudi.tjgo.jus.br/";
@@ -34,7 +35,7 @@ function htmlParaTexto(html) {
 export async function lerMinutaPre(item) {
   const digitos = String(item.processo).replace(/\D/g, "").slice(0, 9), novas = [];
   const aoCriar = (t) => novas.push(t.id); chrome.tabs.onCreated.addListener(aoCriar);
-  const tab = await chrome.tabs.create({ url: BASE + "PreAnalisarConclusao?PaginaAtual=6&tipo=todas", active: false });
+  const tab = await abaProjudi(BASE + "PreAnalisarConclusao?PaginaAtual=6&tipo=todas");
   const motivo = { m: "" };
   try {
     // As listas do Projudi são da serventia ativa NA SESSÃO (e a verificação deixa a sessão na última serventia lida): escolhe a do processo antes.
@@ -83,7 +84,7 @@ export async function lerMinutaPre(item) {
     return { texto: "", motivo: "cliquei em Visualizar, mas não achei o editor com a minuta (ou ele está vazio)" };
   } finally {
     chrome.tabs.onCreated.removeListener(aoCriar);
-    for (const id of [tab.id, ...novas]) chrome.tabs.remove(id).catch(() => {});
+    for (const id of novas) if (id !== tab.id) chrome.tabs.remove(id).catch(() => {});      // só as abas que o Projudi abriu (Visualizar); a aba de trabalho fica
   }
 }
 

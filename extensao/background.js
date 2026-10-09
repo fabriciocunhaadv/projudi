@@ -215,6 +215,7 @@ chrome.runtime.onMessage.addListener((m, s, responder) => {
     const id = String(Date.now());
     chrome.storage.local.set({ ["gerar_" + id]: { url: m.url, corpo: m.corpo, nome: m.nome, pasta: m.pasta, lote: m.lote, studio: m.studio } })
       .then(() => chrome.tabs.create({ url: chrome.runtime.getURL("ocr.html?gerar=" + id), active: !m.lote }))
+      .then((aba) => { chrome.tabs.update(aba.id, { autoDiscardable: false }).catch(() => {}); return aba; })      // o Chrome não pode descartar a aba de OCR (Economia de memória) no meio do trabalho
       .then(() => responder({ ok: true }), (e) => responder({ erro: String(e.message || e) }));
     return true;
   }
