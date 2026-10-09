@@ -111,8 +111,8 @@
     return !(barra && /pointer-events-none/.test(barra.className)) && !/Aguardando Execu/i.test(texto(h.closest("div.border") || document.body));
   };
   const executando = () => { const b = document.getElementById("tour-execute-btn"); return !b || b.disabled || !/Gerar (Minuta|1ª Etapa)/i.test(texto(b)); };
-  // O app passou a vir com “Execução em 2 Etapas” ligada: o resultado sai só com a 1ª etapa e o botão muda de nome. Para a esteira (minuta completa)
-  // desliga a opção durante a análise e devolve ao que o usuário tinha.
+  // A esteira usa “Execução em 2 Etapas” (1ª etapa: assessor fático; 2ª: juiz revisor): garante a opção MARCADA durante a análise, aperta
+  // “Prosseguir para 2ª Etapa” e, no fim, devolve a caixa ao que o usuário tinha.
   const caixaDuasEtapas = () => [...document.querySelectorAll("label")].find((l) => /Execu[cç][aã]o em 2 Etapas/i.test(texto(l)) && visivel(l))?.querySelector("input[type=checkbox]");
   const prosseguirEtapa2 = () => botao(/Prosseguir para (a )?2ª Etapa/i);
 
@@ -142,8 +142,8 @@
       input.files = dt.files; input.dispatchEvent(new Event("change", { bubbles: true }));
       await esperar(() => texto(painel).includes(nome.slice(0, 18)), 20000);
     }
-    const duas = caixaDuasEtapas(); let religar = false;
-    if (duas && duas.checked) { duas.click(); religar = true; await dorme(400); }
+    const duas = caixaDuasEtapas(); let desmarcar = false;
+    if (duas && !duas.checked) { duas.click(); desmarcar = true; await dorme(400); }      // estava desmarcada: marca para a análise e desmarca depois
     try {
       const exec = await esperar(() => { const b = document.getElementById("tour-execute-btn"); return b && !b.disabled ? b : null; }, 60000);
       if (!exec) throw new Error("o botão “Gerar Minuta Judicial” não ficou disponível");
@@ -161,7 +161,7 @@
         await dorme(1000);
       }
     } finally {
-      if (religar) { const c = caixaDuasEtapas(); if (c && !c.checked) c.click(); }
+      if (desmarcar) { const c = caixaDuasEtapas(); if (c && c.checked) c.click(); }
     }
     return { ok: true, mensagem: "análise concluída", minuta: await lerMinuta(), minutaHtml: minutaHtmlDoPainel() };
   }

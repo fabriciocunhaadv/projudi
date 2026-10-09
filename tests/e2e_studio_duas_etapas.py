@@ -1,5 +1,5 @@
-"""Análise principal com o app em “Execução em 2 Etapas” (padrão novo): a extensão desliga a opção durante a análise,
-devolve ao estado do usuário e, se a 1ª etapa sair mesmo assim, aperta “Prosseguir para 2ª Etapa”."""
+"""Análise principal na esteira: a extensão deixa “Execução em 2 Etapas” MARCADA durante a análise (marca se estiver desmarcada),
+devolve a caixa ao estado do usuário e aperta “Prosseguir para 2ª Etapa” até a minuta completa."""
 import glob, os
 from pathlib import Path
 from playwright.sync_api import sync_playwright
@@ -25,8 +25,9 @@ b.onclick=()=>{ const una=ligada(); b.disabled=true; b.innerHTML='<span>Analisan
     document.getElementById('prox').onclick=function(){ this.disabled=true; this.textContent='Executando...'; setTimeout(()=>{ final() },1200) } },1500) };
 </script></body></html>"""
 
-def rodar(ctx, ligada):
+def rodar(ctx, ligada, marcada=True):
     pg = ctx.new_page(); pg.set_content(PAG)
+    if not marcada: pg.evaluate("document.getElementById('duas').checked = false; document.getElementById('tour-execute-btn').innerHTML = '<span>Gerar Minuta Judicial Completa</span>'")
     if not ligada: pg.evaluate("document.getElementById('duas').closest('label').remove()")      # sem a opção na tela: cai no botão “Prosseguir”
     pg.evaluate("window.chrome = { runtime: { onMessage: { addListener(f) { window.__ouvinte = f } } }, notifications: null, storage: { local: { set() { return Promise.resolve() } } } }")
     pg.add_script_tag(path=str(RAIZ / "studio-base.js"))
@@ -38,8 +39,12 @@ with sync_playwright() as p:
     b = p.chromium.launch(executable_path=os.environ.get("CHROMIUM_PATH") or glob.glob("/opt/pw-browsers/chromium-*/chrome-linux*/chrome")[0], args=["--no-sandbox"]); ctx = b.new_context()
     pg, r = rodar(ctx, True); print("A", r.get("ok"), r.get("erro"))
     assert r["ok"] and "COMPLETA" in r["minuta"], r
-    assert pg.evaluate("window.cliques") == [False, True], pg.evaluate("window.cliques")      # desligou e religou
+    assert pg.evaluate("window.cliques") == [], pg.evaluate("window.cliques")      # já estava marcada: não mexe
     assert pg.evaluate("document.getElementById('duas').checked") is True
+    pg, r = rodar(ctx, True, marcada=False); print("C", r.get("ok"), r.get("erro"))
+    assert r["ok"] and "COMPLETA" in r["minuta"], r
+    assert pg.evaluate("window.cliques") == [True, False], pg.evaluate("window.cliques")      # marcou para a análise e devolveu desmarcada
+    assert pg.evaluate("document.getElementById('duas').checked") is False
     pg, r = rodar(ctx, False); print("B", r.get("ok"), r.get("erro"))
     assert r["ok"] and "COMPLETA" in r["minuta"], r
     b.close()
