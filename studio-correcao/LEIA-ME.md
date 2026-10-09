@@ -64,3 +64,6 @@ O 503 ("alta demanda") é do **modelo**, não da chave. Agora (`generateWithFall
 
 ## Fila das etapas 1 e 2 (linhas ~4559 e ~5151)
 `gemini-3.5-flash` passou a ser o 1º; reservas: 3.8 → 3.7 → 3.6 → 3.1 Flash-Lite → flash-latest. Para voltar ao 3.8 na frente, mova-o para o início da lista `customModelQueue` nessas duas linhas.
+
+## Tempo limite das etapas 1 e 2
+Autos grandes (≈195 mil tokens) levam ~75–90 s no 3.5; o limite antigo (78 s) cortava a chamada quase no fim e refazia tudo na outra chave (152 s no total). Agora: 100 s + 3 s por 10 mil tokens (≈160 s para 195 mil; máx. 300 s). "Aborted/fetch failed" passam a ser tratados como timeout (resfriam o modelo corretamente).
