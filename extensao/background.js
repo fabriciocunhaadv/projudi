@@ -208,7 +208,7 @@ chrome.runtime.onMessage.addListener((m, s, responder) => {
   if (m?.acao === "minha-aba") { responder({ tabId: s.tab ? s.tab.id : null }); return false; }
   if (m?.acao === "esteira-abrir") {       // garante a aba que roda a fila de minutas
     const url = chrome.runtime.getURL("esteira.html");
-    chrome.tabs.query({ url }).then((abas) => (abas.length ? abas[0] : chrome.tabs.create({ url, active: false }))).then(() => responder({ ok: true }), (e) => responder({ ok: false, erro: String(e.message || e) }));
+    chrome.runtime.getContexts({ contextTypes: ["TAB"] }).then((cs) => (cs.some((c) => (c.documentUrl || "").startsWith(url)) ? null : chrome.tabs.create({ url, active: false }))).then(() => responder({ ok: true }), (e) => responder({ ok: false, erro: String(e.message || e) }));
     return true;
   }
   if (m?.acao === "gerar-pdf-interceptar") { // a janela "Gerar PDF" entregou o pedido: a extensão busca o PDF, faz OCR e salva

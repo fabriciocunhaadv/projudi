@@ -155,7 +155,7 @@
         if (e && repetirSePassageiro(rep, e, () => { const b = document.getElementById("tour-execute-btn"); if (b && !b.disabled && /Gerar (Minuta|1ª Etapa)/i.test(texto(b))) b.click(); })) { await dorme(1000); continue; }
         if (e) throw new Error("o app avisou: " + e);
         const pro = prosseguirEtapa2();      // se a 1ª etapa saiu mesmo assim, segue para a 2ª (minuta completa)
-        if (ate1 && pro && !executando() && resultadoPronto()) break;      // esteira automática: a 1ª etapa concluída já basta (a minuta fica no histórico do app); o próximo processo segue
+        if (ate1 && pro && resultadoPronto()) break;      // esteira automática: a 1ª etapa concluída já basta (a minuta fica no histórico do app); o próximo processo segue
       if (pro && !pro.disabled && !rep.etapa2) { rep.etapa2 = pro; pro.click(); await dorme(1500); continue; }
       if (!executando() && resultadoPronto() && !prosseguirEtapa2() && !(rep.etapa2 && rep.etapa2.isConnected)) break;      // com a 2ª etapa em curso o botão fica na tela (“Executando…”) até terminar
         if (Date.now() - t0 > 20 * 60000) throw new Error("a análise demorou mais de 20 minutos");
@@ -576,6 +576,6 @@
       };
     } catch (e) { /* extensão recarregada: esta cópia do script morreu */ }
   }
-  setInterval(atualizarBotao, 2500);
-  atualizarBotao();
+  // A esteira é automática: a caixa “Enviar a minuta aberta aqui…” não aparece mais (a recuperação manual fica na própria página da esteira).
+  void atualizarBotao;
 })();

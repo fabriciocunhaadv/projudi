@@ -157,14 +157,32 @@ setInterval(passo, 3000);
 async function assumir(lock) {
   if (!lock) return;
   dono = true;
-  for (const it of await todos()) if (it.estado === "analisando") await atualizar(it.id, { estado: "pausado", rodada: 0 });     // a aba anterior foi fechada no meio da análise: o usuário escolhe (a minuta pode já estar no Studio)
+  for (const it of await todos()) if (it.estado === "analisando" || it.estado === "pausado") await atualizar(it.id, { estado: "aguardando", rodada: 0, erro: "" });     // a aba anterior foi fechada no meio da análise: a fila retoma de onde parou (o processo interrompido volta ao início da fila)
   document.body.dataset.executor = "1";
   const pulsar = () => chrome.storage.local.set({ pulso_esteira: Date.now() }).catch(() => {});
   pulsar(); setInterval(pulsar, 4000);
   await desenhar(); passo();
   await new Promise(() => {});      // segura o bloqueio enquanto a aba existir
 }
-navigator.locks.request("esteira-executor", { ifAvailable: true }, async (lock) => { if (!lock) desenhar(); return assumir(lock); }).catch(() => { dono = false; });
+// Uma única aba da esteira: se já existe uma viva (pulso recente), esta se fecha e a existente vem à frente; abas antigas sem sinal de vida são fechadas.
+async function umaSoAba() {
+  try {
+    const eu = await chrome.tabs.getCurrent(); if (!eu) return false;
+    const url = chrome.runtime.getURL("esteira.html");      // (tabs.query por URL não enxerga páginas da própria extensão sem a permissão "tabs": usa getContexts)
+    const outras = (await chrome.runtime.getContexts({ contextTypes: ["TAB"] })).filter((c) => (c.documentUrl || "").startsWith(url) && c.tabId !== eu.id).map((c) => ({ id: c.tabId, windowId: c.windowId }));
+    if (!outras.length) return false;
+    const { pulso_esteira = 0 } = await chrome.storage.local.get("pulso_esteira");
+    if (Date.now() - pulso_esteira < 25000) {
+      await chrome.tabs.update(outras[0].id, { active: true }).catch(() => {}); chrome.windows.update(outras[0].windowId, { focused: true }).catch(() => {});
+      await chrome.tabs.remove(eu.id); return true;
+    }
+    for (const x of outras.filter((o) => o.id < eu.id)) await chrome.tabs.remove(x.id).catch(() => {});      // abas antigas/travadas
+  } catch (e) { /* segue como aba normal */ }
+  return false;
+}
+umaSoAba().then((fechou) => { if (fechou) return;
+  navigator.locks.request("esteira-executor", { ifAvailable: true }, async (lock) => { if (!lock) desenhar(); return assumir(lock); }).catch(() => { dono = false; });
+});
 setInterval(async () => {
   if (dono) return;
   const { pulso_esteira = 0 } = await chrome.storage.local.get("pulso_esteira").catch(() => ({}));
