@@ -36,3 +36,9 @@ Arquivos (copie por cima, mesmos caminhos):
 Mudança manual em `src/App.tsx` (linha ~381): `const timer = setInterval(fetchHistory, 10000);` → `const timer = setInterval(fetchHistory, 60000);` (cada leitura do histórico é uma leitura completa do Firestore).
 Limpeza imediata no navegador (F12 → Console) — só o cache do histórico, que o Firestore reconstrói:
 `Object.keys(localStorage).filter(k=>k.startsWith('assessor_fabricio_history_cache_')).forEach(k=>localStorage.removeItem(k))`
+
+## Menos navegador, mais Firestore (histórico)
+- `src/lib/firebase.ts`: o Firestore passa a usar cache persistente próprio (IndexedDB, sem o limite de ~5 MB do localStorage) com várias abas (`persistentLocalCache` + `persistentMultipleTabManager`). Se o navegador não suportar, cai no `getFirestore` de antes.
+- `src/utils/historyDb.ts`: com usuário logado, o histórico NÃO é mais gravado no localStorage (só sem login). Substitui a versão anterior deste arquivo.
+- `src/lib/firestoreUtils.ts`: `getHistoryFromDb` lê só as 200 análises mais recentes de cada coleção (`orderBy('date','desc')`, `limit(200)`), em vez da coleção inteira a cada consulta (antes: a cada 10 s, até 4 coleções). Análises antigas sem o campo `date` ficam de fora da lista.
+- Continua valendo: trocar o `setInterval(fetchHistory, 10000)` do `App.tsx` por 60000 (ou usar `onSnapshot`).

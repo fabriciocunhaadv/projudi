@@ -207,8 +207,7 @@ export const getHistory = async (): Promise<SavedAnalysis[]> => {
       const dbList = await getHistoryFromDb();
       // Filter out tombstones and corrupted entries immediately
       const cleanList = filterAndPrune(dbList);
-      // Update local cache to match Firestore exactly, removing any ghosts deleted on another device
-      saveLocalHistory(cleanList);
+      // Logado: o Firestore (com cache em IndexedDB) é a fonte única; NÃO grava no localStorage (limite ~5 MB).
       return cleanList;
     } catch (err) {
       console.warn("Could not fetch history from DB, falling back to local cache:", err);
@@ -234,7 +233,8 @@ export const saveToHistory = async (analysis: SavedAnalysis): Promise<void> => {
     console.warn("Could not save history to Firestore DB:", err);
   }
 
-  // 2. Persist to LocalStorage cache
+  // 2. Persist to LocalStorage cache — só sem login (logado, o Firestore + cache IndexedDB já guardam tudo)
+  if (auth.currentUser) return;
   const localList = getLocalHistory();
   const existingIdx = localList.findIndex((item) => item.id === analysis.id);
   let updatedList: SavedAnalysis[];
