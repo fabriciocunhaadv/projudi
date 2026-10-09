@@ -42,3 +42,11 @@ Limpeza imediata no navegador (F12 → Console) — só o cache do histórico, q
 - `src/utils/historyDb.ts`: com usuário logado, o histórico NÃO é mais gravado no localStorage (só sem login). Substitui a versão anterior deste arquivo.
 - `src/lib/firestoreUtils.ts`: `getHistoryFromDb` lê só as 200 análises mais recentes de cada coleção (`orderBy('date','desc')`, `limit(200)`), em vez da coleção inteira a cada consulta (antes: a cada 10 s, até 4 coleções). Análises antigas sem o campo `date` ficam de fora da lista.
 - Continua valendo: trocar o `setInterval(fetchHistory, 10000)` do `App.tsx` por 60000 (ou usar `onSnapshot`).
+
+## Correção: Etapa 1 demorando (503 em cascata)
+No log, cada modelo testava as 6 chaves (~15–50 s cada) antes de passar ao próximo, gastando 4+ min.
+O 503 ("alta demanda") é do **modelo**, não da chave. Agora (`generateWithFallbackAndRetry`):
+- 503/timeout: tenta no máximo **2 chaves** por modelo e passa ao próximo;
+- o modelo sobrecarregado fica em **resfriamento (45–60 s)** para todas as chamadas seguintes (pulado direto);
+- modelo com 429 em todas as chaves também é pulado enquanto durar a cota;
+- pausas entre chaves/modelos reduzidas (0,3–0,5 s). Contexto do processo continua integral.

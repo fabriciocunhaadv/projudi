@@ -2107,6 +2107,9 @@ const TPM_PADRAO = Number(process.env.FREE_TPM_LIMIT || 1_000_000);     // model
 const tpmDe = (m: string) => Math.floor((TPM_POR_MODELO[m] || TPM_PADRAO) * 0.85);      // 15% de margem
 const usoJanela: Map<string, { t: number; n: number }[]> = ((globalThis as any).__usoTokens ||= new Map());
 const cotaAte: Map<string, number> = ((globalThis as any).__cotaAte ||= new Map());
+const modeloAte: Map<string, number> = ((globalThis as any).__modeloAte ||= new Map());      // modelo sobrecarregado (503/timeout): vale para todas as chaves
+const modeloBloqueado = (m: string, pool: string[]) =>
+    (modeloAte.get(m) || 0) > Date.now() || (pool.length > 0 && pool.every(k => (cotaAte.get(k + "|" + m) || 0) > Date.now()));
 const usadoNoMinuto = (k: string, m: string) => {
     const a = (usoJanela.get(k + "|" + m) || []).filter(x => Date.now() - x.t < 60000);
     usoJanela.set(k + "|" + m, a);
@@ -2219,7 +2222,14 @@ async function generateWithFallbackAndRetry(options) {
         // assegurando que cotas isoladas por modelo não impeçam o assessor de concluir a minuta com sucesso!
         for (let mIdx = 0; mIdx < modelsToTry.length; mIdx++) {
             const modelName = modelsToTry[mIdx];
+            // Modelo em resfriamento (503 recente ou todas as chaves em 429): pula direto, a menos que seja a última opção
+            const restantes = modelsToTry.slice(mIdx + 1).some(m => !modeloBloqueado(m, keyPool));
+            if (modeloBloqueado(modelName, keyPool) && restantes) {
+                console.log(`[Assessor Judicial - Esteira] ${modelName} em resfriamento; pulando para o próximo modelo.`);
+                continue;
+            }
             keyPool = await prepararChaves(keyPool, modelName, estTokensChamada);      // chave com mais folga primeiro
+            let falhasDemanda = 0;      // 503/timeouts neste modelo: 503 é do modelo, não da chave
 
             for (let kIdx = 0; kIdx < keyPool.length; kIdx++) {
                 const currentKey = keyPool[kIdx];
@@ -2357,14 +2367,14 @@ async function generateWithFallbackAndRetry(options) {
                         const mr = errMsg.match(/retry in ([\d.]+)s/i) || errMsg.match(/"retryDelay":\s*"(\d+)s"/i);
                         cotaAte.set(currentKey + "|" + modelName, Date.now() + (mr ? Math.ceil(Number(mr[1])) * 1000 : 60000));
                         if (kIdx < keyPool.length - 1) {
-                            console.log(`[Assessor Judicial - FAILOVER AUTOMÁTICO DE COTA] Cota da chave ${kIdx + 1}/${keyPool.length} esgotada no modelo ${modelName}. Pausa suave (1.5s) e alternando para chave reserva ${kIdx + 2}/${keyPool.length}...`);
-                            await new Promise(r => setTimeout(r, 1500));
+                            console.log(`[Assessor Judicial - FAILOVER AUTOMÁTICO DE COTA] Cota da chave ${kIdx + 1}/${keyPool.length} esgotada no modelo ${modelName}. Alternando para chave reserva ${kIdx + 2}/${keyPool.length}...`);
+                            await new Promise(r => setTimeout(r, 300));
                             continue; // Tenta a próxima chave cadastrada do usuário no mesmo modelo
                         } else {
                             // Todas as chaves do pool atingiram a cota neste modelo:
                             if (mIdx < modelsToTry.length - 1) {
-                                console.log(`[Assessor Judicial - TRANSIÇÃO DA ESTEIRA] Todas as ${keyPool.length} chaves cadastradas atingiram a cota no modelo ${modelName}. Pausa de recomposição (3.5s) e transicionando para o próximo modelo: ${modelsToTry[mIdx + 1]}...`);
-                                await new Promise(r => setTimeout(r, 3500));
+                                console.log(`[Assessor Judicial - TRANSIÇÃO DA ESTEIRA] Todas as ${keyPool.length} chaves cadastradas atingiram a cota no modelo ${modelName}. Transicionando para o próximo modelo: ${modelsToTry[mIdx + 1]}...`);
+                                await new Promise(r => setTimeout(r, 500));
                                 break; // Avança ao próximo modelo da esteira
                             } else {
                                 // Último modelo de todas as chaves: pausa preventiva para recomposição
@@ -2379,13 +2389,17 @@ async function generateWithFallbackAndRetry(options) {
                         if (activeConfig && activeConfig.responseSchema) {
                             delete activeConfig.responseSchema;
                         }
-                        if (kIdx < keyPool.length - 1) {
-                            console.log(`[Assessor Judicial - 503/Fila Failover] Oscilação na chave ${kIdx + 1}/${keyPool.length}. Tentando chave reserva ${kIdx + 2}/${keyPool.length}...`);
-                            await new Promise(r => setTimeout(r, 1000));
+                        falhasDemanda++;
+                        const maxTentativas = Math.min(2, keyPool.length);      // 503 é do modelo: no máximo 2 chaves por modelo
+                        if (falhasDemanda < maxTentativas && kIdx < keyPool.length - 1) {
+                            console.log(`[Assessor Judicial - 503/Fila Failover] Tentando mais uma chave (${kIdx + 2}/${keyPool.length}) no mesmo modelo...`);
+                            await new Promise(r => setTimeout(r, 500));
                             continue;
-                        } else if (mIdx < modelsToTry.length - 1) {
-                            console.log(`[Assessor Judicial - Pausa Inteligente & Transição de Modelo] ${statusReason} em ${modelName}. Executando pausa preventiva (1.2s) e acionando o próximo modelo: ${modelsToTry[mIdx + 1]}...`);
-                            await new Promise(r => setTimeout(r, 1200));
+                        }
+                        modeloAte.set(modelName, Date.now() + (isTimeout ? 60000 : 45000));      // resfria o modelo para as próximas chamadas
+                        if (mIdx < modelsToTry.length - 1) {
+                            console.log(`[Assessor Judicial - Transição de Modelo] ${statusReason} em ${modelName}. Acionando o próximo modelo: ${modelsToTry[mIdx + 1]}...`);
+                            await new Promise(r => setTimeout(r, 300));
                             break;
                         }
                     }
