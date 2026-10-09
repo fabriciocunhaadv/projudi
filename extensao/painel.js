@@ -123,7 +123,6 @@ function desenhar() {
       `<label class="radio"><input type="radio" name="modoStudio" data-modo="analise" ${opcoes.modo === "analise" ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> Análise dos processos (Gerar Minuta Judicial)</label>` +
       `<label class="radio"><input type="radio" name="modoStudio" data-modo="lupa" ${opcoes.modo === "lupa" ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> Lupa do Magistrado <small>(pega a minuta do assessor em “Visualizar” das pré-analisadas, sobe os autos na Lupa e clica em Auditar)</small></label>` +
       `<label class="radio"><input type="radio" name="modoStudio" data-modo="turbo" ${opcoes.modo === "turbo" ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> ⚡ Análise Turbo <small>(Módulo Turbo Independente: anexa o PDF com OCR, Auto-detectar, e gera)</small></label>` +
-      `<label><input type="checkbox" data-op="docs" ${opcoes.docs ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> Depois da minuta pronta, <b>abrir no Google Docs</b> (“número – tipo”, padrão monografia) ao lado do PDF baixado</label><br>` +
       `<label>Enviar os autos ao Studio como: <select data-entrada ${opcoes.studio ? "" : "disabled"}><option value="pdf" ${entradaStudio === "pdf" ? "selected" : ""}>PDF (arquivo completo)</option><option value="txt" ${entradaStudio === "txt" ? "selected" : ""}>texto extraído do PDF com OCR (mais rápido)</option></select> <small>(o .txt de cada processo também é salvo ao lado do PDF)</small></label></div>`;
     h += `<p><button id="baixarLote" ${fila2.length ? "" : "disabled"}>⬇ Baixar PDFs dos ${fila2.length} processo(s)</button> <small>Ordem da fila: “${esc(Ordenar.MODOS[$("modo").value])}”. Cada processo gera <b>número-OCR.pdf</b>.</small></p></div>`;
     window.__candidatos = fila2;
@@ -216,7 +215,7 @@ function csv() {
     if (!fila.length) return;
     const hoje = new Date().toISOString().slice(0, 10), id = String(Date.now());
     const itens = fila.map((p) => ({ processo: p.processo, url: p.url, classificador: nomeCls(p), serventia: p.serventia, situacao: p.tipo, urlPre: p.urlPre || "", serventiaUrl: p.serventiaUrl || "", arquivoModelos: automacao[p.serventia]?.arquivoModelos || "", prompt: automacao[p.serventia]?.prompt || "", pasta: `Projudi/${hoje}/${[p.serventia, nomeCls(p)].map((x) => String(x).replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60).replace(/[\s.]+$/g, "")).join("/")}` }));
-    await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/" + hoje, opcoes: { atualizarBase: opcoes.atualizarBase, studio: { ativo: opcoes.studio, modo: opcoes.modo, docs: opcoes.docs } } } });
+    await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/" + hoje, opcoes: { atualizarBase: opcoes.atualizarBase, studio: { ativo: opcoes.studio, modo: opcoes.modo, docs: false } } } });
     chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + id) });
   });
   $("csv").onclick = csv;

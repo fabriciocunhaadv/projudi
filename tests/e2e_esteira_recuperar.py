@@ -17,7 +17,7 @@ with sync_playwright() as p:
       await chrome.storage.sync.set({ automacao: { [s]: { ativa: true, prompt: 'Outros Área Judicial - Cível' } } }); }""", SERV)
     pg = ctx.new_page(); pg.goto(f"chrome-extension://{sw.url.split('/')[2]}/esteira.html"); pg.wait_for_selector("body[data-executor='1']", timeout=15000)
     pg.evaluate("document.getElementById('importar').open = true")
-    pg.select_option("#impModo", "turbo"); pg.uncheck("#impDocs")
+    pg.select_option("#impModo", "turbo")
     pg.set_input_files("#impArq", [str(a)]); pg.wait_for_timeout(1500)
     print(pg.inner_text("#impMsg"))
     pg.select_option("#impModo", "lupa")        # 6006074.21 é "não analisada": sem minuta do assessor -> entra na fila com o motivo

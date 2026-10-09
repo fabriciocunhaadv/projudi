@@ -10,17 +10,10 @@ const absoluta = (u) => (u ? new URL(u, BASE).href : BASE);
 const $ = (id) => document.getElementById(id), esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 let dono = false, ocupado = false;
 
-// Com a minuta em mãos: cria o Google Docs e abre ao lado do PDF; o item passa a "conferindo".
+// Com a minuta em mãos: o item passa a "conferindo" (o botão "Terminei a conferência" cadastra no Projudi). Não abre mais o Google Docs.
 async function entregar(it, bytes, minuta, mensagem, html = "") {
-  if (it.modo === "lupa" || it.modo === "turbo" || !it.docs) return atualizar(it.id, { estado: it.modo === "lupa" || it.modo === "turbo" ? "concluido" : "conferindo", minuta: minuta || "", tipo: tipoDaMinuta(minuta), aviso: mensagem });
-  if (!minuta) throw new Error("o Studio concluiu, mas não consegui ler a minuta gerada");
-  const tipo = tipoDaMinuta(minuta), titulo = nomeDoc(it.processo, tipo), ps = html ? paragrafosDeHtml(html) : null, doc = await criarDocumento(titulo, minuta, ps && ps.length ? ps : null);
-  const urlPdf = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
-  const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig");
-  const abas = await abrirLadoALado(doc.url, urlPdf, esteiraConfig.abrirEm || "abas");
-  const aviso = doc.via === "colar" ? "Sem o login do Google configurado, a extensão cola a minuta no documento (sem a configuração de página de monografia). Se o documento ficar em branco, use o botão da barra azul." : "";
-  chrome.notifications?.create({ type: "basic", iconUrl: "icone.png", title: "Minuta pronta para conferência", message: `${it.processo} — ${tipo}: Google Docs e PDF abertos.` });
-  await atualizar(it.id, { estado: "conferindo", minuta, minutaHtml: html, tipo, titulo, docUrl: doc.url, via: doc.via, abas: { ...abas, janelas: (esteiraConfig.abrirEm || "abas") === "janelas" }, aviso, htmlColar: doc.html || "", colado: false, inserido: false });
+  const fim = it.modo === "lupa" || it.modo === "turbo";
+  return atualizar(it.id, { estado: fim ? "concluido" : "conferindo", minuta: minuta || "", tipo: tipoDaMinuta(minuta), aviso: mensagem });
 }
 
 async function analisar(it) {
@@ -115,10 +108,9 @@ $("linhas").addEventListener("click", async (ev) => {
   if (a === "projudi") { const it = (await todos()).find((x) => x.id === id), t = await chrome.tabs.create({ url: absoluta(it.urlPre || it.url) }); await atualizar(id, { abas: { ...(it.abas || {}), projudi: t.id } }); }
   passo();
 });
-chrome.storage.sync.get("esteiraConfig").then(({ esteiraConfig = {} }) => { $("abrirEm").value = esteiraConfig.abrirEm || "abas"; $("entrada").value = esteiraConfig.entrada || "pdf"; $("continuo").checked = esteiraConfig.continuo !== false; });
+chrome.storage.sync.get("esteiraConfig").then(({ esteiraConfig = {} }) => { $("entrada").value = esteiraConfig.entrada || "pdf"; $("continuo").checked = esteiraConfig.continuo !== false; });
 $("continuo").onchange = async () => { const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig"); chrome.storage.sync.set({ esteiraConfig: { ...esteiraConfig, continuo: $("continuo").checked } }); passo(); };
 $("entrada").onchange = async () => { const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig"); chrome.storage.sync.set({ esteiraConfig: { ...esteiraConfig, entrada: $("entrada").value } }); };
-$("abrirEm").onchange = async () => { const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig"); chrome.storage.sync.set({ esteiraConfig: { ...esteiraConfig, abrirEm: $("abrirEm").value } }); };
 // Recuperação: coloca na fila PDFs "número-OCR.pdf" que já estão no computador (a fila foi perdida ou os PDFs vieram de fora).
 chrome.storage.sync.get("automacao").then(({ automacao = {} }) => {
   const prompts = [...new Set(Object.values(automacao).map((a) => a.prompt).filter(Boolean))];
@@ -126,7 +118,7 @@ chrome.storage.sync.get("automacao").then(({ automacao = {} }) => {
   if (prompts.length === 1) $("impPrompt").value = prompts[0];
 });
 $("impArq").onchange = async () => {
-  const modo = $("impModo").value, promptDigitado = $("impPrompt").value.trim(), docs = $("impDocs").checked && modo === "analise", arqs = [...$("impArq").files];
+  const modo = $("impModo").value, promptDigitado = $("impPrompt").value.trim(), docs = false, arqs = [...$("impArq").files];
   const { estado } = await chrome.storage.local.get("estado"), { automacao = {} } = await chrome.storage.sync.get("automacao");
   const k = (x) => String(x || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s*-\s*go\s*$/, "").trim();
   // procura o processo (pelos 9 primeiros dígitos) entre os que o painel já conhece: traz serventia, links e prompt cadastrado

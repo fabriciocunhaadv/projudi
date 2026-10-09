@@ -105,7 +105,7 @@
     botaoTodos.onclick = async () => {
       const c = await contexto(), { opcoesLote: o = {} } = await chrome.storage.sync.get("opcoesLote");
       const seguir = !!o.studio && o.modo !== "lupa";
-      const r = await executar({ ...modoDoBotao(), processo: c.cnj, studio: seguir ? { ativo: true, modo: "analise", prompt: c.prompt, tipo: "", minuta: "", url: c.url, urlPre: "", docs: !!o.docs } : null });
+      const r = await executar({ ...modoDoBotao(), processo: c.cnj, studio: seguir ? { ativo: true, modo: "analise", prompt: c.prompt, tipo: "", minuta: "", url: c.url, urlPre: "", docs: false } : null });
       msg(r.erro ? "✖ " + r.erro : r.interceptado ? `PDF pedido (${r.arquivos} arquivo(s) em ${r.movimentacoes} movimentação(ões)); a extensão faz o OCR e salva em Downloads.${seguir ? " Depois segue para a esteira de minutas (Studio)" + (c.cnj ? " — " + c.cnj : "") + (c.prompt ? ", prompt: " + c.prompt : " — prompt não definido (atualize a tela do processo)") + "." : ""}` : "Gerando o PDF do Projudi…");
     };
     const botaoTurbo = sh.querySelector('[data-a="turbo"]');

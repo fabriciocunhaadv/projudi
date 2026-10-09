@@ -14,7 +14,7 @@ with sync_playwright() as p:
     eid = sw.url.split("/")[2]
     pg = ctx.new_page(); pg.goto(f"chrome-extension://{eid}/esteira.html"); pg.wait_for_selector("body[data-executor='1']", timeout=15000)
     pg.evaluate("document.getElementById('importar').open = true")
-    pg.fill("#impPrompt", "Outros Área Judicial - Família e Sucessões"); pg.uncheck("#impDocs")
+    pg.fill("#impPrompt", "Outros Área Judicial - Família e Sucessões")
     pg.set_input_files("#impArq", [str(a), str(b), str(c)]); pg.wait_for_timeout(1500)
     print(pg.inner_text("#impMsg"))
     assert "2 processo(s)" in pg.inner_text("#impMsg")
