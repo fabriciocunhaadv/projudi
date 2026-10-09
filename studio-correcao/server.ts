@@ -4824,7 +4824,7 @@ if (executionStage === 1) {
         };
         let history = readJsonFile("history.json", []);
         history.unshift(serverAnalysisItem);
-        if (history.length > 1e3) { history = history.slice(0, 1e3); }
+        if (history.length > 300) { history = history.slice(0, 300); }
         writeJsonFile("history.json", history);
         console.log(`[Storage] Análise 1ª Etapa ${generatedId} (${procNum}) gravada no histórico compartilhado.`);
         parsedStage1.analysisId = generatedId;
@@ -5512,7 +5512,7 @@ if (wasRotated && rotatedKey) {
         };
         let history=readJsonFile("history.json",[]);
         history.unshift(serverAnalysisItem);
-        if(history.length>1e3){history=history.slice(0,1e3)}
+        if(history.length>300){history=history.slice(0,300)}
         writeJsonFile("history.json",history);
         console.log(`[Storage] Análise 2 etapas ${generatedId} (${processNum}) gravada para ${reqUserEmail || 'anônimo'} no histórico compartilhado. Total: ${history.length}`);
         parsed.analysisId = generatedId;

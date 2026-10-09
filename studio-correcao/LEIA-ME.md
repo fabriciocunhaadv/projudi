@@ -25,3 +25,14 @@ Base: assessor-judicial-fabr_cio_5 + todas as alterações combinadas. Principai
 - Padrão geral (Mesa de Audiências, Mutirão): 3.1 primeiro, depois 3.8, 3.7, 3.6, 3.5, latest, lite.
 - Grounding com 3.1 Lite. Rótulos mostram o modelo realmente usado (`usedModel`).
 - Ajuste os limites de `TPM_POR_MODELO` ao painel de cada projeto (valores atuais: Flash 3M/min, Lite 10M/min; margem de 15%). Para chaves gratuitas com limite menor, defina `FREE_TPM_LIMIT` no ambiente (vale só para modelos fora da tabela) ou reduza a tabela.
+
+## Cota do localStorage estourando (logs `[safeStorage] Storage quota reached`)
+Causa: `saveLocalHistory` gravava até 50 análises COMPLETAS (com auditoria, sinopse e textos) numa única chave; `getHistory` roda a cada 10 s (App.tsx) e relê o Firestore inteiro e tenta regravar sempre. O mesmo estouro derruba o rascunho da sessão e já havia derrubado as auditorias da Lupa no navegador.
+Arquivos (copie por cima, mesmos caminhos):
+- `src/utils/historyDb.ts`: cache local enxuto (20 itens, sem auditoria/sinopse/textos dos autos, teto de ~0,9 MB), não regrava se nada mudou e, se estourar, para por 5 minutos (o Firestore continua sendo a fonte da verdade).
+- `src/utils/safeStorage.ts`: avisos no console no máximo 1 vez por minuto por chave; ao estourar a cota, também limpa os caches de histórico (reconstruíveis).
+- `src/utils/sessionDraft.ts`: rascunho com teto de 400 mil caracteres; se não couber, remove o antigo em vez de ficar falhando.
+- `server.ts`: `history.json` do servidor limitado a 300 análises (era 1000, lido/gravado inteiro a cada análise).
+Mudança manual em `src/App.tsx` (linha ~381): `const timer = setInterval(fetchHistory, 10000);` → `const timer = setInterval(fetchHistory, 60000);` (cada leitura do histórico é uma leitura completa do Firestore).
+Limpeza imediata no navegador (F12 → Console) — só o cache do histórico, que o Firestore reconstrói:
+`Object.keys(localStorage).filter(k=>k.startsWith('assessor_fabricio_history_cache_')).forEach(k=>localStorage.removeItem(k))`
