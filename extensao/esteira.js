@@ -30,7 +30,13 @@ async function analisar(it) {
     const r = await analisarNoStudio(bytes, { nome: it.pdfNome, prompt: it.prompt, modo: it.modo, tipo: "", processo: it.processo, minuta: it.minutaAssessor, motivoMinuta: it.motivoMinuta, texto, ate1: it.modo === "analise" });
     if (!(await valida())) return;
     await entregar(it, bytes, r.minuta, r.mensagem, r.minutaHtml || "");
-  } catch (e) { if (await valida()) await atualizar(it.id, { estado: "erro", erro: e.message }); }
+  } catch (e) {
+    if (await valida()) {      // esteira automática: uma nova tentativa sozinha antes de dar erro (o app pode ter estado ocupado)
+      const cur = (await todos()).find((x) => x.id === it.id) || it;
+      if ((cur.tentativas || 0) < 1) await atualizar(it.id, { estado: "aguardando", erro: "", tentativas: (cur.tentativas || 0) + 1, aviso: "nova tentativa automática após: " + e.message });
+      else await atualizar(it.id, { estado: "erro", erro: e.message });
+    }
+  }
 }
 
 // A análise já tinha terminado no Studio (a extensão foi recarregada ou a tela travou): usa a minuta que está lá, sem analisar de novo.

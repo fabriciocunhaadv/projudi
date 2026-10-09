@@ -145,8 +145,13 @@
     const duas = caixaDuasEtapas(); let desmarcar = false;
     if (duas && !duas.checked) { duas.click(); desmarcar = true; await dorme(400); }      // estava desmarcada: marca para a análise e desmarca depois
     try {
-      const exec = await esperar(() => { const b = document.getElementById("tour-execute-btn"); return b && !b.disabled ? b : null; }, 60000);
-      if (!exec) throw new Error("o botão “Gerar Minuta Judicial” não ficou disponível");
+      // o app pode ainda estar ocupado com a análise anterior (botão “Processando…”): espera até 4 min; se o botão continuar desabilitado, reenvia o texto uma vez
+      let exec = await esperar(() => { const b = document.getElementById("tour-execute-btn"); return b && !b.disabled ? b : null; }, 90000);
+      if (!exec && textoAutos) {
+        const ta2 = [...document.querySelectorAll("#tour-input-panel textarea")].find(visivel); if (ta2) { definirValor(ta2, textoAutos + " "); await dorme(300); definirValor(ta2, textoAutos); }
+        exec = await esperar(() => { const b = document.getElementById("tour-execute-btn"); return b && !b.disabled ? b : null; }, 150000);
+      }
+      if (!exec) { const b = document.getElementById("tour-execute-btn"); throw new Error("o botão “Gerar Minuta Judicial” não ficou disponível (estado do botão: " + (b ? `“${texto(b).slice(0, 60)}”, ${b.disabled ? "desabilitado" : "habilitado"}` : "não encontrado") + ")"); }
       exec.click();
       if (!(await esperar(() => executando() || resultadoPronto() || erroNaTela(), 60000))) throw new Error("a análise não começou");
       const t0 = Date.now(), rep = { vezes: 0, ate: 0 };
@@ -155,7 +160,7 @@
         if (e && repetirSePassageiro(rep, e, () => { const b = document.getElementById("tour-execute-btn"); if (b && !b.disabled && /Gerar (Minuta|1ª Etapa)/i.test(texto(b))) b.click(); })) { await dorme(1000); continue; }
         if (e) throw new Error("o app avisou: " + e);
         const pro = prosseguirEtapa2();      // se a 1ª etapa saiu mesmo assim, segue para a 2ª (minuta completa)
-        if (ate1 && pro && resultadoPronto()) break;      // esteira automática: a 1ª etapa concluída já basta (a minuta fica no histórico do app); o próximo processo segue
+        if (ate1 && pro && resultadoPronto() && !/Processando/i.test(texto(document.getElementById("tour-execute-btn") || document.body.firstChild || document.body).slice(0, 200))) break;      // esteira automática: a 1ª etapa concluída já basta (a minuta fica no histórico do app); o próximo processo segue
       if (pro && !pro.disabled && !rep.etapa2) { rep.etapa2 = pro; pro.click(); await dorme(1500); continue; }
       if (!executando() && resultadoPronto() && !prosseguirEtapa2() && !(rep.etapa2 && rep.etapa2.isConnected)) break;      // com a 2ª etapa em curso o botão fica na tela (“Executando…”) até terminar
         if (Date.now() - t0 > 20 * 60000) throw new Error("a análise demorou mais de 20 minutos");
