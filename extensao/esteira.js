@@ -154,11 +154,21 @@ $("limpar").onclick = async () => { await remover((await todos()).filter((i) => 
 chrome.storage.onChanged.addListener((c, area) => { if (area === "local" && Object.keys(c).some((k) => k.startsWith("esteira_"))) { desenhar(); passo(); } });
 setInterval(passo, 3000);
 
-navigator.locks.request("esteira-executor", { ifAvailable: true }, async (lock) => {
-  if (!lock) { desenhar(); return; }
+// Só uma aba executa a fila. A dona avisa que está viva (pulso); se o pulso some (aba antiga/travada ou extensão recarregada), esta aba assume.
+async function assumir(lock) {
+  if (!lock) return;
   dono = true;
   for (const it of await todos()) if (it.estado === "analisando") await atualizar(it.id, { estado: "pausado", rodada: 0 });     // a aba anterior foi fechada no meio da análise: o usuário escolhe (a minuta pode já estar no Studio)
   document.body.dataset.executor = "1";
+  const pulsar = () => chrome.storage.local.set({ pulso_esteira: Date.now() }).catch(() => {});
+  pulsar(); setInterval(pulsar, 4000);
   await desenhar(); passo();
   await new Promise(() => {});      // segura o bloqueio enquanto a aba existir
-});
+}
+navigator.locks.request("esteira-executor", { ifAvailable: true }, async (lock) => { if (!lock) desenhar(); return assumir(lock); }).catch(() => { dono = false; });
+setInterval(async () => {
+  if (dono) return;
+  const { pulso_esteira = 0 } = await chrome.storage.local.get("pulso_esteira").catch(() => ({}));
+  if (Date.now() - pulso_esteira < 25000) return;      // a aba dona está viva
+  navigator.locks.request("esteira-executor", { steal: true }, assumir).catch(() => { dono = false; });
+}, 6000);

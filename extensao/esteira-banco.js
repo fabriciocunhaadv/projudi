@@ -42,4 +42,4 @@ export async function remover(ids) {
   });
   for (const id of ids) await apagarPdf(id).catch(() => {});
 }
-export const ROTULO = { aguardando: "na fila", analisando: "analisando no Studio…", pausado: "interrompido — escolha abaixo", recebida: "minuta recebida do Studio — abrindo o Google Docs…", conferindo: "minuta no Google Docs — aguardando a sua conferência", conferido: "conferida — abrindo o Projudi…", cadastrando: "no Projudi — lance a minuta no editor", concluido: "concluído", erro: "erro", pulado: "pulado" };
+export const ROTULO = { aguardando: "na fila", analisando: "analisando no Studio…", pausado: "interrompido — escolha abaixo", recebida: "minuta recebida do Studio…", conferindo: "minuta pronta — aguardando a sua conferência", conferido: "conferida — abrindo o Projudi…", cadastrando: "no Projudi — lance a minuta no editor", concluido: "concluído", erro: "erro", pulado: "pulado" };
