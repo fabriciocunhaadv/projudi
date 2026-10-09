@@ -23,7 +23,11 @@ with sync_playwright() as p:
     z = ctx.new_page(); z.goto(base + "lote.html")
     z.evaluate("() => { navigator.locks.request('esteira-executor', () => new Promise(() => {})); }"); z.wait_for_timeout(500)
     pg = ctx.new_page(); pg.goto(base + "esteira.html")
-    pg.wait_for_function("document.getElementById('status').textContent.includes('Outra aba')", timeout=10000)
+    for _ in range(40):      # (sem wait_for_function: a página da extensão não aceita eval de texto)
+        if "Outra aba" in pg.evaluate("() => document.getElementById('status').textContent"): break
+        pg.wait_for_timeout(250)
+    else:
+        raise AssertionError("deveria mostrar que outra aba segura a fila")
     assert pg.evaluate("document.body.dataset.executor") is None
     pg.wait_for_selector("body[data-executor='1']", timeout=20000)      # sem pulso: assume sozinha
     assert pg.evaluate("document.getElementById('status').textContent") == ""

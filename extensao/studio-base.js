@@ -160,7 +160,12 @@
         if (e && repetirSePassageiro(rep, e, () => { const b = document.getElementById("tour-execute-btn"); if (b && !b.disabled && /Gerar (Minuta|1ª Etapa)/i.test(texto(b))) b.click(); })) { await dorme(1000); continue; }
         if (e) throw new Error("o app avisou: " + e);
         const pro = prosseguirEtapa2();      // se a 1ª etapa saiu mesmo assim, segue para a 2ª (minuta completa)
-        if (ate1 && pro && resultadoPronto() && !/Processando/i.test(texto(document.getElementById("tour-execute-btn") || document.body.firstChild || document.body).slice(0, 200))) break;      // esteira automática: a 1ª etapa concluída já basta (a minuta fica no histórico do app); o próximo processo segue
+        if (ate1 && pro) {      // esteira automática: SÓ a 1ª etapa. Nunca aperta “Prosseguir para 2ª Etapa”; espera o app ficar ocioso (ou 2 min) e devolve
+          if (!rep.pro1) rep.pro1 = Date.now();
+          const ocupadoAinda = /Processando/i.test(texto(document.getElementById("tour-execute-btn") || document.body).slice(0, 200));
+          if (resultadoPronto() && (!ocupadoAinda || Date.now() - rep.pro1 > 120000)) break;
+          await dorme(1000); continue;
+        }
       if (pro && !pro.disabled && !rep.etapa2) { rep.etapa2 = pro; pro.click(); await dorme(1500); continue; }
       if (!executando() && resultadoPronto() && !prosseguirEtapa2() && !(rep.etapa2 && rep.etapa2.isConnected)) break;      // com a 2ª etapa em curso o botão fica na tela (“Executando…”) até terminar
         if (Date.now() - t0 > 20 * 60000) throw new Error("a análise demorou mais de 20 minutos");

@@ -22,11 +22,13 @@ b.onclick=()=>{ const una=ligada(); b.disabled=true; b.innerHTML='<span>Analisan
   setTimeout(()=>{ b.disabled=false; b.innerHTML='<span>'+rot()+'</span>';
     if(!una){ final(); return }
     document.getElementById('res').innerHTML='<div id="tour-result-tabs"></div><div class="font-serif"><div>x</div><div><h3>DISPOSITIVO</h3><div class="markdown-body"><p>Minuta 1ª ETAPA. '+'z'.repeat(300)+'</p></div></div></div><button id="prox">Prosseguir para 2ª Etapa</button>';
+    if(window.lento){ b.disabled=true; b.innerHTML='<span>Processando e elaborando minuta judicial...</span>'; setTimeout(()=>{ b.disabled=false; b.innerHTML='<span>'+rot()+'</span>' },3000) }
     document.getElementById('prox').onclick=function(){ this.disabled=true; this.textContent='Executando...'; setTimeout(()=>{ final() },1200) } },1500) };
 </script></body></html>"""
 
 def rodar(ctx, ligada, marcada=True, ate1=False):
     pg = ctx.new_page(); pg.set_content(PAG)
+    if ate1: pg.evaluate('window.lento = true')
     if not marcada: pg.evaluate("document.getElementById('duas').checked = false; document.getElementById('tour-execute-btn').innerHTML = '<span>Gerar Minuta Judicial Completa</span>'")
     if not ligada: pg.evaluate("document.getElementById('duas').closest('label').remove()")      # sem a opção na tela: cai no botão “Prosseguir”
     pg.evaluate("window.chrome = { runtime: { onMessage: { addListener(f) { window.__ouvinte = f } } }, notifications: null, storage: { local: { set() { return Promise.resolve() } } } }")
