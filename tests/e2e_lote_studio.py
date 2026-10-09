@@ -148,10 +148,13 @@ def main():
             raise AssertionError(rot + " " + str(sw.evaluate("async () => Object.entries(await chrome.storage.local.get(null)).filter(([k]) => k.startsWith('esteira_m')).map(([k, v]) => [v.estado, v.erro])")) + str(estados()) + str([x.url[-40:] for x in ctx.pages]))
         espera(lambda: estados() == ["conferindo", "aguardando"], "1º processo deveria estar em conferência e o 2º aguardando")
         assert len(studio.evaluate("window.__analises")) == 1                              # o 2º não foi ao Studio
-        doc = [x for x in ctx.pages if x.url.startswith("http://127.0.0.1:8777/d/DOC123")][0]
-        doc.wait_for_selector("[data-projudi-ext=esteira] #ok", state="attached", timeout=20000)
-        assert any(x.url.startswith("blob:") for x in ctx.pages), [x.url for x in ctx.pages]       # PDF aberto ao lado
-        doc.locator("[data-projudi-ext=esteira] #ok").click()
+        assert not any(x.url.startswith("http://127.0.0.1:8777/d/") or x.url.startswith("blob:") for x in ctx.pages), [x.url for x in ctx.pages]      # não abre mais o Google Docs nem o PDF ao lado
+        est = [x for x in ctx.pages if "esteira.html" in x.url]
+        est = est[0] if est else None
+        if est is None:
+            est = ctx.new_page(); est.goto(f"chrome-extension://{ext_id}/esteira.html")
+        est.wait_for_selector("button[data-a=conferido]", timeout=20000)
+        est.locator("button[data-a=conferido]").first.click()
         espera(lambda: estados()[0] == "cadastrando", "deveria ir para o Projudi")
         assert estados()[1] == "aguardando"                                                  # a fila só avança depois do lançamento
         proj = [x for x in ctx.pages if x.url.startswith("http://localhost:8770/proc?id=1") and x.locator("[data-projudi-ext=esteira]").count()][0]
@@ -163,10 +166,6 @@ def main():
         analises = studio.evaluate("window.__analises"); print(analises)
         assert len(analises) == 2 and all(a["prompt"] == "Outros Área Judicial - Família e Sucessões" for a in analises), analises
         assert [a["nome"] for a in analises] == ["5293296-60.2026.8.09.0166-OCR.pdf", "5000001-11.2026.8.09.0166-OCR.pdf"]
-        print(DOCSREQ)
-        assert DOCSREQ[0][2] == {"title": "5293296-60.2026.8.09.0166 – sentença"} and DOCSREQ[0][1] == "Bearer tok-teste"
-        rq = DOCSREQ[1][2]["requests"]; assert rq[0]["insertText"]["text"] == "SENTENÇA\nVistos, etc.\nJulgo procedente o pedido formulado."
-        assert any(r.get("updateParagraphStyle", {}).get("paragraphStyle", {}).get("alignment") == "JUSTIFIED" for r in rq)
         pdf = subprocess.run(["pdftotext", "-layout", fins[0]["pdf"], "-"], capture_output=True, text=True).stdout.lower(); pdf = " ".join(pdf.split())
         ctx.close()
     assert "5293296-60.2026.8.09.0166" in pdf and "movimentacao 8 : juntada" in pdf       # carimbo do Projudi preservado
