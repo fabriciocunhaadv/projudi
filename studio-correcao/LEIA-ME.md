@@ -56,3 +56,8 @@ O 503 ("alta demanda") é do **modelo**, não da chave. Agora (`generateWithFall
 - **Etapa 2** só revisa: confronto com os autos, auditoria forense, súmulas/precedentes (+ grounding), coerência com a cadeia decisória e preclusão. Não recebe mais teses, paradigma, base de conhecimento nem o prompt temático (que a levava a "forçar" embargos).
 - O tipo de ato da Etapa 2 passa a ser o `actType` entregue pela Etapa 1 (log: "Etapa 2 segue o tipo de ato entregue pela Etapa 1").
 - Despacho na Etapa 2 não sai mais curto (4 a 8 parágrafos motivados).
+
+## Saúde dos modelos + rascunho
+- Modelo que falha em sequência (503/timeout/429 em todas as chaves) fica em resfriamento crescente (45 s → 90 s → 3 min → 6 min → 10 min) e é pulado nas próximas análises; volta ao normal no primeiro sucesso. Com isso 3.8/3.7/3.6 deixam de gastar ~1–2 min por etapa quando estão indisponíveis para suas chaves.
+- "Cumprimento de Sentença" na questão pendente não classifica mais o ato como sentença.
+- `sessionDraft.ts`: ao estourar o localStorage, limpa caches dispensáveis e salva um rascunho mínimo (sem o texto dos autos).
