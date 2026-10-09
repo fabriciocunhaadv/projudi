@@ -146,23 +146,9 @@ def main():
                 if cond(): return
                 pg.wait_for_timeout(1000)
             raise AssertionError(rot + " " + str(sw.evaluate("async () => Object.entries(await chrome.storage.local.get(null)).filter(([k]) => k.startsWith('esteira_m')).map(([k, v]) => [v.estado, v.erro])")) + str(estados()) + str([x.url[-40:] for x in ctx.pages]))
-        espera(lambda: estados() == ["conferindo", "aguardando"], "1º processo deveria estar em conferência e o 2º aguardando")
-        assert len(studio.evaluate("window.__analises")) == 1                              # o 2º não foi ao Studio
-        assert not any(x.url.startswith("http://127.0.0.1:8777/d/") or x.url.startswith("blob:") for x in ctx.pages), [x.url for x in ctx.pages]      # não abre mais o Google Docs nem o PDF ao lado
-        est = [x for x in ctx.pages if "esteira.html" in x.url]
-        est = est[0] if est else None
-        if est is None:
-            est = ctx.new_page(); est.goto(f"chrome-extension://{ext_id}/esteira.html")
-        est.wait_for_selector("button[data-a=conferido]", timeout=20000)
-        est.locator("button[data-a=conferido]").first.click()
-        espera(lambda: estados()[0] == "cadastrando", "deveria ir para o Projudi")
-        assert estados()[1] == "aguardando"                                                  # a fila só avança depois do lançamento
-        proj = [x for x in ctx.pages if x.url.startswith("http://localhost:8770/proc?id=1") and x.locator("[data-projudi-ext=esteira]").count()][0]
-        proj.wait_for_selector("[data-projudi-ext=esteira] #cop", state="attached", timeout=20000)        # só "Copiar minuta" e "Lancei"; nada é lançado no editor
-        assert proj.locator("[data-projudi-ext=esteira] #ins").count() == 0
-        assert "inicio" == [f for f in proj.frames if f != proj.main_frame][0].inner_text("body").strip()      # o editor do Projudi não foi tocado
-        proj.locator("[data-projudi-ext=esteira] #ok").click()
-        espera(lambda: estados()[0] == "concluido" and estados()[1] in ("analisando", "conferindo") and len(studio.evaluate("window.__analises")) == 2, "2º deveria seguir para o Studio")
+        espera(lambda: estados() == ["concluido", "concluido"], "esteira automática: os 2 processos deveriam concluir sozinhos, um depois do outro (sem conferência nem Projudi)", n=150)
+        assert not any(x.url.startswith("http://127.0.0.1:8777/d/") or x.url.startswith("blob:") or x.url.startswith("http://localhost:8770/proc") for x in ctx.pages), [x.url for x in ctx.pages]      # sem Google Docs, sem PDF ao lado, sem abrir o Projudi
+        assert len(studio.evaluate("window.__analises")) == 2
         analises = studio.evaluate("window.__analises"); print(analises)
         assert len(analises) == 2 and all(a["prompt"] == "Outros Área Judicial - Família e Sucessões" for a in analises), analises
         assert [a["nome"] for a in analises] == ["5293296-60.2026.8.09.0166-OCR.pdf", "5000001-11.2026.8.09.0166-OCR.pdf"]

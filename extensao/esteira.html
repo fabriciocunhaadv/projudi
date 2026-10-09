@@ -10,9 +10,7 @@
   @media (prefers-color-scheme: dark) { body { background: #1c1d21; color: #e6e6e6; } th { background: #2a2d33; } th, td { border-color: #444; } .dica { color: #aaa; } }
 </style>
 <h1>Esteira de minutas</h1>
-<p class="dica">Um processo por vez <b>no Studio</b> (o próximo começa quando o Studio concluir, se a opção abaixo estiver marcada): <b>Studio gera a minuta → você confere → botão “cadastrar no Projudi” → lançamento no editor</b>. Só depois de concluir (ou de dar erro) o próximo da fila vai para o Studio.
-Os downloads dos PDFs seguem em paralelo, sem esperar esta fila. Mantenha esta aba aberta.</p>
-<p><label><input type="checkbox" id="continuo" checked> Seguir para o próximo processo assim que o Studio concluir (sem esperar a minha conferência)</label></p>
+<p class="dica">Esteira automática: um processo por vez <b>no Studio</b>. Quando o Studio devolve a <b>1ª etapa concluída</b>, o próximo processo da fila já é enviado — sem esperar conferência nem lançamento no Projudi. A minuta de cada processo fica no histórico do Studio (onde você pode seguir para a 2ª etapa). Mantenha esta aba aberta.</p>
 <p>Enviar os autos ao Studio como: <select id="entrada"><option value="pdf">PDF (arquivo completo)</option><option value="txt">texto extraído do PDF com OCR (mais rápido)</option></select></p>
 <div id="status"></div>
 <table><thead><tr><th>#</th><th>Processo</th><th>Situação</th><th>Ações</th></tr></thead><tbody id="linhas"></tbody></table>

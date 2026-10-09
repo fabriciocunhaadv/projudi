@@ -25,13 +25,13 @@ b.onclick=()=>{ const una=ligada(); b.disabled=true; b.innerHTML='<span>Analisan
     document.getElementById('prox').onclick=function(){ this.disabled=true; this.textContent='Executando...'; setTimeout(()=>{ final() },1200) } },1500) };
 </script></body></html>"""
 
-def rodar(ctx, ligada, marcada=True):
+def rodar(ctx, ligada, marcada=True, ate1=False):
     pg = ctx.new_page(); pg.set_content(PAG)
     if not marcada: pg.evaluate("document.getElementById('duas').checked = false; document.getElementById('tour-execute-btn').innerHTML = '<span>Gerar Minuta Judicial Completa</span>'")
     if not ligada: pg.evaluate("document.getElementById('duas').closest('label').remove()")      # sem a opção na tela: cai no botão “Prosseguir”
     pg.evaluate("window.chrome = { runtime: { onMessage: { addListener(f) { window.__ouvinte = f } } }, notifications: null, storage: { local: { set() { return Promise.resolve() } } } }")
     pg.add_script_tag(path=str(RAIZ / "studio-base.js"))
-    pg.evaluate("() => { window.__r = null; window.__ouvinte({ acao: 'studio-analisar', modo: 'analise', arquivoId: '', nome: 'x.pdf', prompt: 'Outros Área Judicial - Criminal', texto: '[Página 1]\\nAutos. ' + 'y'.repeat(300) }, {}, (r) => { window.__r = r }) }")
+    pg.evaluate("() => { window.__r = null; window.__ouvinte({ acao: 'studio-analisar', modo: 'analise', arquivoId: '', nome: 'x.pdf', prompt: 'Outros Área Judicial - Criminal', texto: '[Página 1]\\nAutos. ' + 'y'.repeat(300), ate1: %s }, {}, (r) => { window.__r = r }) }" % ("true" if ate1 else "false"))
     pg.wait_for_function("window.__r", timeout=60000)
     return pg, pg.evaluate("window.__r")
 
@@ -47,5 +47,9 @@ with sync_playwright() as p:
     assert pg.evaluate("document.getElementById('duas').checked") is False
     pg, r = rodar(ctx, False); print("B", r.get("ok"), r.get("erro"))
     assert r["ok"] and "COMPLETA" in r["minuta"], r
+    pg, r = rodar(ctx, True, ate1=True); print("D", r.get("ok"), r.get("erro"))
+    assert r["ok"] and "1ª ETAPA" in r["minuta"] and "COMPLETA" not in r["minuta"], r
+    assert pg.evaluate("document.getElementById('prox').textContent") == "Prosseguir para 2ª Etapa"      # esteira automática: parou na 1ª etapa, não apertou o botão
+    assert pg.evaluate("window.cliques") == [], pg.evaluate("window.cliques")
     b.close()
 print("OK")

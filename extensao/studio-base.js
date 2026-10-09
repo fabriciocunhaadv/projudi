@@ -116,7 +116,7 @@
   const caixaDuasEtapas = () => [...document.querySelectorAll("label")].find((l) => /Execu[cç][aã]o em 2 Etapas/i.test(texto(l)) && visivel(l))?.querySelector("input[type=checkbox]");
   const prosseguirEtapa2 = () => botao(/Prosseguir para (a )?2ª Etapa/i);
 
-  async function analisar({ arquivoId, nome, prompt, tipo, texto: textoAutos }) {
+  async function analisar({ arquivoId, nome, prompt, tipo, texto: textoAutos, ate1 }) {
     const bytes = arquivos.get(arquivoId);
     if (!bytes && !textoAutos) throw new Error("arquivo não recebido");
     fecharJanelas();
@@ -155,6 +155,7 @@
         if (e && repetirSePassageiro(rep, e, () => { const b = document.getElementById("tour-execute-btn"); if (b && !b.disabled && /Gerar (Minuta|1ª Etapa)/i.test(texto(b))) b.click(); })) { await dorme(1000); continue; }
         if (e) throw new Error("o app avisou: " + e);
         const pro = prosseguirEtapa2();      // se a 1ª etapa saiu mesmo assim, segue para a 2ª (minuta completa)
+        if (ate1 && pro && !executando() && resultadoPronto()) break;      // esteira automática: a 1ª etapa concluída já basta (a minuta fica no histórico do app); o próximo processo segue
       if (pro && !pro.disabled && !rep.etapa2) { rep.etapa2 = pro; pro.click(); await dorme(1500); continue; }
       if (!executando() && resultadoPronto() && !prosseguirEtapa2() && !(rep.etapa2 && rep.etapa2.isConnected)) break;      // com a 2ª etapa em curso o botão fica na tela (“Executando…”) até terminar
         if (Date.now() - t0 > 20 * 60000) throw new Error("a análise demorou mais de 20 minutos");

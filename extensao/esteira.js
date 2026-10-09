@@ -10,10 +10,10 @@ const absoluta = (u) => (u ? new URL(u, BASE).href : BASE);
 const $ = (id) => document.getElementById(id), esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 let dono = false, ocupado = false;
 
-// Com a minuta em mãos: o item passa a "conferindo" (o botão "Terminei a conferência" cadastra no Projudi). Não abre mais o Google Docs.
+// Esteira automática: com a 1ª etapa concluída no Studio o processo está "concluído" para a fila (a minuta fica no histórico do app) e o próximo já é enviado.
 async function entregar(it, bytes, minuta, mensagem, html = "") {
-  const fim = it.modo === "lupa" || it.modo === "turbo";
-  return atualizar(it.id, { estado: fim ? "concluido" : "conferindo", minuta: minuta || "", tipo: tipoDaMinuta(minuta), aviso: mensagem });
+  const aviso = it.modo === "analise" ? "1ª etapa concluída no Studio; a minuta está no histórico do app (use “Prosseguir para 2ª Etapa” lá para a revisão)." : mensagem;
+  return atualizar(it.id, { estado: "concluido", minuta: minuta || "", minutaHtml: html, tipo: tipoDaMinuta(minuta), aviso });
 }
 
 async function analisar(it) {
@@ -27,7 +27,7 @@ async function analisar(it) {
     const comTexto = it.modo === "turbo" || ((it.modo === "analise" || (it.modo === "lupa" && it.minutaAssessor)) && esteiraConfig.entrada === "txt");      // Turbo: sempre texto; esteira principal: conforme a escolha do usuário (txt ou PDF)
     const texto = comTexto ? await textoDoPdf(bytes) : "";
     if (comTexto && texto.replace(/\[Página \d+\]|\s/g, "").length < 200) throw new Error("não consegui extrair texto do PDF (o OCR pode não ter funcionado)");
-    const r = await analisarNoStudio(bytes, { nome: it.pdfNome, prompt: it.prompt, modo: it.modo, tipo: "", processo: it.processo, minuta: it.minutaAssessor, motivoMinuta: it.motivoMinuta, texto });
+    const r = await analisarNoStudio(bytes, { nome: it.pdfNome, prompt: it.prompt, modo: it.modo, tipo: "", processo: it.processo, minuta: it.minutaAssessor, motivoMinuta: it.motivoMinuta, texto, ate1: it.modo === "analise" });
     if (!(await valida())) return;
     await entregar(it, bytes, r.minuta, r.mensagem, r.minutaHtml || "");
   } catch (e) { if (await valida()) await atualizar(it.id, { estado: "erro", erro: e.message }); }
@@ -63,7 +63,7 @@ async function passo() {
     // Um por vez NO STUDIO. No modo contínuo (padrão) o próximo começa assim que o Studio devolve a conclusão; a conferência/lançamento no Projudi
     // do anterior segue em paralelo. Com o modo contínuo desligado, espera o processo anterior ser concluído.
     const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig");
-    const bloqueiam = esteiraConfig.continuo === false ? ATIVOS : ["analisando", "recebida", "pausado"];
+    const bloqueiam = ["analisando", "recebida", "pausado"];      // só bloqueia enquanto o Studio trabalha (ou o usuário precisa escolher); conferência/Projudi não seguram a fila
     if (lista.some((i) => bloqueiam.includes(i.estado))) return;
     const prox = lista.find((i) => i.estado === "aguardando");
     if (prox) await analisar(prox);
@@ -108,8 +108,7 @@ $("linhas").addEventListener("click", async (ev) => {
   if (a === "projudi") { const it = (await todos()).find((x) => x.id === id), t = await chrome.tabs.create({ url: absoluta(it.urlPre || it.url) }); await atualizar(id, { abas: { ...(it.abas || {}), projudi: t.id } }); }
   passo();
 });
-chrome.storage.sync.get("esteiraConfig").then(({ esteiraConfig = {} }) => { $("entrada").value = esteiraConfig.entrada || "pdf"; $("continuo").checked = esteiraConfig.continuo !== false; });
-$("continuo").onchange = async () => { const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig"); chrome.storage.sync.set({ esteiraConfig: { ...esteiraConfig, continuo: $("continuo").checked } }); passo(); };
+chrome.storage.sync.get("esteiraConfig").then(({ esteiraConfig = {} }) => { $("entrada").value = esteiraConfig.entrada || "pdf"; });
 $("entrada").onchange = async () => { const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig"); chrome.storage.sync.set({ esteiraConfig: { ...esteiraConfig, entrada: $("entrada").value } }); };
 // Recuperação: coloca na fila PDFs "número-OCR.pdf" que já estão no computador (a fila foi perdida ou os PDFs vieram de fora).
 chrome.storage.sync.get("automacao").then(({ automacao = {} }) => {
