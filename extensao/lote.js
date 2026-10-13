@@ -1,7 +1,6 @@
 import { montarPdf, nomePadrao, semBarra, acharServentia } from "./modelos-pdf.js";
 import { enviarBase } from "./studio-cliente.js";
 import { manterAcordado } from "./acordado.js";
-import { abaProjudi, liberarAbaProjudi } from "./aba-projudi.js";
 // Fila: para cada processo selecionado, abre o processo, pede o PDF completo ao Projudi e deixa a página de OCR salvar PDF + texto.
 const BASE = "https://projudi.tjgo.jus.br/";
 const $ = (id) => document.getElementById(id);
@@ -55,7 +54,7 @@ function htmlParaTexto(html) {
 async function lerMinutaPre(item) {
   const digitos = String(item.processo).replace(/\D/g, "").slice(0, 9), novas = [];
   const aoCriar = (t) => novas.push(t.id); chrome.tabs.onCreated.addListener(aoCriar);
-  const tab = await abaProjudi(BASE + "PreAnalisarConclusao?PaginaAtual=6&tipo=todas");
+  const tab = await chrome.tabs.create({ url: BASE + "PreAnalisarConclusao?PaginaAtual=6&tipo=todas", active: false });
   const motivo = { m: "" };
   try {
     // As listas do Projudi são da serventia ativa NA SESSÃO (e a verificação deixa a sessão na última serventia lida): escolhe a do processo antes.
@@ -104,7 +103,7 @@ async function lerMinutaPre(item) {
     return { texto: "", motivo: "cliquei em Visualizar, mas não achei o editor com a minuta (ou ele está vazio)" };
   } finally {
     chrome.tabs.onCreated.removeListener(aoCriar);
-    for (const id of novas) if (id !== tab.id) chrome.tabs.remove(id).catch(() => {});      // só as abas que o Projudi abriu (Visualizar); a aba de trabalho fica
+    for (const id of [tab.id, ...novas]) chrome.tabs.remove(id).catch(() => {});
   }
 }
 
@@ -117,7 +116,7 @@ async function paginaInvalida(tabId) {
 // Pega um link NOVO do processo na lista da serventia (a lista é da serventia ativa na sessão: escolhe a do processo antes).
 async function urlFresca(item) {
   const dig = String(item.processo || "").replace(/\D/g, "").slice(0, 9), lista = BASE + (item.situacao === "preAnalisadas" ? "PreAnalisarConclusao?PaginaAtual=6&tipo=todas" : "PreAnalisarConclusao?PaginaAtual=2");
-  const tab = await abaProjudi(lista);
+  const tab = await chrome.tabs.create({ url: lista, active: false });
   try {
     if (item.serventiaUrl) {
       await chrome.tabs.update(tab.id, { url: new URL(item.serventiaUrl, BASE).href }); await dorme(600);
@@ -134,7 +133,7 @@ async function urlFresca(item) {
       await dorme(1000);
     }
     return "";
-  } finally { /* a aba de trabalho do Projudi é reaproveitada */ }
+  } finally { chrome.tabs.remove(tab.id).catch(() => {}); }
 }
 window.__urlFresca = urlFresca;      // usado nos testes
 
@@ -142,15 +141,15 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
   const passo = (t) => { registro.push(new Date().toLocaleTimeString("pt-BR") + " " + item.processo + " — " + t); etapa(t); };
   passo("abrindo o processo");
   const url = new URL(item.url, BASE).href;
-  const tab = await abaProjudi(url);      // reaproveita uma aba do Projudi já aberta (não abre aba nova a cada processo)
-  let popup = null, urlAtual = url;
+  const tab = await chrome.tabs.create({ url, active: false });
+  let popup = null;
   try {
     await carregou(tab.id); await dorme(1500);
     if (await paginaInvalida(tab.id)) {
       passo("o link guardado do processo expirou (“Código inválido”); pegando um novo na lista");
       const nova = await urlFresca(item);
       if (!nova) throw new Error("o link do processo expirou e não achei o processo na lista da serventia (clique em “Verificar agora” no painel e tente de novo)");
-      urlAtual = nova; await chrome.tabs.update(tab.id, { url: nova }); await carregou(tab.id); await dorme(1500);
+      await chrome.tabs.update(tab.id, { url: nova }); await carregou(tab.id); await dorme(1500);
       if (await paginaInvalida(tab.id)) throw new Error("o Projudi recusou o link do processo (“Código inválido”)");
     }
     passo("procurando o botão Gerar PDF");
@@ -159,7 +158,6 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
     if (opcoes.studio?.ativo && opcoes.studio.modo === "lupa") {
       if (item.situacao !== "preAnalisadas") motivoMinuta = "processo não está pré-analisado (sem minuta do assessor)";
       else { passo("lendo a minuta do assessor (Visualizar)"); const r = await limite(lerMinutaPre(item), 120000, "a minuta da pré-análise não carregou").catch((e) => ({ texto: "", motivo: e.message })); minuta = r.texto; motivoMinuta = r.motivo; if (minuta) passo("minuta do assessor lida (" + minuta.length + " caracteres)"); else passo("⚠ " + motivoMinuta); }
-      await chrome.tabs.update(tab.id, { url: urlAtual }); await carregou(tab.id); await dorme(1500);      // a leitura usou a mesma aba: volta ao processo
     }
     await chrome.storage.local.set({ gerarpdf_pedido: { todos: true, processo: item.processo, pasta, lote: chave, ts: Date.now(), studio: opcoes.studio?.ativo ? { ativo: true, modo: opcoes.studio.modo, prompt: item.prompt || "", tipo: "", minuta, motivoMinuta, url: item.url, urlPre: item.urlPre || "", docs: !!opcoes.studio.docs && opcoes.studio.modo !== "lupa" } : null } });
     let r = await limite(GerarUtil.capturarGerar(tab.id), 45000, "a página do processo não respondeu (pode haver um aviso do Projudi aberto nela)");
@@ -170,7 +168,7 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
     }
     if (!r.achou) throw new Error("não achei o botão “Gerar PDF” no processo");
     passo("abrindo a janela Gerar PDF");
-    if (r.url) await chrome.tabs.update(tab.id, { url: r.url });      // a janela “Gerar PDF” abre na mesma aba de trabalho
+    if (r.url) popup = await chrome.tabs.create({ url: r.url, active: false });
     // a janela Gerar PDF consome o pedido; se ele continuar lá depois de 90 s, ela não abriu
     const t0 = Date.now();
     while (Date.now() - t0 < 90000) {
@@ -178,6 +176,7 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
       await dorme(1000);
     }
     if ((await chrome.storage.local.get("gerarpdf_pedido")).gerarpdf_pedido) throw new Error("a janela “Gerar PDF” não abriu ou não carregou");
+    if (popup) { chrome.tabs.remove(popup.id).catch(() => {}); popup = null; }
     passo("janela Gerar PDF entregou o pedido; aguardando o início do OCR");
     const inicio = await esperarFim("lote_prog_" + chave, 150000);      // a página de OCR publica o andamento assim que recebe o pedido
     if (inicio.erro === "tempo esgotado" && !(await chrome.storage.local.get("lote_fim_" + chave))["lote_fim_" + chave]) throw new Error("a extensão não recebeu o pedido da janela Gerar PDF (a janela pode ter fechado antes de enviar)");
@@ -202,7 +201,8 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
     if (!fim.ok) throw new Error(fim.erro || "falhou");
     return fim;
   } finally {
-    /* a aba de trabalho fica para o próximo processo; é liberada no fim do lote */
+    if (popup) chrome.tabs.remove(popup.id).catch(() => {});
+    chrome.tabs.remove(tab.id).catch(() => {});
   }
 }
 
@@ -254,7 +254,6 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
     $("barra").value = i + 1;
   }
   clearInterval(sinal); manterAcordado("lote", false);
-  liberarAbaProjudi();
   const resumo = `${cancelado ? "Cancelado. " : ""}${feitos} de ${itens.length} processo(s) baixado(s)${erros ? `, ${erros} com erro` : ""}.`;
   $("status").textContent = resumo; $("cancelar").disabled = true;
   document.body.dataset.pronto = "1"; document.body.dataset.resumo = JSON.stringify({ feitos, erros });
