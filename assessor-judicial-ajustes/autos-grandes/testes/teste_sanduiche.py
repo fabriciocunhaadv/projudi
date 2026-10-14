@@ -26,22 +26,18 @@ def main():
         log = json.loads(urllib.request.urlopen(f"http://127.0.0.1:{PM}/__log").read())
         print("A) pequeno:", [(x["modelo"], x["tok"], x["res"]) for x in log]); assert all(x["res"] == 200 for x in log) and len(log) >= 1 and not any(x["parte"] for x in log)
         n_a = len(log)
-        # B) processo grande (texto colado): precisa dividir e passar
-        t0 = time.time()
-        r = json.loads(post({**base, "processText": autos(1000000, fatos)}))
-        log = json.loads(urllib.request.urlopen(f"http://127.0.0.1:{PM}/__log").read())[n_a:]
-        print("B) grande:", [(x["modelo"], x["tok"], x["res"], x.get("p") or "final", x.get("chars")) for x in log], f"{time.time()-t0:.0f}s")
-        texto = json.dumps(r, ensure_ascii=False)
-        for f in ["FATO-001", "FATO-002", "FATO-003", "FATO-004"]: assert f in texto, f"{f} não chegou ao resultado final"
-        assert any(x["parte"] and x["res"] == 200 for x in log), "não houve extração por partes"
-        assert max(x["tok"] for x in log if x["res"] == 200) <= 250000
-        n_b = n_a + len(log)
-        # C) mesmo processo grande enviado como PDF extraído (pdfFiles)
-        r = json.loads(post({**base, "pdfFiles": [{"name": "autos.pdf", "extractedText": autos(1000000, fatos)}]}))
-        log = json.loads(urllib.request.urlopen(f"http://127.0.0.1:{PM}/__log").read())[n_b:]
-        print("C) grande em pdfFiles:", [(x["modelo"], x["tok"], x["res"], x.get("p") or "final", x.get("chars")) for x in log])
-        texto = json.dumps(r, ensure_ascii=False)
-        for f in ["FATO-001", "FATO-002", "FATO-003", "FATO-004"]: assert f in texto, f"{f} não chegou (pdfFiles)"
+        # B) processo grande (texto colado): recusa 1x e refaz com início + fim
+        for rotulo, corpo in (("B) texto colado", {"processText": autos(1000000, fatos)}), ("C) pdfFiles", {"pdfFiles": [{"name": "autos.pdf", "extractedText": autos(1000000, fatos)}]})):
+            urllib.request.urlopen(f"http://127.0.0.1:{PM}/__reset")
+            t0 = time.time()
+            r = json.loads(post({**base, **corpo}))
+            log = json.loads(urllib.request.urlopen(f"http://127.0.0.1:{PM}/__log").read())
+            print(rotulo, [(x["modelo"], x["tok"], x["res"]) for x in log], f"{time.time()-t0:.0f}s")
+            texto = json.dumps(r, ensure_ascii=False)
+            assert "FATO-001" in texto and "FATO-003" in texto and "FATO-004" in texto, "início e fim (páginas 1-100 e 250-400) precisam chegar"
+            assert "FATO-002" not in texto, "o miolo (página 160) não deveria ter sido enviado"
+            assert [x["res"] for x in log] == [429, 200], "uma recusa e uma chamada que passa: " + str(log)
+            assert log[1]["tok"] <= 250000
         print("OK")
     finally:
         import os as _o
