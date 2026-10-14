@@ -157,7 +157,7 @@ export async function fazerOcr(bytes, opcoes, ganchos = {}) {
         canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
         const ctx = canvas.getContext("2d", { willReadFrequently: true });
         ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-        await page.render({ canvasContext: ctx, canvas, viewport }).promise;
+        await page.render({ canvasContext: ctx, canvas, viewport, intent: "print" }).promise;      // "print" não usa requestAnimationFrame: em aba escondida o rAF para e o OCR travava
         melhorarParaOcr(ctx, canvas.width, canvas.height);
         const { data } = await w.recognize(canvas, {}, { blocks: true });
         const ja = await retangulosDeTexto(page, viewport);
