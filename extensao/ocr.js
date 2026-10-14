@@ -110,6 +110,23 @@ async function automatico(idDownload) {
 
 // PDF pedido ao Projudi pela janela "Gerar PDF": a extensão recebe o PDF antes de ir para Downloads, faz o OCR e salva só o pesquisável.
 let loteAtual = null;
+// Aba escondida é congelada pelo Chrome depois de uns minutos; uma conexão WebRTC local aberta e um Web Lock seguro impedem o congelamento e o "estrangulamento" dos timers.
+let mantem = null;
+function manterAtiva(liga) {
+  try {
+    if (!liga) { if (mantem) { mantem.soltar(); mantem = null; } return; }
+    if (mantem) return;
+    const a = new RTCPeerConnection(), b = new RTCPeerConnection();
+    a.onicecandidate = (e) => e.candidate && b.addIceCandidate(e.candidate).catch(() => {});
+    b.onicecandidate = (e) => e.candidate && a.addIceCandidate(e.candidate).catch(() => {});
+    const canal = a.createDataChannel("ativa");
+    let solto = null;
+    navigator.locks.request("ocr-ativo-" + Date.now(), () => new Promise((ok) => { solto = ok; })).catch(() => {});
+    const pulso = setInterval(() => { try { if (canal.readyState === "open") canal.send("."); } catch {} }, 5000);
+    a.createOffer().then((o) => a.setLocalDescription(o).then(() => b.setRemoteDescription(o))).then(() => b.createAnswer()).then((r) => b.setLocalDescription(r).then(() => a.setRemoteDescription(r))).catch(() => {});
+    mantem = { soltar() { clearInterval(pulso); try { solto && solto(); a.close(); b.close(); } catch {} } };
+  } catch {}
+}
 function publicar() {      // a página da fila mostra o que está acontecendo aqui (OCR página a página)
   if (!loteAtual) return;
   chrome.storage.local.set({ ["lote_prog_" + loteAtual]: { txt: $("status").textContent, t: Date.now() } });
@@ -120,6 +137,7 @@ async function interceptado(idJob) {
   if (!job) { log("Pedido não encontrado."); return; }
   rodando = true; cancelado = false; $("cancelar").disabled = false;
   loteAtual = job.lote || null;
+  manterAtiva(true);
   new MutationObserver(publicar).observe($("status"), { childList: true, characterData: true, subtree: true });
   $("status").textContent = "Pedindo o PDF ao Projudi (pode demorar)…";
   try {
@@ -164,7 +182,7 @@ async function interceptado(idJob) {
     avisar("PDF do processo", e.message);
     document.body.dataset.erro = e.message;
     if (job.lote) await chrome.storage.local.set({ ["lote_fim_" + job.lote]: { ok: false, erro: e.message } });
-  } finally { rodando = false; $("cancelar").disabled = true; $("barra").hidden = true; }
+  } finally { manterAtiva(false); rodando = false; $("cancelar").disabled = true; $("barra").hidden = true; }
 }
 
 async function iniciar() {

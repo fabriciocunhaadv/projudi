@@ -190,7 +190,7 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
       for (;;) {
         const d = await chrome.storage.local.get(["lote_fim_" + chave, "lote_prog_" + chave]), pr = d["lote_prog_" + chave];
         if (d["lote_fim_" + chave]) { fim = d["lote_fim_" + chave]; break; }
-        const semSinal = Date.now() - (pr?.t || t0), limite = parado0 || (/^Pedindo o PDF/i.test(pr?.txt || "") ? 27 * 60000 : 5 * 60000);
+        const semSinal = Date.now() - (pr?.t || t0), limite = parado0 || (/^Pedindo o PDF/i.test(pr?.txt || "") ? 27 * 60000 : 8 * 60000);
         if (semSinal > limite || Date.now() - t0 > 90 * 60000) {
           try { for (const c of await chrome.runtime.getContexts({ contextTypes: ["TAB"] })) if ((c.documentUrl || "").includes("ocr.html")) chrome.tabs.remove(c.tabId).catch(() => {}); } catch (e) { /* sem getContexts */ }
           throw new Error(`o OCR travou${pr?.txt ? ` em “${String(pr.txt).slice(0, 60)}”` : ""} (${Math.round(semSinal / 60000)} min sem sinal); a aba de OCR foi fechada e o processo pulado — tente de novo depois`);
@@ -243,7 +243,14 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
     $("status").textContent = `Processo ${i + 1} de ${itens.length}: ${p.processo}`;
     marca(i, `⏳ ${esc(p.processo)} — baixando…`, "");
     try {
-      const r = await processar(p, id + ":" + i, p.pasta || pasta, (t) => marca(i, `⏳ ${esc(p.processo)} — ${esc(t)}`, ""), job.opcoes || {});
+      const rodar = (n) => processar(p, id + ":" + i + (n ? "r" : ""), p.pasta || pasta, (t) => marca(i, `⏳ ${esc(p.processo)} — ${esc(t)}`, ""), job.opcoes || {});
+      let r;
+      try { r = await rodar(0); }
+      catch (e1) {      // OCR travado: uma nova tentativa automática, do zero
+        if (!/^o OCR travou/.test(e1.message) || cancelado) throw e1;
+        marca(i, `⏳ ${esc(p.processo)} — o OCR travou; tentando de novo…`, "");
+        r = await rodar(1);
+      }
       feitos++;
       await navigator.locks.request("baixados", async () => { const { baixados = {} } = await chrome.storage.local.get("baixados"); baixados[p.processo] = { em: Date.now(), arquivo: r.pdf }; await chrome.storage.local.set({ baixados }); });
       const st = r.studio ? (r.studio.ok ? (r.studio.parcial ? ` — Studio: ${esc(r.studio.mensagem)}` : r.studio.fila ? " — na esteira de minutas" : " — análise concluída no Studio" + (r.studio.docs ? (r.studio.docs.ok ? ` — Google Docs: ${esc(r.studio.docs.titulo)}` : ` — <span class="erro">Docs: ${esc(r.studio.docs.erro)}</span>`) : "")) : ` — <span class="erro">Studio: ${esc(r.studio.erro)}</span>`) : "";

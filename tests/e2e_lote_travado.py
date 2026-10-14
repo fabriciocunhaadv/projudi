@@ -70,9 +70,9 @@ def main():
         pg.wait_for_selector("body[data-pronto='1']", timeout=600000)
         print(pg.inner_text("#lista")); print(pg.inner_text("#status"))
         lista = pg.inner_text("#lista")
-        assert "travou" in lista, lista                                  # o 1º foi pulado com o motivo
-        assert "1 de 2 processo(s) baixado(s)" in pg.inner_text("#status"), pg.inner_text("#status")      # o 2º baixou normalmente
-        assert len(CORPOS) == 2, CORPOS
+        assert "erro" not in pg.inner_text("#status"), pg.inner_text("#status")
+        assert "2 de 2 processo(s) baixado(s)" in pg.inner_text("#status"), pg.inner_text("#status")      # o 1º travou, a nova tentativa automática o recuperou; o 2º baixou normalmente
+        assert len(CORPOS) == 3, CORPOS
         ctx.close()
 
     print("OK")
