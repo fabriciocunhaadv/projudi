@@ -72,6 +72,8 @@
   // ---------- análise de um processo ----------
   const normal = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase().replace(/\boutr[oa]s?\b/g, "outros");      // “Outros/Outras”: a tradução automática do Chrome troca uma pela outra
   const botao = (rx, raiz = document) => [...raiz.querySelectorAll("button")].find((b) => rx.test(texto(b)) && visivel(b));
+  // Botão da auditoria da Lupa: pelo id do app (estável) e, na falta dele, pelo texto — tolerante à tradução do Chrome (“Auditar” vira “Auditor”)
+  const botaoAuditar = (modal) => modal.querySelector("#btn-lupa-auditar-minuta") || botao(/Audit(ar|or)\s+Minuta|Minuta com Rigor/i, modal);
   function definirValor(el, valor) {   // campos controlados pelo React: usa o "setter" nativo e avisa a página
     const proto = el.tagName === "SELECT" ? HTMLSelectElement.prototype : el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
     Object.getOwnPropertyDescriptor(proto, "value").set.call(el, valor);
@@ -322,7 +324,7 @@
     if (!modal) throw new Error("a janela da Lupa do Magistrado não abriu");
     // Leva a janela ao formulário de nova auditoria: depois de uma auditoria ela reabre na tela de resultado (“Bancada”/“Resultado & Análise”).
     // Insiste nos botões que levam ao formulário até aparecer o botão “Auditar Minuta”.
-    const noForm = () => (botao(/Auditar Minuta/i, modal) || botao(/^Colar Texto$/i, modal)) && [...modal.querySelectorAll("textarea")].filter(visivel).length >= 1;
+    const noForm = () => (botaoAuditar(modal) || botao(/^Colar Texto$/i, modal)) && [...modal.querySelectorAll("textarea")].filter(visivel).length >= 1;
     const caminhos = [/^\s*Nova Auditoria\s*$/i, /Iniciar Nova Auditoria/i, /Nova Auditoria/i];
     document.documentElement.dataset.projudiAutoConfirm = "1";
     try {
@@ -371,8 +373,8 @@
       input.files = dt.files; input.dispatchEvent(new Event("change", { bubbles: true }));
       await dorme(1000);
     }
-    const b = await esperar(() => { const x = botao(/Auditar Minuta/i, modal); return x && !x.disabled ? x : null; }, 15000);
-    if (!b) throw new Error("não achei o botão “Auditar Minuta”");
+    const b = await esperar(() => { const x = botaoAuditar(modal); return x && !x.disabled ? x : null; }, 15000);
+    if (!b) throw new Error("não achei o botão “Auditar Minuta”" + dicaTraducao());
     const rotulo = texto(b); const foto0 = fotoAuditorias(); b.click();
     // Espera a auditoria terminar. Sinais: o botão volta ao normal OU a janela deixa de mudar (texto estável por ~12 s, sem “auditando/aguarde”).
     const t0 = Date.now(), texto_ = () => (modal.innerText || "").replace(/\s+/g, " ").trim();
@@ -382,7 +384,7 @@
     for (;;) {
       await dorme(1500);
       const e = erroNaTela(); if (e) throw new Error("o app avisou: " + e);
-      const x = botao(/Auditar Minuta/i, modal), agora = texto_();
+      const x = botaoAuditar(modal), agora = texto_();
       if (!x || x.disabled || texto(x) !== rotulo) comecou = true;
       if (agora !== ultimo) { ultimo = agora; desde = Date.now(); }
       const ocupado = /auditando|analisando|processando|aguarde|carregando|gerando/i.test(agora.slice(0, 4000));
