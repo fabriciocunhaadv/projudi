@@ -70,7 +70,7 @@
   }
 
   // ---------- análise de um processo ----------
-  const normal = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+  const normal = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase().replace(/\boutr[oa]s?\b/g, "outros");      // “Outros/Outras”: a tradução automática do Chrome troca uma pela outra
   const botao = (rx, raiz = document) => [...raiz.querySelectorAll("button")].find((b) => rx.test(texto(b)) && visivel(b));
   function definirValor(el, valor) {   // campos controlados pelo React: usa o "setter" nativo e avisa a página
     const proto = el.tagName === "SELECT" ? HTMLSelectElement.prototype : el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
@@ -78,6 +78,8 @@
     el.dispatchEvent(new Event(el.tagName === "SELECT" ? "change" : "input", { bubbles: true }));
     if (el.tagName !== "SELECT") el.dispatchEvent(new Event("change", { bubbles: true }));
   }
+  const traduzida = () => /translated-(ltr|rtl)/.test(document.documentElement.className);
+  const dicaTraducao = () => traduzida() ? " — o Chrome está TRADUZINDO esta página do Studio e isso muda os nomes e botões; desative a tradução (ícone de tradução na barra de endereço → “Nunca traduzir este site”) e tente de novo" : "";
   const pnormal = (t) => normal(t).replace(/\bcivil\b/g, "civel");      // “Civil” (grafia antiga das sugestões) = “Cível” do app
   function escolherPrompt(sel, prompt) {
     if (!prompt) return true;
@@ -124,7 +126,7 @@
     const painel = await esperar(() => document.getElementById("tour-input-panel"), 20000);
     if (!painel) throw new Error("não achei a área de entrada dos autos do app");
     const sel = prompt ? await esperar(() => seletorDePrompt(document, prompt), 30000) : seletorDePrompt(document, prompt);      // a lista de prompts do app carrega depois da página
-    if (prompt && (!sel || !escolherPrompt(sel, prompt))) throw new Error(`não achei o prompt “${prompt}” na lista do app`);
+    if (prompt && (!sel || !escolherPrompt(sel, prompt))) throw new Error(`não achei o prompt “${prompt}” na lista do app${dicaTraducao()}`);
     await dorme(400);
     if (tipo && !/auto/i.test(tipo)) { const bt = botao(new RegExp("^" + tipo + "$", "i"), painel); if (bt) bt.click(); }
     if (textoAutos) {      // entrada “Texto / Casos”: cola o texto do PDF com OCR (bem mais rápido que enviar o PDF)
@@ -350,7 +352,7 @@
     for (const i of modal.querySelectorAll("input[type=text]")) if (i.value && !/^\s*$/.test(i.value)) definirValor(i, "");
     await dorme(300);
     const sel = seletorDePrompt(modal, prompt);
-    if (prompt && (!sel || !escolherPrompt(sel, prompt))) throw new Error(`não achei o prompt “${prompt}” na Lupa`);
+    if (prompt && (!sel || !escolherPrompt(sel, prompt))) throw new Error(`não achei o prompt “${prompt}” na Lupa${dicaTraducao()}`);
     const num = [...modal.querySelectorAll("input[type=text]")].find((i) => /5012345/.test(i.placeholder || ""));
     if (num && processo) definirValor(num, processo);
     const tas = () => [...modal.querySelectorAll("textarea")].filter(visivel);
@@ -485,7 +487,7 @@
       const achar = (s) => [...s.options].find((o) => sem(o.text) === alvo) || [...s.options].find((o) => sem(o.text).includes(alvo)) || [...s.options].find((o) => alvo.includes(sem(o.text)) && sem(o.text).length > 8);
       const todosSelects = () => [...raiz.querySelectorAll("select"), ...document.querySelectorAll("select")];
       const dono = await esperar(() => todosSelects().find((s) => achar(s)), 30000), selects = todosSelects();      // a lista de prompts carrega depois da página
-      if (!dono) throw new Error(`não achei o prompt “${prompt}” no Módulo Turbo (opções vistas: ${(selects[0] ? [...selects[0].options].map((o) => texto(o)).slice(0, 4).join(" | ") : "nenhuma lista de prompts na tela")})`);
+      if (!dono) throw new Error(`não achei o prompt “${prompt}” no Módulo Turbo (opções vistas: ${(selects[0] ? [...selects[0].options].map((o) => texto(o)).slice(0, 4).join(" | ") : "nenhuma lista de prompts na tela")})${dicaTraducao()}`);
       definirValor(dono, achar(dono).value);
     }
     await dorme(300);

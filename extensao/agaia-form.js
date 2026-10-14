@@ -4,7 +4,7 @@
   if (window.__projudiAgaiaForm) return;
   window.__projudiAgaiaForm = true;
   const dorme = (ms) => new Promise((ok) => setTimeout(ok, ms));
-  const sem = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase().replace(/civel/g, "civil");
+  const sem = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase().replace(/civel/g, "civil").replace(/\boutr[oa]s?\b/g, "outros");
   async function esperar(fn, ms) { const t0 = Date.now(); for (;;) { const v = fn(); if (v) return v; if (Date.now() - t0 > ms) return null; await dorme(250); } }
 
   function marcar(id) {

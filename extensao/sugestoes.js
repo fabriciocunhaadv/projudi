@@ -9,6 +9,8 @@
     [/infracional/, "Infância e Juventude Infracional", "Infância e Juventude Infracional"],
     [/inf[aâ]ncia|infancia|juventude|inf\.? e juv/, "Infância e Juventude Cível", "Infância e Juventude Cível"],
     [/familia|sucess/, "Família e Sucessões", "Família"],
+    [/execucao fiscal.*estadual|estadual.*execucao fiscal/, "Execução Fiscal Estadual", "Execução Fiscal"],
+    [/execucao fiscal|exec\.? fiscal/, "Execução Fiscal Municipal", "Execução Fiscal"],
     [/fazenda/, "Fazenda Pública Comum", "Fazenda Pública"],
     [/eleitoral/, "Eleitoral", "Eleitoral"],
     [/criminal|penal/, "Criminal", "Criminal"],
