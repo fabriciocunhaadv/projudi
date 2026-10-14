@@ -39,6 +39,7 @@
   (async () => {
     const { agaia_pedido: p } = await chrome.storage.local.get("agaia_pedido");
     if (!p || Date.now() - p.ts > 3 * 60000) { if (p) await chrome.storage.local.remove("agaia_pedido"); return; }
+    if (p.rota && !p.irOk) return;      // ainda no caminho até a execução: agaia-rota.js cuida; aqui só age na tela de execução
     await chrome.storage.local.remove("agaia_pedido");
     if (!(await esperar(() => document.getElementById("consultar_juris_auto") && document.getElementById("incluir_contexto_ampliado_acuracia"), 20000))) return aviso("Extensão: não achei as opções extras do ExecAgaia.", false);
     await dorme(500);
@@ -51,6 +52,6 @@
     const e = escolherPrompt(p.prompt);
     if (e) problemas.push(e);
     document.documentElement.dataset.projudiAgaia = problemas.length ? "parcial:" + problemas.join("|") : "ok";
-    aviso(problemas.length ? "Extensão: preenchi o que deu; " + problemas.join("; ") + "." : `Extensão: ${p.numero} — opções marcadas e prompt escolhido. Falta só o restante do formulário.`, !problemas.length);
+    aviso((p.primeiro && p.aberto ? `ATENÇÃO: o processo ${p.numero} não estava na lista do Classificador; abri o primeiro da lista (${p.aberto}). ` : "") + (problemas.length ? "Extensão: preenchi o que deu; " + problemas.join("; ") + "." : `Extensão: ${p.aberto || p.numero} — opções marcadas e prompt escolhido. Falta só o restante do formulário.`), !problemas.length && !(p.primeiro && p.aberto));
   })();
 })();

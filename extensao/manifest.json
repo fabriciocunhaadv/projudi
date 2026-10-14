@@ -116,6 +116,7 @@
         "https://simplesefacil.tjgo.jus.br/agaia/*"
       ],
       "js": [
+        "agaia-rota.js",
         "agaia-form.js"
       ],
       "run_at": "document_idle"

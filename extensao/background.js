@@ -200,8 +200,10 @@ async function abrirGerarPdf(tabId) {
 
 chrome.runtime.onMessage.addListener((m, s, responder) => {
   if (m?.acao === "agaia-enviar") {       // abre o ExecAgaia com o número do processo; agaia-form.js marca as opções e o prompt
-    const url = "https://simplesefacil.tjgo.jus.br/agaia/prompts/moderno?numero_processo=" + encodeURIComponent(m.numero) + "&tipo_processo=judicial&acao_id=6&validado=True";
-    chrome.storage.local.set({ agaia_pedido: { numero: m.numero, serventia: m.serventia || "", prompt: m.prompt || "", ts: Date.now() } })
+    const rota = m.rota !== false;      // padrão: faz o caminho pelas telas do Agaia (agaia-rota.js); "rota: false" abre direto pela URL do processo
+    const url = rota ? "https://simplesefacil.tjgo.jus.br/agaia/home"
+      : "https://simplesefacil.tjgo.jus.br/agaia/prompts/moderno?numero_processo=" + encodeURIComponent(m.numero) + "&tipo_processo=judicial&acao_id=6&validado=True";
+    chrome.storage.local.set({ agaia_pedido: { numero: m.numero, serventia: m.serventia || "", prompt: m.prompt || "", rota, ts: Date.now() } })
       .then(() => chrome.tabs.create({ url, active: true })).then(() => responder({ ok: true }), (e) => responder({ ok: false, erro: String(e.message || e) }));
     return true;
   }
