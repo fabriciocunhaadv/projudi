@@ -25,10 +25,16 @@
       /tipo\s+conclus/i.test(t.textContent) && /n[ãa]o\s+analisadas/i.test(t.textContent) &&
       !t.querySelector("table"));
     if (!t) return { logado: logado(d), linhas: null };
-    const linhas = [...t.querySelectorAll("tr")]
-      .map((tr) => [...tr.querySelectorAll("th,td")].map((c) => norm(c.textContent)))
-      .filter((r) => r.length >= 3 && !semAcento(r[0]).startsWith("tipo conclus"))
-      .map((r) => ({ tipo: r[0], naoAnalisadas: paraInt(r[1]), preAnalisadas: paraInt(r[2]) }));
+    // Colunas pelo CABEÇALHO (a tela ganhou “Aguardando assinatura” antes de “Não analisadas”) e sem a linha “Total”.
+    const todas = [...t.querySelectorAll("tr")].map((tr) => [...tr.querySelectorAll("th,td")].map((c) => norm(c.textContent)));
+    const cab = todas.find((r) => r.some((c) => /^n[ãa]o analisadas?$/i.test(c)));
+    const col = (rx, padrao) => { const i = cab ? cab.findIndex((c) => rx.test(semAcento(c))) : -1; return i >= 0 ? { i, n: cab.length } : { i: padrao, n: 3 }; };
+    const cNa = col(/^nao analisadas?/, 1), cPre = col(/^pre-?\s?analisadas?/, 2), cAg = cab ? col(/^aguardando/, -1) : { i: -1, n: 3 };
+    // linha com menos células que o cabeçalho (rótulo com colspan): alinha pela direita
+    const val = (r, c) => { if (c.i < 0) return 0; const j = r.length - (c.n - c.i); return j >= 1 ? paraInt(r[j]) : 0; };
+    const linhas = todas
+      .filter((r) => r.length >= 3 && r !== cab && !semAcento(r[0]).startsWith("tipo conclus") && !/^total\b/.test(semAcento(r[0])))
+      .map((r) => ({ tipo: r[0], naoAnalisadas: val(r, cNa), preAnalisadas: val(r, cPre), ...(cAg.i >= 0 ? { aguardandoAssinatura: val(r, cAg) } : {}) }));
     return { logado: true, linhas };
   }
 

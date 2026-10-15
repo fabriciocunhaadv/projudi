@@ -22,6 +22,16 @@ def main():
         assert r["linhas"] == [{"tipo": "Concluso - Genérico", "naoAnalisadas": 6, "preAnalisadas": 1},
                                {"tipo": "Concluso - Decisão", "naoAnalisadas": 0, "preAnalisadas": 2}], r
 
+        # tela nova: coluna “Aguardando assinatura” antes de “Não analisadas” + linha Total (antes: pré-analisadas saía somada e não analisadas zerada)
+        html4 = ('<table><tr><th>Tipo Conclusão</th><th>Aguardando assinatura</th><th>Não analisadas</th><th>Pré-analisadas</th></tr>'
+                 '<tr><td>Conclusão - Decisão</td><td>0</td><td><a href="x">5</a></td><td><a href="y">4</a></td></tr>'
+                 '<tr><td>Conclusão - Despacho</td><td>1</td><td>2</td><td>0</td></tr>'
+                 '<tr><td colspan="2">Total</td><td>1</td><td>7</td><td>4</td></tr></table>')
+        r = pg.evaluate("h => ProjudiParser.parseConclusoes(h)", html4)
+        print(r)
+        assert r["linhas"] == [{"tipo": "Conclusão - Decisão", "naoAnalisadas": 5, "preAnalisadas": 4, "aguardandoAssinatura": 0},
+                               {"tipo": "Conclusão - Despacho", "naoAnalisadas": 2, "preAnalisadas": 0, "aguardandoAssinatura": 1}], r
+
         # lista de serventias
         r = call("h => ProjudiParser.parseLista(h)", "lista_serventias.html")
         assert r["logado"] and len(r["itens"]) == 2 and r["itens"][0]["href"].startswith("Usuario?PaginaAtual=7")
