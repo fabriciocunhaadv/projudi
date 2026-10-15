@@ -24,7 +24,10 @@
     const t = [...d.querySelectorAll("table")].find((t) =>
       /tipo\s+conclus/i.test(t.textContent) && /n[ãa]o\s+analisadas/i.test(t.textContent) &&
       !t.querySelector("table"));
-    if (!t) return { logado: logado(d), linhas: null };
+    // serventia que a tela mostra ("Serventia: …"): a sessão do Projudi guarda UMA serventia por vez; se outra aba trocar, os números seriam de outra vara
+    const mS = norm(d.body?.textContent || "").match(/Serventia:\s*(.+?)\s*(?:Serventia Cargo|Cargo:|E-?mail:|$)/i);
+    const serventiaTela = mS ? mS[1].trim() : "";
+    if (!t) return { logado: logado(d), linhas: null, serventiaTela };
     // Colunas pelo CABEÇALHO (a tela ganhou “Aguardando assinatura” antes de “Não analisadas”) e sem a linha “Total”.
     const todas = [...t.querySelectorAll("tr")].map((tr) => [...tr.querySelectorAll("th,td")].map((c) => norm(c.textContent)));
     const cab = todas.find((r) => r.some((c) => /^n[ãa]o analisadas?$/i.test(c)));
@@ -35,7 +38,7 @@
     const linhas = todas
       .filter((r) => r.length >= 3 && r !== cab && !semAcento(r[0]).startsWith("tipo conclus") && !/^total\b/.test(semAcento(r[0])))
       .map((r) => ({ tipo: r[0], naoAnalisadas: val(r, cNa), preAnalisadas: val(r, cPre), ...(cAg.i >= 0 ? { aguardandoAssinatura: val(r, cAg) } : {}) }));
-    return { logado: true, linhas };
+    return { logado: true, linhas, serventiaTela };
   }
 
   const RE_PROC = /\d{5,7}[.\-]\d{2}(?:\.\d{4}\.\d\.\d{2}\.\d{4})?/;

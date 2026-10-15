@@ -32,6 +32,12 @@ def main():
         assert r["linhas"] == [{"tipo": "Conclusão - Decisão", "naoAnalisadas": 5, "preAnalisadas": 4, "aguardandoAssinatura": 0},
                                {"tipo": "Conclusão - Despacho", "naoAnalisadas": 2, "preAnalisadas": 0, "aguardandoAssinatura": 1}], r
 
+        # serventia mostrada na tela (para conferir que a sessão não trocou de vara no meio da leitura)
+        r = pg.evaluate("h => ProjudiParser.parseConclusoes(h)", '<div>Boa Tarde! Seja bem vindo ao Processo Judicial Serventia: Montes Claros de Goias - Vara da Inf. e Juv. Infracional E-mail: x@tjgo.jus.br</div>' + html4)
+        assert r["serventiaTela"] == "Montes Claros de Goias - Vara da Inf. e Juv. Infracional", r
+        r = pg.evaluate("h => ProjudiParser.parseConclusoes(h)", '<div>Serventia: Goiânia - 3º Núcleo de Justiça 4.0 - Execução Fiscal Municip Serventia Cargo: Juiz 03 E-mail: x</div><table><tr><th>Tipo Conclusão</th><th>Não analisadas</th><th>Pré-analisadas</th></tr><tr><td>Não há Conclusões</td></tr></table>')
+        assert r["serventiaTela"] == "Goiânia - 3º Núcleo de Justiça 4.0 - Execução Fiscal Municip", r
+
         # lista de serventias
         r = call("h => ProjudiParser.parseLista(h)", "lista_serventias.html")
         assert r["logado"] and len(r["itens"]) == 2 and r["itens"][0]["href"].startswith("Usuario?PaginaAtual=7")

@@ -224,7 +224,10 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
   const job = id ? (await chrome.storage.local.get("lote_" + id))["lote_" + id] : null;
   if (!job) { $("status").textContent = "Selecione os processos no painel da extensão e use “Baixar PDFs dos selecionados”."; $("barra").hidden = true; return; }
   const itens = job.itens, pasta = job.pasta || "Projudi";
-  manterAcordado("lote", true); const sinal = setInterval(() => manterAcordado("lote", true), 60000); addEventListener("pagehide", () => manterAcordado("lote", false));      // o computador não entra em espera enquanto o lote roda
+  // o lote troca de serventia na sessão do Projudi: avisa a verificação (que lê números por serventia) para não rodar junto, e espera uma verificação em curso terminar
+  for (let k = 0; k < 90 && (await chrome.storage.local.get("estado")).estado?.status === "verificando"; k++) { $("status").textContent = "Aguardando a verificação do Projudi terminar…"; await dorme(2000); }
+  const marcaSessao = () => chrome.storage.local.set({ lote_sessao_ts: Date.now() }); marcaSessao();
+  manterAcordado("lote", true); const sinal = setInterval(() => { manterAcordado("lote", true); marcaSessao(); }, 30000); addEventListener("pagehide", () => manterAcordado("lote", false));      // o computador não entra em espera enquanto o lote roda
   $("lista").innerHTML = itens.map((p, i) => `<li data-i="${i}" class="fila">${esc(p.processo)} <small>${esc(p.classificador || "")}</small> — na fila</li>`).join("");
   $("barra").max = itens.length;
   const diag = document.createElement("button"); diag.textContent = "Copiar diagnóstico"; diag.style.marginLeft = "8px";
@@ -274,7 +277,7 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
     }
     $("barra").value = i + 1;
   }
-  clearInterval(sinal); manterAcordado("lote", false); fecharAbaDoLote();
+  clearInterval(sinal); manterAcordado("lote", false); fecharAbaDoLote(); chrome.storage.local.remove("lote_sessao_ts");
   const resumo = `${cancelado ? "Cancelado. " : ""}${feitos} de ${itens.length} processo(s) baixado(s)${erros ? `, ${erros} com erro` : ""}.`;
   $("status").textContent = resumo; $("cancelar").disabled = true;
   document.body.dataset.pronto = "1"; document.body.dataset.resumo = JSON.stringify({ feitos, erros });

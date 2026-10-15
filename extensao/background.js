@@ -58,10 +58,23 @@ async function lerProcessos(s, tipo) {
   return r.processos;
 }
 
+// Compara o nome da serventia da lista ("… - GO") com o da tela ("Serventia: …", às vezes cortado): sem acento, sem “- GO”, um começando o outro.
+function mesmaServentia(tela, lista) {
+  if (!tela) return true;      // a tela não informa a serventia: não dá para conferir
+  const n = (s) => semAcento(s).replace(/\s+/g, " ").replace(/\s*-\s*go\s*$/, "").replace(/[….]+$/, "").trim();
+  const a = n(tela), b = n(lista);
+  return !!a && !!b && (a === b || a.startsWith(b) || b.startsWith(a));
+}
+
 const ocioso = (ms) => new Promise((ok) => setTimeout(ok, ms));
 
 async function verificar() {
   if (rodando) return;
+  const { lote_sessao_ts: ocupadaPor } = await chrome.storage.local.get("lote_sessao_ts");
+  if (ocupadaPor && Date.now() - ocupadaPor < 120000) {      // um lote de PDFs está trocando de serventia na mesma sessão: os números sairiam misturados
+    await chrome.storage.local.set({ estado: { status: "erro", mensagem: "Há um download de PDFs (lote) em andamento: ele troca de serventia na sessão do Projudi. Aguarde terminar e clique em Verificar agora." } });
+    return;
+  }
   rodando = true;
   await chrome.storage.local.set({ estado: { status: "verificando" } });
   try {
@@ -80,9 +93,16 @@ async function verificar() {
       const url = new URL(a.href, BASE).href;
       const s = { serventia: a.serventia, perfil: a.perfil, url, linhas: [], processos: { naoAnalisadas: [], preAnalisadas: [] }, erro: null };
       try {
-        await baixar(url); // escolhe a serventia na sessão (devolve só a moldura da página)
-        const html = await baixar(INICIO);
-        const r = await ler("conclusoes", html);
+        // escolhe a serventia na sessão e confere, pela própria tela, que a sessão está nela (outra aba do Projudi pode trocar de serventia no meio)
+        let html = "", r = null, ok = false;
+        for (let t = 0; t < 4 && !ok; t++) {
+          await baixar(url); // escolhe a serventia na sessão (devolve só a moldura da página)
+          html = await baixar(INICIO);
+          r = await ler("conclusoes", html);
+          ok = mesmaServentia(r.serventiaTela, a.serventia);
+          if (!ok) await ocioso(2500 * (t + 1));
+        }
+        if (!ok) throw new Error(`a sessão do Projudi mudou de serventia durante a leitura (a tela mostrou “${r?.serventiaTela || "?"}” em vez de “${a.serventia}”): outra aba do Projudi está trocando de serventia; feche-as e verifique de novo`);
         if ((await chrome.storage.local.get("debug")).debug?.["amostra inicio"] === undefined) await guardarDebug("amostra inicio", INICIO, html);
         if (!r.linhas) { guardarDebug(s.serventia + " :: tela inicial", INICIO, html); s.erro = "tabela de conclusões não encontrada"; }
         else {
@@ -100,6 +120,9 @@ async function verificar() {
             }
             s.processos.preAnalisadas = todas;
           }
+          // a sessão continuou na mesma serventia até o fim da leitura das listas?
+          const fim = await ler("conclusoes", await baixar(INICIO));
+          if (!mesmaServentia(fim.serventiaTela, a.serventia)) throw new Error(`a sessão do Projudi trocou de serventia no meio da leitura (agora “${fim.serventiaTela || "?"}”): outra aba do Projudi está mudando de serventia; feche-as e verifique de novo`);
           s.avisos = [["naoAnalisadas", nNa], ["preAnalisadas", nPre]]
             .map(([k, esperado]) => ({ tipo: k, esperado, lido: s.processos[k].length }))
             .filter((x) => x.lido !== x.esperado);
