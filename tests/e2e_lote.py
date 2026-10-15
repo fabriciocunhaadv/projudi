@@ -17,10 +17,12 @@ GERAR = """<html><head><meta charset="utf-8"><title>Gerar PDF</title></head><bod
 <button type="submit" id="operacao" name="operacao" value="GerarPDF"> Gerar Processo em PDF </button></form></div></body></html>"""
 PDF = {}
 CORPOS = []
+REQS = []
 
 
 class H(http.server.BaseHTTPRequestHandler):
     def do_GET(s):
+        REQS.append(s.path)
         if s.path.startswith("/proc"):
             corpo = (PROC % (s.path, uuid.uuid4().hex[:6])).encode()
         elif s.path.startswith("/PdfServico"):
@@ -61,14 +63,16 @@ def main():
         PDF["b"] = base64.b64decode(b64); aux.close()
 
         pg = ctx.new_page(); pg.goto(f"chrome-extension://{ext_id}/lote.html")
-        itens = [{"processo": "5293296-60.2026.8.09.0166", "url": "http://localhost:8770/proc?id=1", "classificador": "Emilly - minutando", "pasta": "Projudi/2026-10-02/Emilly"},
-                 {"processo": "5000001-11.2026.8.09.0166", "url": "http://localhost:8770/proc?id=2", "classificador": "Emilly - minutando", "pasta": "Projudi/2026-10-02/Emilly"}]
+        itens = [{"processo": "5293296-60.2026.8.09.0166", "url": "http://localhost:8770/proc?id=1", "classificador": "Emilly - minutando", "pasta": "Projudi/2026-10-02/Emilly", "serventia": "Vara A", "serventiaUrl": "http://localhost:8770/serventia?s=A"},
+                 {"processo": "5000001-11.2026.8.09.0166", "url": "http://localhost:8770/proc?id=2", "classificador": "Emilly - minutando", "pasta": "Projudi/2026-10-02/Emilly", "serventia": "Vara B", "serventiaUrl": "http://localhost:8770/serventia?s=B"}]
         sw.evaluate("(j) => chrome.storage.local.set({ lote_t1: j })", {"itens": itens, "pasta": "Projudi"})
         pg.goto(f"chrome-extension://{ext_id}/lote.html?lote=t1")
         pg.wait_for_selector("body[data-pronto='1']", timeout=600000)
         print(pg.inner_text("#lista")); print(pg.inner_text("#status"))
         assert "2 de 2 processo(s) baixado(s)" in pg.inner_text("#status")
         assert len(CORPOS) == 2, CORPOS
+        # a serventia do processo é escolhida na sessão ANTES de abrir o processo (senão o Projudi nega acesso aos arquivos)
+        assert REQS.index("/serventia?s=A") < REQS.index("/proc?id=1") and REQS.index("/serventia?s=B") < REQS.index("/proc?id=2"), REQS
         fins = [sw.evaluate("(k) => chrome.storage.local.get(k)", f"lote_fim_t1:{i}")[f"lote_fim_t1:{i}"] for i in (0, 1)]
         print(fins)
         pdf = subprocess.run(["pdftotext", "-layout", fins[0]["pdf"], "-"], capture_output=True, text=True).stdout.lower(); pdf = " ".join(pdf.split())
