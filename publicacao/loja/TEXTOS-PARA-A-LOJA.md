@@ -49,7 +49,7 @@ Todas usam dados fictícios (comarca "Exemplo", processos inventados).
 
 **Dados coletados (marque):** "Conteúdo do site" e "Informações pessoais ou profissionais / comunicações" apenas no sentido de que a extensão lê as páginas e os processos que o próprio usuário abre; nada é enviado ao desenvolvedor. Marque as três declarações: não vendo dados; não uso para fins alheios à finalidade única; não uso para avaliar crédito.
 
-**URL da política de privacidade:** a do GitHub Pages (`https://fabriciocunhaadv.github.io/projudi/`) assim que a pasta `docs/` estiver na branch `main` e o Pages ativado.
+**URL da política de privacidade:** `https://fabriciocunhaadv.github.io/projudi/` — exige ativar o GitHub Pages em Settings → Pages (Source: Deploy from a branch; Branch: `claude/determined-bardeen-xtc9lq`, pasta `/docs`). Abra a URL no navegador antes de colar na loja.
 
 ## Aba "Distribuição"
 Visibilidade: **Privada** (testadores confiáveis, com os e-mails Google dos assessores) ou **Não listada**. Regiões: Brasil.
