@@ -128,7 +128,7 @@
   const caixaDuasEtapas = () => [...document.querySelectorAll("label")].find((l) => /Execu[cç][aã]o em 2 Etapas/i.test(texto(l)) && visivel(l))?.querySelector("input[type=checkbox]");
   const prosseguirEtapa2 = () => botao(/Prosseguir para (a )?2ª Etapa/i);
 
-  async function analisar({ arquivoId, nome, prompt, tipo, texto: textoAutos, ate1 }) {
+  async function analisar({ arquivoId, nome, prompt, tipo, texto: textoAutos, ate1, processo }) {
     const bytes = arquivos.get(arquivoId);
     if (!bytes && !textoAutos) throw new Error("arquivo não recebido");
     fecharJanelas();
@@ -152,7 +152,10 @@
       if (!input) throw new Error("não achei o campo de envio do PDF do processo");
       const dt = new DataTransfer(); dt.items.add(new File([bytes], nome, { type: "application/pdf" }));
       input.files = dt.files; input.dispatchEvent(new Event("change", { bubbles: true }));
-      await esperar(() => texto(painel).includes(nome.slice(0, 18)), 20000);
+      // o app tem de mostrar o PDF recebido; sem isso ele geraria uma minuta genérica (partes/número em branco) só com o prompt
+      let recebido = await esperar(() => texto(painel).includes(nome.slice(0, 18)), 20000);
+      if (!recebido) { const dt2 = new DataTransfer(); dt2.items.add(new File([bytes], nome, { type: "application/pdf" })); input.files = dt2.files; input.dispatchEvent(new Event("change", { bubbles: true })); recebido = await esperar(() => texto(painel).includes(nome.slice(0, 18)), 20000); }
+      if (!recebido) throw new Error(`o app do Studio não recebeu o PDF ${nome} (ele não aparece na área de entrada); a minuta não foi gerada para não sair com dados genéricos — tente de novo`);
     }
     const duas = caixaDuasEtapas(); let desmarcar = false;
     if (duas && !duas.checked) { duas.click(); desmarcar = true; await dorme(400); }      // estava desmarcada: marca para a análise e desmarca depois
@@ -186,6 +189,9 @@
     } finally {
       if (desmarcar) { const c = caixaDuasEtapas(); if (c && c.checked) c.click(); }
     }
+    // confere se a minuta é mesmo DESTE processo: o app, sem ler o PDF, devolve número 0000000-00… e “Parte Autora/Parte Ré” e guardaria tudo como um processo só
+    const dig = String(processo || "").replace(/\D/g, ""), caixa = document.getElementById("tour-meta-parties-box");
+    if (dig.length >= 7 && caixa && !(caixa.innerText || "").replace(/\D/g, "").includes(dig.slice(0, 7))) throw new Error(`a minuta saiu com dados que não são de ${processo} (o app mostrou “${(caixa.innerText || "").replace(/\s+/g, " ").trim().slice(0, 90)}”): ele não leu os autos. Apague esse registro no Histórico do app e tente de novo`);
     return { ok: true, mensagem: "análise concluída" + (window.__promptAproximado ? " — " + window.__promptAproximado : ""), aproximado: window.__promptAproximado || "", minuta: await lerMinuta(), minutaHtml: minutaHtmlDoPainel(), injecao: lerInjecao() };
   }
 

@@ -166,7 +166,10 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
       await carregou(tab.id); await dorme(1500);
       for (let k = 0; k < 8 && !r.achou; k++) { r = await limite(GerarUtil.capturarGerar(tab.id), 45000, "a aba “Navegação de Arquivos” não respondeu"); if (!r.achou) await dorme(1000); }
     }
-    if (!r.achou) throw new Error("não achei o botão “Gerar PDF” no processo");
+    if (!r.achou) {
+      const d = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => ({ u: location.href.slice(0, 120), t: document.title.slice(0, 80), x: (document.body?.innerText || "").replace(/\s+/g, " ").slice(0, 160) }) }).then((x) => x[0]?.result).catch(() => null);
+      throw new Error("não achei o botão “Gerar PDF” no processo" + (d ? ` (página vista: “${d.t}” — ${d.x})` : ""));
+    }
     passo("abrindo a janela Gerar PDF");
     if (r.url) popup = await chrome.tabs.create({ url: r.url, active: false });
     // a janela Gerar PDF consome o pedido; se ele continuar lá depois de 90 s, ela não abriu
@@ -247,8 +250,9 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
       let r;
       try { r = await rodar(0); }
       catch (e1) {      // OCR travado: uma nova tentativa automática, do zero
-        if (!/^o OCR travou/.test(e1.message) || cancelado) throw e1;
-        marca(i, `⏳ ${esc(p.processo)} — o OCR travou; tentando de novo…`, "");
+        if (!/^(o OCR travou|não achei o botão|a página do processo não respondeu|a aba “Navegação)/.test(e1.message) || cancelado) throw e1;
+        marca(i, `⏳ ${esc(p.processo)} — ${/^o OCR/.test(e1.message) ? "o OCR travou" : "não achei o botão Gerar PDF"}; tentando de novo com um link novo do processo…`, "");
+        if (!/^o OCR/.test(e1.message)) { const nova = await urlFresca(p).catch(() => null); if (nova) p.url = nova; }      // link novo pela lista da serventia
         r = await rodar(1);
       }
       feitos++;
