@@ -178,9 +178,19 @@
     } finally {
       if (desmarcar) { const c = caixaDuasEtapas(); if (c && c.checked) c.click(); }
     }
-    return { ok: true, mensagem: "análise concluída", minuta: await lerMinuta(), minutaHtml: minutaHtmlDoPainel() };
+    return { ok: true, mensagem: "análise concluída", minuta: await lerMinuta(), minutaHtml: minutaHtmlDoPainel(), injecao: lerInjecao() };
   }
 
+  // Tarja de "prompt injection" do app (vermelha: com a movimentação/arquivo/página; verde: nada encontrado). Lida da tela, sem mexer nela.
+  function lerInjecao(escopo) {
+    try {
+      const raiz = escopo || document;
+      const v = raiz.querySelector("[data-testid=aviso-prompt-injection]"), g = raiz.querySelector("[data-testid=aviso-prompt-injection-ok]");
+      if (v) return { estado: "vermelha", texto: [...v.querySelectorAll("li")].slice(0, 6).map((li) => (li.innerText || "").replace(/\s+/g, " ").trim().slice(0, 260)).join(" | ") };
+      if (g) return { estado: "verde", texto: "nada encontrado" };
+    } catch (e) { /* sem tarja */ }
+    return null;
+  }
   // Texto da minuta gerada, lido direto do painel de resultado (só o texto do ato: sem caixas de auditoria/teses).
   // Se a estrutura da tela mudar, usa o botão "Copiar" do app.
   function minutaDoPainel() {
@@ -400,6 +410,7 @@
       if (voltou || (comecou && !ocupado && Date.now() - desde > 12000) || (!comecou && Date.now() - t0 > 20000)) break;
       if (Date.now() - t0 > 8 * 60000) throw new Error("a auditoria da Lupa demorou mais de 8 minutos");
     }
+    const injecaoLupa = lerInjecao(modal);      // a tarja fica no topo do resultado; lida antes de a janela mudar de tela
     const resumo = texto_().replace(/Auditar Minuta com Rigor do Magistrado.*$/i, "").slice(0, 300);
     // Confere em “Processos Auditados” se a auditoria ficou gravada. Só segue para o próximo depois de confirmar:
     // consulta a aba por até ~100 s e, se não aparecer, fecha e reabre o módulo e navega de novo pelos botões.
@@ -444,7 +455,7 @@
     if (rxProc && temNaFoto(foto1, rxProc) && !temNaFoto(foto2, rxProc)) throw new Error(`o botão “Limpar Tudo” apagou ${processo} dos Processos Auditados. Parei para não perder mais registros. ${trilha}`);
     if (antes != null && !jaTinha && qtd != null && Number(qtd) <= antes) throw new Error(`a auditoria de ${processo} substituiu outra em vez de entrar na lista (eram ${antes}, ficaram ${qtd}). Não passei para o próximo`);
     window.__lupaQtd = Number(qtd) || window.__lupaQtd; window.__lupaRx = rxProc;
-    return { ok: true, mensagem: `auditoria gravada em Processos Auditados (${qtd ?? "?"} registro(s); ${processo} ✔) — ${trilha}` + (resumo ? " — " + resumo : ""), minuta: "" };
+    return { ok: true, mensagem: `auditoria gravada em Processos Auditados (${qtd ?? "?"} registro(s); ${processo} ✔) — ${trilha}` + (resumo ? " — " + resumo : ""), minuta: "", injecao: injecaoLupa };
   }
 
 
