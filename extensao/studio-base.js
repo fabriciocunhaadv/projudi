@@ -86,11 +86,16 @@
   function escolherPrompt(sel, prompt) {
     if (!prompt) return true;
     const op = [...sel.options].find((o) => pnormal(o.text) === pnormal(prompt)) || [...sel.options].find((o) => pnormal(o.text).includes(pnormal(prompt)));
-    if (!op) return false;
+    if (!op) {      // o juiz não tem o prompt exato: usa o parecido da mesma matéria (ex.: Execução Fiscal Estadual → Municipal)
+      const p = globalThis.PromptSimilar?.melhor([...sel.options].filter((o) => o.value && /Área Judicial|Area Judicial/i.test(o.text)).map((o) => ({ texto: o.text, ref: o })), prompt, window.__dicasPrompt);
+      if (!p) return false;
+      definirValor(sel, p.ref.value); window.__promptAproximado = `prompt “${prompt}” não cadastrado: usado o parecido “${p.texto.trim()}”`;
+      return true;
+    }
     definirValor(sel, op.value);
     return true;
   }
-  const seletorDePrompt = (raiz, prompt) => [...raiz.querySelectorAll("select")].find((s) => [...s.options].some((o) => /Área Judicial|Area Judicial/i.test(o.text)) && (!prompt || [...s.options].some((o) => pnormal(o.text).includes(pnormal(prompt)))));
+  const seletorDePrompt = (raiz, prompt) => [...raiz.querySelectorAll("select")].find((s) => [...s.options].some((o) => /Área Judicial|Area Judicial/i.test(o.text)) && (!prompt || [...s.options].some((o) => pnormal(o.text).includes(pnormal(prompt))) || !!globalThis.PromptSimilar?.melhor([...s.options].filter((o) => /Área Judicial|Area Judicial/i.test(o.text)).map((o) => ({ texto: o.text, ref: o })), prompt, window.__dicasPrompt)));
   const erroNaTela = () => { const t = document.querySelector("[data-rht-toaster]"); const x = t ? texto(t) : ""; return /erro|falha|inv[aá]lid|limite|quota|n[aã]o foi poss/i.test(x) ? x : ""; };
   // Falha passageira dos servidores de IA (alta demanda, 503, tempo de fila): espera 5 s e aperta o botão de novo (até 6 vezes).
   const transitorio = (msg) => /alta demanda|503|timeout de fila|reten[cç][aã]o em fila|tente novamente|tentar novamente|sobrecarg|indispon[ií]vel/i.test(msg || "");
@@ -178,7 +183,7 @@
     } finally {
       if (desmarcar) { const c = caixaDuasEtapas(); if (c && c.checked) c.click(); }
     }
-    return { ok: true, mensagem: "análise concluída", minuta: await lerMinuta(), minutaHtml: minutaHtmlDoPainel(), injecao: lerInjecao() };
+    return { ok: true, mensagem: "análise concluída" + (window.__promptAproximado ? " — " + window.__promptAproximado : ""), aproximado: window.__promptAproximado || "", minuta: await lerMinuta(), minutaHtml: minutaHtmlDoPainel(), injecao: lerInjecao() };
   }
 
   // Tarja de "prompt injection" do app (vermelha: com a movimentação/arquivo/página; verde: nada encontrado). Lida da tela, sem mexer nela.
@@ -455,7 +460,7 @@
     if (rxProc && temNaFoto(foto1, rxProc) && !temNaFoto(foto2, rxProc)) throw new Error(`o botão “Limpar Tudo” apagou ${processo} dos Processos Auditados. Parei para não perder mais registros. ${trilha}`);
     if (antes != null && !jaTinha && qtd != null && Number(qtd) <= antes) throw new Error(`a auditoria de ${processo} substituiu outra em vez de entrar na lista (eram ${antes}, ficaram ${qtd}). Não passei para o próximo`);
     window.__lupaQtd = Number(qtd) || window.__lupaQtd; window.__lupaRx = rxProc;
-    return { ok: true, mensagem: `auditoria gravada em Processos Auditados (${qtd ?? "?"} registro(s); ${processo} ✔) — ${trilha}` + (resumo ? " — " + resumo : ""), minuta: "", injecao: injecaoLupa };
+    return { ok: true, mensagem: `auditoria gravada em Processos Auditados (${qtd ?? "?"} registro(s); ${processo} ✔) — ${trilha}` + (window.__promptAproximado ? " — " + window.__promptAproximado : "") + (resumo ? " — " + resumo : ""), minuta: "", injecao: injecaoLupa };
   }
 
 
@@ -497,11 +502,12 @@
     if (!raiz) throw new Error("não achei o Módulo Turbo no app (abra o módulo uma vez e tente de novo)");
     if (prompt) {      // a lista do Turbo mostra “Prompt • [TAG]”: compara sem a etiqueta e procura primeiro no próprio módulo
       const sem = (t) => normal(t).replace(/\s*•.*$/, ""), alvo = sem(prompt);
-      const achar = (s) => [...s.options].find((o) => sem(o.text) === alvo) || [...s.options].find((o) => sem(o.text).includes(alvo)) || [...s.options].find((o) => alvo.includes(sem(o.text)) && sem(o.text).length > 8);
+      const achar = (s) => [...s.options].find((o) => sem(o.text) === alvo) || [...s.options].find((o) => sem(o.text).includes(alvo)) || [...s.options].find((o) => alvo.includes(sem(o.text)) && sem(o.text).length > 8) || null;
+      const parecido = (s) => { const p = globalThis.PromptSimilar?.melhor([...s.options].filter((o) => /Área Judicial|Area Judicial/i.test(o.text)).map((o) => ({ texto: o.text, ref: o })), prompt, window.__dicasPrompt); return p ? p.ref : null; };
       const todosSelects = () => [...raiz.querySelectorAll("select"), ...document.querySelectorAll("select")];
-      const dono = await esperar(() => todosSelects().find((s) => achar(s)), 30000), selects = todosSelects();      // a lista de prompts carrega depois da página
+      const dono = await esperar(() => todosSelects().find((s) => achar(s)) || todosSelects().find((s) => parecido(s)), 30000), selects = todosSelects();      // a lista de prompts carrega depois da página
       if (!dono) throw new Error(`não achei o prompt “${prompt}” no Módulo Turbo (opções vistas: ${(selects[0] ? [...selects[0].options].map((o) => texto(o)).slice(0, 4).join(" | ") : "nenhuma lista de prompts na tela")})${dicaTraducao()}`);
-      definirValor(dono, achar(dono).value);
+      if (achar(dono)) definirValor(dono, achar(dono).value); else { const o = parecido(dono); definirValor(dono, o.value); window.__promptAproximado = `prompt “${prompt}” não cadastrado: usado o parecido “${o.text.trim()}”`; }
     }
     await dorme(300);
     const bt = botao(tipo && !/auto/i.test(tipo) ? new RegExp(tipo, "i") : /Auto-?detectar/i, raiz); if (bt) bt.click();
@@ -558,6 +564,7 @@
       const r = lerResultadoTurbo(); responder({ ok: !!r.texto, minuta: r.texto, minutaHtml: r.html, erro: r.texto ? "" : "não consegui ler a minuta do Turbo" }); return false;
     }
     if (m?.acao === "studio-ler-minuta") { (m.processo ? carregarDoHistorico(m.processo) : Promise.resolve()).then(() => lerMinuta()).then((t) => responder({ ok: !!t, minuta: t, minutaHtml: minutaHtmlDoPainel(), erro: t ? "" : "não há minuta pronta na tela do app" })).catch((e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
+    if (m?.acao === "studio-analisar") { window.__dicasPrompt = m.dicas || ""; window.__promptAproximado = ""; }
     if (m?.acao === "studio-analisar" && m.modo === "turbo" && m.reqId) {      // análise longa: responde já e entrega o resultado pelo storage (o canal de mensagem pode cair no meio)
       const k = "studio_res_" + m.reqId;
       turbo(m).catch((e) => ({ ok: false, erro: String(e.message || e) })).then((r) => chrome.storage.local.set({ [k]: r }));

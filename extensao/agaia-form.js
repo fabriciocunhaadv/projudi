@@ -18,7 +18,11 @@
     const ops = [...sel.options].filter((o) => o.value && !/selecione/i.test(o.text));
     const t = sem(alvo), fim = sem(alvo.split(" - ").pop());
     const por = (f) => ops.filter((o) => f(sem(o.text))).sort((a, b) => a.text.length - b.text.length)[0];
-    return por((x) => x === t) || por((x) => x.includes(t)) || (fim && (por((x) => x.endsWith(fim)) || por((x) => x.includes(fim)))) || null;
+    const exata = por((x) => x === t) || por((x) => x.includes(t)) || (fim && (por((x) => x.endsWith(fim)) || por((x) => x.includes(fim)))) || null;
+    if (exata) return exata;
+    const p = globalThis.PromptSimilar?.melhor(ops.map((o) => ({ texto: o.text, ref: o })), alvo, "");      // o juiz não tem o prompt exato: o parecido da mesma matéria
+    if (p) { window.__promptAproximado = `prompt “${alvo}” não cadastrado no Agaia: usado o parecido “${p.texto.trim()}”`; return p.ref; }
+    return null;
   }
   function escolherPrompt(alvo) {
     const sel = [...document.querySelectorAll("select")].find((s) => [...s.options].some((o) => /selecione um prompt/i.test(o.text)));
@@ -27,7 +31,7 @@
     if (!op) return alvo ? `não achei no Agaia um prompt parecido com “${alvo}” (escolha à mão)` : "serventia sem prompt cadastrado (escolha à mão)";
     Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(sel, op.value);
     sel.dispatchEvent(new Event("input", { bubbles: true })); sel.dispatchEvent(new Event("change", { bubbles: true }));
-    return "";
+    return window.__promptAproximado ? "⚠ " + window.__promptAproximado : "";
   }
   function aviso(txt, ok) {
     const d = document.createElement("div");

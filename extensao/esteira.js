@@ -12,8 +12,8 @@ const $ = (id) => document.getElementById(id), esc = (s) => String(s ?? "").repl
 let dono = false, ocupado = false;
 
 // Esteira automática: com a 1ª etapa concluída no Studio o processo está "concluído" para a fila (a minuta fica no histórico do app) e o próximo já é enviado.
-async function entregar(it, bytes, minuta, mensagem, html = "", injecao = null) {
-  const aviso = it.modo === "analise" ? "1ª etapa concluída no Studio; a minuta está no histórico do app (use “Prosseguir para 2ª Etapa” lá para a revisão)." : mensagem;
+async function entregar(it, bytes, minuta, mensagem, html = "", injecao = null, aproximado = "") {
+  const aviso = (it.modo === "analise" ? "1ª etapa concluída no Studio; a minuta está no histórico do app (use “Prosseguir para 2ª Etapa” lá para a revisão)." : mensagem) + (aproximado && !String(mensagem).includes(aproximado) ? " ⚠ " + aproximado : (it.modo === "analise" && aproximado ? " ⚠ " + aproximado : ""));
   return atualizar(it.id, { estado: "concluido", minuta: minuta || "", minutaHtml: html, tipo: tipoDaMinuta(minuta), aviso, injecao });
 }
 
@@ -28,9 +28,9 @@ async function analisar(it) {
     const comTexto = it.modo === "turbo" || ((it.modo === "analise" || (it.modo === "lupa" && it.minutaAssessor)) && esteiraConfig.entrada === "txt");      // Turbo: sempre texto; esteira principal: conforme a escolha do usuário (txt ou PDF)
     const texto = comTexto ? await textoDoPdf(bytes) : "";
     if (comTexto && texto.replace(/\[Página \d+\]|\s/g, "").length < 200) throw new Error("não consegui extrair texto do PDF (o OCR pode não ter funcionado)");
-    const r = await analisarNoStudio(bytes, { nome: it.pdfNome, prompt: it.prompt, modo: it.modo, tipo: "", processo: it.processo, minuta: it.minutaAssessor, motivoMinuta: it.motivoMinuta, texto, ate1: it.modo === "analise" });
+    const r = await analisarNoStudio(bytes, { nome: it.pdfNome, prompt: it.prompt, modo: it.modo, tipo: "", processo: it.processo, minuta: it.minutaAssessor, motivoMinuta: it.motivoMinuta, dicas: it.serventia || "", texto, ate1: it.modo === "analise" });
     if (!(await valida())) return;
-    await entregar(it, bytes, r.minuta, r.mensagem, r.minutaHtml || "", r.injecao || null);
+    await entregar(it, bytes, r.minuta, r.mensagem, r.minutaHtml || "", r.injecao || null, r.aproximado || "");
   } catch (e) {
     if (await valida()) {      // esteira automática: uma nova tentativa sozinha antes de dar erro (o app pode ter estado ocupado)
       const cur = (await todos()).find((x) => x.id === it.id) || it;
@@ -149,7 +149,7 @@ $("impArq").onchange = async () => {
       else { $("impMsg").textContent = `Lendo a minuta do assessor de ${proc}…`; const r = await lerMinutaPre({ processo: proc, serventiaUrl: conhecido.serventiaUrl }).catch((e) => ({ texto: "", motivo: e.message })); minutaAssessor = r.texto; motivoMinuta = r.motivo; }
     }
     const num = proc.replace(/\D/g, ""), url = conhecido?.url || (cnj ? `BuscaProcesso?PaginaAtual=2&TipoConsultaProcesso=24&ProcessoNumero=${num.slice(0, -13)}-${num.slice(-13)}` : "");
-    await enfileirar({ processo: proc, url, urlPre: conhecido?.urlPre || "", prompt, modo, docs, minutaAssessor, motivoMinuta, pdfNome: f.name, pdf: f.name }, new Uint8Array(await f.arrayBuffer()));
+    await enfileirar({ processo: proc, url, urlPre: conhecido?.urlPre || "", prompt, modo, docs, minutaAssessor, motivoMinuta, pdfNome: f.name, pdf: f.name, serventia: conhecido?.serventia || "" }, new Uint8Array(await f.arrayBuffer()));
     ja.add(proc); n++;
     if (modo === "lupa" && !minutaAssessor) msgs.push(`${proc}: entrou na fila, mas sem a minuta do assessor (${motivoMinuta})`);
   }
