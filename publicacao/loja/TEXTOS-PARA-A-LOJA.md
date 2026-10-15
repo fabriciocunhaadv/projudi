@@ -40,6 +40,8 @@ Todas usam dados fictícios (comarca "Exemplo", processos inventados).
 - **scripting:** executar, na aba do Projudi/Studio, os passos pedidos pelo usuário (abrir o processo, gerar o PDF, ler a minuta).
 - **storage / unlimitedStorage:** guardar configurações, a fila de processos e as minutas no computador do usuário.
 - **clipboardWrite:** copiar para a área de transferência a minuta e o diagnóstico, a pedido do usuário.
+- **power:** impedir que o computador entre em suspensão enquanto a extensão processa em segundo plano um lote de processos (download dos PDFs e OCR, que levam vários minutos). Só mantém o computador acordado durante o processamento e libera assim que termina; nenhum dado é coletado por essa permissão.
+- **identity:** (opcional) entrar com a conta Google do próprio usuário para ler e abrir, no Google Docs dele, a minuta que ele mesmo está revisando. Não é usada para nenhuma outra finalidade.
 - **tabGroups:** agrupar, numa só janela, as abas do Google Docs e do PDF do processo.
 - **Acesso a sites:** *.tjgo.jus.br (Projudi: ler conclusões, gerar PDF, editor de minutas); *.ai.studio (app Assessor Judicial: enviar o PDF e ler a minuta); docs.google.com e docs.googleapis.com (abrir o documento da minuta).
 
