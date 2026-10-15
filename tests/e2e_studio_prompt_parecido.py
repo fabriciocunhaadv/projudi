@@ -46,6 +46,7 @@ with sync_playwright() as p:
     pg.evaluate("([ex]) => window.__ouvinte({ acao: 'studio-analisar', modo: 'lupa', arquivoId: '', nome: 'x-OCR.pdf', prompt: 'Outros Área Judicial - Família e Sucessões', processo: '5001234-56.2026.8.09.0166', minuta: 'Minuta do assessor. ' + 'a'.repeat(300), ...ex.dados }, {}, (r) => { window.__r = r })", [{"dados": dados}])
     pg.wait_for_function("window.__r", timeout=60000); r = pg.evaluate("window.__r"); print("familia", r)
     assert not r.get("ok") and "não achei o prompt" in (r.get("erro") or ""), r
+    assert "Outros Área Judicial - Execução Fiscal Municipal" in r["opcoes"] and len(r["opcoes"]) == 4, r      # a esteira oferece a lista do Studio
     # 5) sem o prompt da serventia no nome, a matéria da serventia (dica) decide
     r = rodar(pg, {"dados": dados, "prompt": "Prompt Personalizado do Juiz", "dicas": "Goiânia - 3º Núcleo de Justiça 4.0 - Execução Fiscal Municipal"}, "dica")
     assert sel().endswith("Execução Fiscal Municipal"), sel()

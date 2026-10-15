@@ -45,7 +45,7 @@ export async function analisarNoStudio(bytes, opcoes) {
   const arquivoId = opcoes.texto ? "" : await enviarArquivo(aba.id, bytes);
   if (opcoes.modo === "turbo") return analisarTurbo(aba, arquivoId, opcoes);
   const r = await chrome.tabs.sendMessage(aba.id, { acao: "studio-analisar", arquivoId, ...opcoes });
-  if (!r?.ok) throw new Error(r?.erro || "o app não confirmou a análise");
+  if (!r?.ok) throw Object.assign(new Error(r?.erro || "o app não confirmou a análise"), { opcoes: r?.opcoes });
   return r;
 }
 
@@ -63,11 +63,11 @@ async function analisarTurbo(aba, arquivoId, opcoes) {
   let r;
   try { r = await chrome.tabs.sendMessage(aba.id, { acao: "studio-analisar", arquivoId, reqId, ...opcoes }); }
   catch (e) { throw new Error("o app do Studio não recebeu o pedido (" + e.message + "). Atualize a aba do assessor-judicial e tente de novo"); }
-  if (!r?.ok) throw new Error(r?.erro || "o app não confirmou a análise");
+  if (!r?.ok) throw Object.assign(new Error(r?.erro || "o app não confirmou a análise"), { opcoes: r?.opcoes });
   const t0 = Date.now(); let carregando = 0;
   for (;;) {
     const res = (await chrome.storage.local.get(chave))[chave];
-    if (res) { await chrome.storage.local.remove(chave); if (!res.ok) throw new Error(res.erro || "o Módulo Turbo falhou"); return res; }
+    if (res) { await chrome.storage.local.remove(chave); if (!res.ok) throw Object.assign(new Error(res.erro || "o Módulo Turbo falhou"), { opcoes: res.opcoes }); return res; }
     const aba2 = await chrome.tabs.get(aba.id).catch(() => null);
     if (!aba2) throw new Error("a aba do assessor-judicial foi fechada durante a análise");
     carregando = aba2.status === "loading" ? carregando + 1 : 0;

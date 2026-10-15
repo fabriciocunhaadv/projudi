@@ -34,7 +34,8 @@ async function analisar(it) {
   } catch (e) {
     if (await valida()) {      // esteira automática: uma nova tentativa sozinha antes de dar erro (o app pode ter estado ocupado)
       const cur = (await todos()).find((x) => x.id === it.id) || it;
-      if ((cur.tentativas || 0) < 1) await atualizar(it.id, { estado: "aguardando", erro: "", tentativas: (cur.tentativas || 0) + 1, aviso: "nova tentativa automática após: " + e.message });
+      if (e.opcoes?.length) await atualizar(it.id, { estado: "erro", erro: e.message, promptOpcoes: e.opcoes, promptEscolhido: "" });      // sem prompt da matéria: o usuário escolhe na lista do Studio
+      else if ((cur.tentativas || 0) < 1) await atualizar(it.id, { estado: "aguardando", erro: "", tentativas: (cur.tentativas || 0) + 1, aviso: "nova tentativa automática após: " + e.message });
       else await atualizar(it.id, { estado: "erro", erro: e.message });
     }
   }
@@ -92,12 +93,14 @@ async function desenhar() {
     if (["pausado", "erro", "analisando"].includes(it.estado)) b.push(`<button data-a="repetir" data-id="${it.id}">${it.estado === "erro" ? "Tentar de novo" : "Analisar de novo"}</button>`);
     if (it.estado === "conferindo") { if (it.docUrl) b.push(`<a href="${esc(it.docUrl)}" target="_blank">Abrir Docs</a>`); b.push(`<button data-a="conferido" data-id="${it.id}">✔ Terminei a conferência — cadastrar no Projudi</button>`); }
     if (it.estado === "cadastrando") { b.push(`<button data-a="projudi" data-id="${it.id}">Abrir o processo</button>`, `<button data-a="concluir" data-id="${it.id}">✔ Lancei no Projudi — próximo processo</button>`); }
+    if (it.estado === "erro" && it.promptOpcoes?.length) b.push(`<br><select data-a-sel="${it.id}" title="Prompts que existem no seu Studio"><option value="">— escolha o prompt —</option>${it.promptOpcoes.map((o) => `<option value="${esc(o)}"${o === it.promptEscolhido ? " selected" : ""}>${esc(o)}</option>`).join("")}</select> <button data-a="usarprompt" data-id="${it.id}">Usar este prompt e analisar</button>`);
     b.push(`<button data-a="excluir" data-id="${it.id}" title="Tira este processo da fila e apaga o PDF guardado (não mexe no Projudi nem nos arquivos já baixados)">🗑 Excluir</button>`);
     return `<tr><td>${n + 1}</td><td>${esc(it.processo)}<br><small>${esc(it.tipo || "")}</small></td><td class="e-${it.estado}">${esc(ROTULO[it.estado] || it.estado)}${it.erro ? "<br>" + esc(it.erro) : ""}${it.aviso ? `<br><small>${esc(it.aviso)}</small>` : ""}${it.injecao ? (it.injecao.estado === "vermelha" ? `<br><small class="inj-v">🚨 Prompt injection nos autos: ${esc(it.injecao.texto || "confira a tarja vermelha no app")}</small>` : `<br><small class="inj-ok">✅ Prompt injection: nada encontrado</small>`) : ""}</td><td>${b.join(" ")}</td></tr>`;
   }).join("") : '<tr><td colspan="4">Fila vazia.</td></tr>';
   $("status").textContent = dono ? "" : "Outra aba da esteira já está em execução; esta mostra apenas o andamento.";
 }
 
+$("linhas").addEventListener("change", async (ev) => { const s = ev.target.closest("select[data-a-sel]"); if (s) await atualizar(s.dataset.aSel, { promptEscolhido: s.value }); });
 $("linhas").addEventListener("click", async (ev) => {
   const b = ev.target.closest("button[data-a]"); if (!b) return;
   const id = b.dataset.id, a = b.dataset.a;
@@ -106,6 +109,11 @@ $("linhas").addEventListener("click", async (ev) => {
     await fecharAbas((await todos()).find((x) => x.id === id));
     await atualizar(id, { rodada: 0 });      // se estiver analisando, o resultado que chegar depois é descartado
     await remover([id]); desenhar(); passo(); return;
+  }
+  if (a === "usarprompt") {
+    const it = (await todos()).find((x) => x.id === id), v = document.querySelector(`select[data-a-sel="${id}"]`)?.value || it?.promptEscolhido || "";
+    if (!v) { alert("Escolha um prompt da lista."); return; }
+    await atualizar(id, { prompt: v, promptOpcoes: null, promptEscolhido: "", estado: "aguardando", erro: "", rodada: 0, tentativas: 0 });
   }
   if (a === "pular") { await fecharAbas((await todos()).find((x) => x.id === id)); await atualizar(id, { estado: "pulado" }); }
   if (a === "repetir") await atualizar(id, { estado: "aguardando", erro: "", rodada: 0 });
