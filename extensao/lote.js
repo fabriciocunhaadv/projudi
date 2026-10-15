@@ -137,19 +137,31 @@ async function urlFresca(item) {
 }
 window.__urlFresca = urlFresca;      // usado nos testes
 
+let abaLoteId = null;
+const irPara = async (tabId, url) => { await chrome.tabs.update(tabId, { url }); await dorme(600); await carregou(tabId); };
+async function abaDoLote() {
+  if (abaLoteId != null) { const t = await chrome.tabs.get(abaLoteId).catch(() => null); if (t) return t; }
+  const t = await chrome.tabs.create({ url: BASE, active: false }); abaLoteId = t.id; await carregou(t.id); return t;
+}
+const fecharAbaDoLote = () => { if (abaLoteId != null) chrome.tabs.remove(abaLoteId).catch(() => {}); abaLoteId = null; };
+
 async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
   const passo = (t) => { registro.push(new Date().toLocaleTimeString("pt-BR") + " " + item.processo + " — " + t); etapa(t); };
   passo("abrindo o processo");
   const url = new URL(item.url, BASE).href;
-  const tab = await chrome.tabs.create({ url, active: false });
+  // O Projudi só dá acesso aos arquivos do processo na serventia ESCOLHIDA na sessão (senão: “nível de acesso insuficiente”, PDF incompleto).
+  // Por isso, antes de cada processo, a extensão entra na serventia dele (o mesmo clique da tela “Serventias Disponíveis”).
+  // Navega DENTRO de uma única aba do Projudi (reaproveitada em todo o lote): serventia → processo; não abre aba nova a cada processo.
+  const tab = await abaDoLote();
   let popup = null;
   try {
-    await carregou(tab.id); await dorme(1500);
+    if (item.serventiaUrl) { passo("entrando na serventia " + (item.serventia || "")); await irPara(tab.id, new URL(item.serventiaUrl, BASE).href); await dorme(1200); }
+    await irPara(tab.id, url); await dorme(1500);
     if (await paginaInvalida(tab.id)) {
       passo("o link guardado do processo expirou (“Código inválido”); pegando um novo na lista");
       const nova = await urlFresca(item);
       if (!nova) throw new Error("o link do processo expirou e não achei o processo na lista da serventia (clique em “Verificar agora” no painel e tente de novo)");
-      await chrome.tabs.update(tab.id, { url: nova }); await carregou(tab.id); await dorme(1500);
+      await irPara(tab.id, nova); await dorme(1500);
       if (await paginaInvalida(tab.id)) throw new Error("o Projudi recusou o link do processo (“Código inválido”)");
     }
     passo("procurando o botão Gerar PDF");
@@ -159,11 +171,10 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
       if (item.situacao !== "preAnalisadas") motivoMinuta = "processo não está pré-analisado (sem minuta do assessor)";
       else { passo("lendo a minuta do assessor (Visualizar)"); const r = await limite(lerMinutaPre(item), 120000, "a minuta da pré-análise não carregou").catch((e) => ({ texto: "", motivo: e.message })); minuta = r.texto; motivoMinuta = r.motivo; if (minuta) passo("minuta do assessor lida (" + minuta.length + " caracteres)"); else passo("⚠ " + motivoMinuta); }
     }
-    await chrome.storage.local.set({ gerarpdf_pedido: { todos: true, processo: item.processo, pasta, lote: chave, ts: Date.now(), studio: opcoes.studio?.ativo ? { ativo: true, modo: opcoes.studio.modo, prompt: item.prompt || "", tipo: "", minuta, motivoMinuta, url: item.url, urlPre: item.urlPre || "", docs: !!opcoes.studio.docs && opcoes.studio.modo !== "lupa" } : null } });
+    await chrome.storage.local.set({ gerarpdf_pedido: { todos: true, processo: item.processo, pasta, lote: chave, ts: Date.now(), studio: opcoes.studio?.ativo ? { ativo: true, modo: opcoes.studio.modo, prompt: item.prompt || "", tipo: "", minuta, motivoMinuta, url: item.url, urlPre: item.urlPre || "", serventiaUrl: item.serventiaUrl || "", serventia: item.serventia || "", docs: !!opcoes.studio.docs && opcoes.studio.modo !== "lupa" } : null } });
     let r = await limite(GerarUtil.capturarGerar(tab.id), 45000, "a página do processo não respondeu (pode haver um aviso do Projudi aberto nela)");
     if (!r.achou) {   // o botão fica na aba "Navegação de Arquivos"
-      await chrome.tabs.update(tab.id, { url: BASE + "BuscaProcesso?PaginaAtual=98&PassoBusca=4" });
-      await carregou(tab.id); await dorme(1500);
+      await irPara(tab.id, BASE + "BuscaProcesso?PaginaAtual=98&PassoBusca=4"); await dorme(1500);
       for (let k = 0; k < 8 && !r.achou; k++) { r = await limite(GerarUtil.capturarGerar(tab.id), 45000, "a aba “Navegação de Arquivos” não respondeu"); if (!r.achou) await dorme(1000); }
     }
     if (!r.achou) {
@@ -205,7 +216,6 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
     return fim;
   } finally {
     if (popup) chrome.tabs.remove(popup.id).catch(() => {});
-    chrome.tabs.remove(tab.id).catch(() => {});
   }
 }
 
@@ -258,13 +268,13 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
       feitos++;
       await navigator.locks.request("baixados", async () => { const { baixados = {} } = await chrome.storage.local.get("baixados"); baixados[p.processo] = { em: Date.now(), arquivo: r.pdf }; await chrome.storage.local.set({ baixados }); });
       const st = r.studio ? (r.studio.ok ? (r.studio.parcial ? ` — Studio: ${esc(r.studio.mensagem)}` : r.studio.fila ? " — na esteira de minutas" : " — análise concluída no Studio" + (r.studio.docs ? (r.studio.docs.ok ? ` — Google Docs: ${esc(r.studio.docs.titulo)}` : ` — <span class="erro">Docs: ${esc(r.studio.docs.erro)}</span>`) : "")) : ` — <span class="erro">Studio: ${esc(r.studio.erro)}</span>`) : "";
-      marca(i, `✔ ${esc(p.processo)} — ${r.paginas} páginas (${r.ocr} com OCR) — salvo${st}`, "ok");
+      marca(i, `✔ ${esc(p.processo)} — ${r.paginas} páginas (${r.ocr} com OCR) — salvo${st}${r.semAcesso?.length ? ` — ⚠ ${r.semAcesso.length} arquivo(s) sem acesso (sigilo/nível insuficiente), fora da análise: ${esc(r.semAcesso.slice(0, 6).join("; "))}` : ""}`, "ok");
     } catch (e) {
       erros++; marca(i, `✖ ${esc(p.processo)} — ${esc(e.message)}`, "erro");
     }
     $("barra").value = i + 1;
   }
-  clearInterval(sinal); manterAcordado("lote", false);
+  clearInterval(sinal); manterAcordado("lote", false); fecharAbaDoLote();
   const resumo = `${cancelado ? "Cancelado. " : ""}${feitos} de ${itens.length} processo(s) baixado(s)${erros ? `, ${erros} com erro` : ""}.`;
   $("status").textContent = resumo; $("cancelar").disabled = true;
   document.body.dataset.pronto = "1"; document.body.dataset.resumo = JSON.stringify({ feitos, erros });

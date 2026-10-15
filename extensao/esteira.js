@@ -12,6 +12,18 @@ const $ = (id) => document.getElementById(id), esc = (s) => String(s ?? "").repl
 let dono = false, ocupado = false;
 
 // Esteira automática: com a 1ª etapa concluída no Studio o processo está "concluído" para a fila (a minuta fica no histórico do app) e o próximo já é enviado.
+// O Projudi só mostra o processo na serventia escolhida na sessão: entra nela antes de abrir (mesmo clique de “Serventias Disponíveis”).
+async function abrirNoProjudi(it, url, active = true) {
+  // navega dentro de uma aba do Projudi que já esteja aberta (sem abrir aba nova); só cria uma se não houver nenhuma
+  const abertas = await chrome.tabs.query({ url: new URL(BASE).origin + "/*" }).catch(() => []);
+  const antiga = abertas.find((t) => t.id === it.abas?.projudi) || abertas.find((t) => !t.pinned) || abertas[0];
+  const ir = async (alvo) => { await chrome.tabs.update(aba.id, { url: alvo, active }); await new Promise((ok) => setTimeout(ok, 600)); await new Promise((ok) => { const f = (id, i) => { if (id === aba.id && i.status === "complete") { chrome.tabs.onUpdated.removeListener(f); ok(); } }; chrome.tabs.onUpdated.addListener(f); setTimeout(() => { chrome.tabs.onUpdated.removeListener(f); ok(); }, 30000); }); };
+  const aba = antiga || await chrome.tabs.create({ url: it.serventiaUrl ? absoluta(it.serventiaUrl) : url, active });
+  if (antiga) { if (it.serventiaUrl) { await ir(absoluta(it.serventiaUrl)); await new Promise((ok) => setTimeout(ok, 1200)); } await ir(url); if (active) chrome.windows.update(aba.windowId, { focused: true }).catch(() => {}); }
+  else if (it.serventiaUrl) { await new Promise((ok) => setTimeout(ok, 3000)); await chrome.tabs.update(aba.id, { url }); }
+  return aba;
+}
+
 async function entregar(it, bytes, minuta, mensagem, html = "", injecao = null, aproximado = "") {
   const aviso = (it.modo === "analise" ? "1ª etapa concluída no Studio; a minuta está no histórico do app (use “Prosseguir para 2ª Etapa” lá para a revisão)." : mensagem) + (aproximado && !String(mensagem).includes(aproximado) ? " ⚠ " + aproximado : (it.modo === "analise" && aproximado ? " ⚠ " + aproximado : ""));
   return atualizar(it.id, { estado: "concluido", minuta: minuta || "", minutaHtml: html, tipo: tipoDaMinuta(minuta), aviso, injecao });
@@ -55,7 +67,7 @@ async function cadastrar(it) {         // conferência terminada: pega o texto f
     if (lido) { texto = lido.texto; html = lido.html; aviso = ""; }
     else if (it.docUrl) aviso = "Sem o login do Google não dá para ler as suas correções do Docs: será usada a minuta original do Studio.";
   } catch (e) { aviso = "Não consegui ler o Google Docs (" + e.message + "): será usada a minuta original do Studio."; }
-  const aba = await chrome.tabs.create({ url: absoluta(it.urlPre || it.url), active: true });
+  const aba = await abrirNoProjudi(it, absoluta(it.urlPre || it.url), true);
   await atualizar(it.id, { estado: "cadastrando", textoFinal: texto, htmlFinal: html, aviso, projudiTab: aba.id, inserido: false });
 }
 
@@ -120,7 +132,7 @@ $("linhas").addEventListener("click", async (ev) => {
   if (a === "usar") { usarMinutaDoStudio((await todos()).find((x) => x.id === id)); return; }
   if (a === "conferido") await atualizar(id, { estado: "conferido" });
   if (a === "concluir") { await fecharAbas((await todos()).find((x) => x.id === id)); await atualizar(id, { estado: "concluido" }); }
-  if (a === "projudi") { const it = (await todos()).find((x) => x.id === id), t = await chrome.tabs.create({ url: absoluta(it.urlPre || it.url) }); await atualizar(id, { abas: { ...(it.abas || {}), projudi: t.id } }); }
+  if (a === "projudi") { const it = (await todos()).find((x) => x.id === id), t = await abrirNoProjudi(it, absoluta(it.urlPre || it.url), true); await atualizar(id, { abas: { ...(it.abas || {}), projudi: t.id } }); }
   passo();
 });
 chrome.storage.sync.get("esteiraConfig").then(({ esteiraConfig = {} }) => { $("entrada").value = esteiraConfig.entrada || "pdf"; });
@@ -157,7 +169,7 @@ $("impArq").onchange = async () => {
       else { $("impMsg").textContent = `Lendo a minuta do assessor de ${proc}…`; const r = await lerMinutaPre({ processo: proc, serventiaUrl: conhecido.serventiaUrl }).catch((e) => ({ texto: "", motivo: e.message })); minutaAssessor = r.texto; motivoMinuta = r.motivo; }
     }
     const num = proc.replace(/\D/g, ""), url = conhecido?.url || (cnj ? `BuscaProcesso?PaginaAtual=2&TipoConsultaProcesso=24&ProcessoNumero=${num.slice(0, -13)}-${num.slice(-13)}` : "");
-    await enfileirar({ processo: proc, url, urlPre: conhecido?.urlPre || "", prompt, modo, docs, minutaAssessor, motivoMinuta, pdfNome: f.name, pdf: f.name, serventia: conhecido?.serventia || "" }, new Uint8Array(await f.arrayBuffer()));
+    await enfileirar({ processo: proc, url, urlPre: conhecido?.urlPre || "", prompt, modo, docs, minutaAssessor, motivoMinuta, pdfNome: f.name, pdf: f.name, serventia: conhecido?.serventia || "", serventiaUrl: conhecido?.serventiaUrl || "" }, new Uint8Array(await f.arrayBuffer()));
     ja.add(proc); n++;
     if (modo === "lupa" && !minutaAssessor) msgs.push(`${proc}: entrou na fila, mas sem a minuta do assessor (${motivoMinuta})`);
   }

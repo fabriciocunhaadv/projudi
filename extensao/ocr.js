@@ -159,6 +159,8 @@ async function interceptado(idJob) {
     };
     $("status").textContent = "Salvando o PDF…";
     const arqPdf = await salvar(new Blob([res.bytes], { type: "application/pdf" }), num + "-OCR.pdf");
+    let semAcesso = [];      // páginas “Não será possível mostrar o Arquivo da movimentação … nível de acesso insuficiente” (arquivo sigiloso/restrito): ficam FORA da análise
+    try { const txtPdf = await textoDoPdf(res.bytes); semAcesso = [...new Set([...txtPdf.matchAll(/Movimenta[cç][aã]o\s*(\d+)\s*:\s*([^\n]{0,70})[\s\S]{0,260}?n[ií]vel de acesso/gi)].map((m) => `Mov. ${m[1]}${m[2] ? " (" + m[2].trim() + ")" : ""}`))]; if (semAcesso.length) log("⚠ " + semAcesso.length + " arquivo(s) sem acesso (nível insuficiente): " + semAcesso.join("; ") + " — não entram na análise"); } catch (e) { /* sem texto */ }
     try { await salvar(new Blob([await textoDoPdf(res.bytes)], { type: "text/plain;charset=utf-8" }), num + "-OCR.txt"); log("Texto do PDF salvo: " + num + "-OCR.txt"); } catch (e) { log("⚠ não consegui salvar o .txt: " + e.message); }      // o texto de cada processo baixado fica ao lado do PDF
     $("status").textContent = `Pronto: ${arqPdf}`;
     document.body.dataset.salvo = arqPdf;
@@ -166,13 +168,13 @@ async function interceptado(idJob) {
     let studio = null;      // minuta no app de IA: entra na esteira (um processo por vez); o download não espera por ela
     if (job.studio && job.studio.ativo) {
       try {
-        await enfileirar({ processo: job.nome, url: job.studio.url || "", urlPre: job.studio.urlPre || "", prompt: job.studio.prompt, modo: job.studio.modo, docs: !!job.studio.docs, minutaAssessor: job.studio.minuta || "", motivoMinuta: job.studio.motivoMinuta || "", pdfNome: num + "-OCR.pdf", pdf: arqPdf }, res.bytes);
+        await enfileirar({ processo: job.nome, url: job.studio.url || "", urlPre: job.studio.urlPre || "", serventiaUrl: job.studio.serventiaUrl || "", serventia: job.studio.serventia || "", prompt: job.studio.prompt, modo: job.studio.modo, docs: !!job.studio.docs, minutaAssessor: job.studio.minuta || "", motivoMinuta: job.studio.motivoMinuta || "", pdfNome: num + "-OCR.pdf", pdf: arqPdf }, res.bytes);
         await chrome.runtime.sendMessage({ acao: "esteira-abrir" });
         studio = { ok: true, fila: true, mensagem: "na esteira de minutas" };
       } catch (e) { studio = { ok: false, erro: e.message }; log("✖ esteira: " + e.message); }
       document.body.dataset.studio = JSON.stringify(studio);
     }
-    if (job.lote) await chrome.storage.local.set({ ["lote_fim_" + job.lote]: { ok: true, pdf: arqPdf, paginas: res.total, ocr: res.ocr, studio } });
+    if (job.lote) await chrome.storage.local.set({ ["lote_fim_" + job.lote]: { ok: true, semAcesso, pdf: arqPdf, paginas: res.total, ocr: res.ocr, studio } });
     await chrome.storage.local.remove(chave);
     document.body.dataset.pronto = "1";
     setTimeout(() => window.close(), 5000);
