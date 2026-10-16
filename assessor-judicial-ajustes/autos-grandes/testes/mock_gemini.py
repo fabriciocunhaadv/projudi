@@ -54,12 +54,12 @@ class H(BaseHTTPRequestHandler):
             resp = {"candidates": [{"content": {"role": "model", "parts": [{"text": b.decode()}]}, "finishReason": "STOP", "index": 0}], "usageMetadata": {"promptTokenCount": n_tok if False else 1, "candidatesTokenCount": 10, "totalTokenCount": 11}, "modelVersion": modelo}
             bb = json.dumps(resp).encode()
             self.send_response(200); self.send_header("Content-Type", "application/json"); self.send_header("Content-Length", str(len(bb))); self.end_headers(); self.wfile.write(bb); return
-        if "copiloto de edição da ATA PRELIMINAR" in txt:
-            cur = txt.split("DOCUMENTO ATUAL (HTML):\n", 1)[1].split("\n\nAUTOS (para", 1)[0]
-            novo = cur.rstrip()
-            novo = (novo[:-6] if novo.endswith("</div>") else novo) + '<p class="sub">Acréscimo do copiloto</p><p>Texto acrescentado.</p><script>alert(1)</script>' + ("</div>" if cur.rstrip().endswith("</div>") else "")
-            LOG[-1]["p"] = "ata-edit"
-            b = json.dumps({"candidates": [{"content": {"role": "model", "parts": [{"text": json.dumps({"html": novo, "resumo": "Acrescentei uma seção."})}]}, "finishReason": "STOP", "index": 0}], "usageMetadata": {"promptTokenCount": 10, "candidatesTokenCount": 10, "totalTokenCount": 20}}).encode()
+        if "Você edita a ATA PRELIMINAR" in txt:
+            ids = [(int(a), t) for a, t in re.findall(r"^\[(\d+)\] <(\w+)", txt, re.M)]
+            ult_p = [a for a, t in ids if t == "p"][-1]; primeiro_li = [a for a, t in ids if t == "li"]
+            ops = [{"op": "insert_after", "id": ult_p, "tipo": "p", "classe": "sub", "texto": "Acréscimo do copiloto"}, {"op": "replace", "id": ult_p, "texto": "Texto substituído <script>x</script>"}, {"op": "replace", "id": 99999, "texto": "id inexistente"}]
+            LOG[-1]["p"] = "ata-edit"; LOG[-1]["autos"] = "TRECHOS DOS AUTOS (relevantes" in txt
+            b = json.dumps({"candidates": [{"content": {"role": "model", "parts": [{"text": json.dumps({"operacoes": ops, "resumo": "Acrescentei uma seção."})}]}, "finishReason": "STOP", "index": 0}], "usageMetadata": {"promptTokenCount": 10, "candidatesTokenCount": 10, "totalTokenCount": 20}}).encode()
             self.send_response(200); self.send_header("Content-Type", "application/json"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
         if "ATA PRELIMINAR" in txt and "ESTRITAMENTE em JSON" in txt:
             ata = {"cabecalho": {"numeroProcesso": "5000001-11.2026.8.09.0166", "classe": "Procedimento Comum", "assunto": "Dano material"}, "partes": [{"polo": "ativo", "nome": "MARIA TESTE DA SILVA", "advogados": [{"nome": "Dr. Fulano", "oab": "GO 1"}], "localizacao": "Mov. 2, Arq. 1, Pág. 1"}],
