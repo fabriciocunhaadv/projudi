@@ -64,8 +64,9 @@ const celProc = (l) => `${esc(l.processo)}${l.dados?.artigo ? `\n\n${esc(l.dados
 
 // Criminal (modelo do juiz): AUTOR = réu/autor do fato; VÍTIMA/TESTEMUNHAS. Cível/Fazenda: AUTOR = promovente; RÉU = promovido; TESTEMUNHAS. Decide pelo conteúdo (MP como promovente ou artigo penal nos autos).
 const ehCriminal = (l) => /minist[eé]rio p[uú]blico/i.test(l.promovente || "") || !!l.dados?.artigo;
-const nomeAutor = (l) => (l.dados?.autor && String(l.dados.autor).trim()) || l.promovente || "";
-const nomeReu = (l) => (l.dados?.reu && String(l.dados.reu).trim()) || l.promovido || "";
+// As PARTES vêm sempre da lista do Projudi (Promovente/Promovido); a Mesa/IA só completa testemunhas, intimações e alertas.
+const nomeAutor = (l) => l.promovente || "";
+const nomeReu = (l) => l.promovido || "";
 const avisosCiveis = (l) => { const d = l.dados; let h = l.erroMesa ? `<span class="alerta">${esc(l.erroMesa)}</span>` : "";
   if (d) {
     const t = d.pessoas.filter((p) => p.papel !== "vitima");
