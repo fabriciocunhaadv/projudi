@@ -132,5 +132,37 @@
     return { processos, formulario };
   }
 
-  g.ProjudiParser = { parseLista, parseConclusoes, parseProcessos, semAcento };
+  // Lista de audiências (Audiências > Pendentes / Para hoje / Filtro): colunas lidas pelo CABEÇALHO
+  // (Data/Hora, Processo, Promovente, Promovido, Responsável, Status, Concluir). A faixa "Serventia: …" antecede as linhas.
+  function parseAudiencias(html) {
+    const d = doc(html);
+    const t = [...d.querySelectorAll("table")].find((t) => !t.querySelector("table") && /data\/hora/i.test(t.textContent) && /promovente/i.test(t.textContent));
+    const paginas = [...d.querySelectorAll("a[href]")].filter((a) => /^(\d+|primeira|ultima|última|proxima|próxima|anterior)$/i.test(norm(a.textContent)) && /PaginaAtual|Pagina/i.test(a.getAttribute("href") || "") && /Audiencia/i.test(a.getAttribute("href") || ""))
+      .map((a) => ({ texto: norm(a.textContent), href: a.getAttribute("href") }));
+    if (!t) return { logado: logado(d), linhas: null, paginas };
+    let serventia = "", cab = null;
+    const linhas = [];
+    t.querySelectorAll("tr").forEach((tr) => {
+      const cel = [...tr.children].filter((c) => /^t[dh]$/i.test(c.tagName));
+      const txt = cel.map((c) => norm(c.textContent));
+      if (!txt.length) return;
+      if (txt.length <= 2 && /^serventia:/i.test(txt[0])) { serventia = txt[0].replace(/^serventia:\s*/i, ""); return; }
+      if (txt.some((c) => /^data\/hora$/i.test(c))) { cab = txt.map(semAcento); return; }
+      if (!cab || txt.length < cab.length - 1) return;
+      const i = (rx, pad) => { const k = cab.findIndex((c) => rx.test(c)); return k >= 0 ? k : pad; };
+      const dh = txt[i(/^data\/hora/, 0)] || "";
+      const m = dh.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{1,2}):(\d{2})/);
+      if (!m) return;
+      const link = tr.querySelector("a[href*='Id_Processo'], a[href*='Processo']") || cel[i(/^processo/, 1)]?.querySelector("a");
+      linhas.push({
+        serventia, dataHora: dh, data: `${m[3]}-${m[2]}-${m[1]}`, hora: `${m[4].padStart(2, "0")}:${m[5]}`,
+        processo: txt[i(/^processo/, 1)] || "", url: link ? link.getAttribute("href") : "",
+        promovente: txt[i(/^promovente/, 2)] || "", promovido: txt[i(/^promovido/, 3)] || "",
+        responsavel: txt[i(/^responsavel/, 4)] || "", status: txt[i(/^status/, 5)] || "",
+      });
+    });
+    return { logado: logado(d), linhas, paginas };
+  }
+
+  g.ProjudiParser = { parseLista, parseConclusoes, parseProcessos, parseAudiencias, semAcento };
 })(globalThis);
