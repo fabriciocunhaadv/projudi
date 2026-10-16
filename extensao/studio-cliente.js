@@ -43,7 +43,7 @@ export async function enviarBase(nome, bytes, substituir = false) {          // 
 export async function analisarNoStudio(bytes, opcoes) {
   const aba = await acharStudio();
   const arquivoId = opcoes.texto ? "" : await enviarArquivo(aba.id, bytes);
-  if (opcoes.modo === "turbo") return analisarTurbo(aba, arquivoId, opcoes);
+  if (opcoes.modo === "turbo" || opcoes.modo === "mesa") return analisarTurbo(aba, arquivoId, opcoes);
   const r = await chrome.tabs.sendMessage(aba.id, { acao: "studio-analisar", arquivoId, ...opcoes });
   if (!r?.ok) throw Object.assign(new Error(r?.erro || "o app não confirmou a análise"), { opcoes: r?.opcoes });
   return r;
@@ -67,12 +67,12 @@ async function analisarTurbo(aba, arquivoId, opcoes) {
   const t0 = Date.now(); let carregando = 0;
   for (;;) {
     const res = (await chrome.storage.local.get(chave))[chave];
-    if (res) { await chrome.storage.local.remove(chave); if (!res.ok) throw Object.assign(new Error(res.erro || "o Módulo Turbo falhou"), { opcoes: res.opcoes }); return res; }
+    if (res) { await chrome.storage.local.remove(chave); if (!res.ok) throw Object.assign(new Error(res.erro || "o Módulo Turbo falhou"), { opcoes: res.opcoes, semRetry: !!res.semRetry, grande: !!res.grande }); return res; }
     const aba2 = await chrome.tabs.get(aba.id).catch(() => null);
     if (!aba2) throw new Error("a aba do assessor-judicial foi fechada durante a análise");
     carregando = aba2.status === "loading" ? carregando + 1 : 0;
     if (carregando > 10) throw new Error("a aba do assessor-judicial recarregou durante a análise");
-    if (Date.now() - t0 > 12 * 60000) throw new Error("o Módulo Turbo não terminou em 12 minutos");
+    if (Date.now() - t0 > 18 * 60000) throw new Error("o Módulo Turbo/Mesa não terminou em 18 minutos");
     await dorme(2000);
   }
 }

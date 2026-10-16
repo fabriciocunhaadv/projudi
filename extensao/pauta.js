@@ -64,8 +64,8 @@ function desenhar() {
   $("saida").innerHTML = Object.keys(dias).sort().map((d) => `<div class="folha"><h2 class="dia">Audiências ${esc(dataBr(d))}</h2><table class="p"><thead><tr><th class="h">HORA</th><th class="n">PROCESSO</th><th>AUTOR</th><th>VÍTIMA/ TESTEMUNHAS</th></tr></thead><tbody>` +
     dias[d].sort((a, b) => a.hora.localeCompare(b.hora)).map((l) => `<tr data-k="${chave(l.processo)}"><td class="h"><label class="nao-imprimir"><input type="checkbox" class="sel" ${l.marcado ? "checked" : ""}></label><br>${esc(l.hora.replace(":", "h").replace(/h00$/, ":00").replace("h", ":"))}</td>` +
       `<td class="n"><div class="cel" contenteditable="true">${celProc(l)}</div></td><td><div class="cel" contenteditable="true">${celAutor(l)}</div></td><td><div class="cel" contenteditable="true">${celPessoas(l)}</div></td></tr>`).join("") + `</tbody></table></div>`).join("");
-  document.querySelectorAll(".sel").forEach((c) => (c.onchange = () => { const k = c.closest("tr").dataset.k; pauta.find((l) => chave(l.processo) === k).marcado = c.checked; $("analisar").disabled = !pauta.some((l) => l.marcado); }));
-  $("analisar").disabled = !pauta.some((l) => l.marcado);
+  document.querySelectorAll(".sel").forEach((c) => (c.onchange = () => { const k = c.closest("tr").dataset.k; pauta.find((l) => chave(l.processo) === k).marcado = c.checked; $("analisar").disabled = $("mesa").disabled = !pauta.some((l) => l.marcado); }));
+  $("analisar").disabled = $("mesa").disabled = !pauta.some((l) => l.marcado);
 }
 
 $("gerar").onclick = async () => {
@@ -101,3 +101,15 @@ $("copiar").onclick = async () => {
 };
 window.__pauta = { get: () => pauta, desenhar, aplicar };
 carregarServentias();
+
+// Mesa de Audiência: baixa o PDF completo (com OCR) de cada processo marcado e a esteira entrega ao Studio (Mesa > Nova > Selecionar PDF)
+$("mesa").onclick = async () => {
+  const marcados = pauta.filter((l) => l.marcado && l.url);
+  if (!marcados.length) { $("msg").textContent = "Marque ao menos um processo (com link na lista)."; return; }
+  const id = "pautamesa" + Date.now();
+  const itens = marcados.map((l) => ({ processo: l.processo, url: l.url, classificador: "pauta", serventia: l.serventiaNome || "", serventiaUrl: l.serventiaUrl || "", situacao: "" }));
+  await chrome.storage.local.remove("pauta_ativa");
+  await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/Pauta", opcoes: { studio: { ativo: true, modo: "mesa", docs: false } } } });
+  chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + id), active: false });
+  $("msg").textContent = `${marcados.length} processo(s) em download/OCR. Cada um entra na esteira e vira uma audiência NOVA na Mesa de Audiência do Studio (mantenha a aba do Assessor aberta e logada).`;
+};

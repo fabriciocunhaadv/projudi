@@ -9,7 +9,7 @@ const BASE = "https://projudi.tjgo.jus.br/";
 const absoluta = (u) => (u ? new URL(u, BASE).href : BASE);
 
 const $ = (id) => document.getElementById(id), esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-let dono = false, ocupado = false;
+let dono = false, ocupado = false, pausaAte = 0;
 
 // Esteira automática: com a 1ª etapa concluída no Studio o processo está "concluído" para a fila (a minuta fica no histórico do app) e o próximo já é enviado.
 // O Projudi só mostra o processo na serventia escolhida na sessão: entra nela antes de abrir (mesmo clique de “Serventias Disponíveis”).
@@ -46,7 +46,14 @@ async function analisar(it) {
   } catch (e) {
     if (await valida()) {      // esteira automática: uma nova tentativa sozinha antes de dar erro (o app pode ter estado ocupado)
       const cur = (await todos()).find((x) => x.id === it.id) || it;
-      if (e.opcoes?.length) await atualizar(it.id, { estado: "erro", erro: e.message, promptOpcoes: e.opcoes, promptEscolhido: "" });      // sem prompt da matéria: o usuário escolhe na lista do Studio
+      const cota = /cota|quota|429|rate limit/i.test(e.message || "");
+      if (cota && !e.opcoes?.length) {      // cota gratuita da IA esgotada: espera (a janela renova) e tenta o MESMO processo de novo; depois, não trava a fila
+        const n = (cur.cotaVezes || 0) + 1;
+        pausaAte = Date.now() + 3 * 60000;
+        if (n <= 2) await atualizar(it.id, { estado: "aguardando", erro: "", cotaVezes: n, aviso: `Cota da IA esgotada: a fila espera 3 minutos e tenta de novo (${n}/2).` });
+        else await atualizar(it.id, { estado: "erro", erro: it.modo === "turbo" ? "O PDF/texto extraído é grande demais para o Módulo Turbo (ou a cota da IA esgotou). Use a “análise normal” para este processo." : "A cota gratuita da IA esgotou e não renovou a tempo. Tente de novo mais tarde ou peça a liberação da Chave Nativa.", grande: it.modo === "turbo", aviso: "A fila segue para o próximo processo depois de 3 minutos." });
+      } else if (e.semRetry) await atualizar(it.id, { estado: "erro", erro: e.message, grande: !!e.grande });      // autos grandes demais para o Turbo / Mesa travada: não repete e a fila segue
+      else if (e.opcoes?.length) await atualizar(it.id, { estado: "erro", erro: e.message, promptOpcoes: e.opcoes, promptEscolhido: "" });      // sem prompt da matéria: o usuário escolhe na lista do Studio
       else if ((cur.tentativas || 0) < 1) await atualizar(it.id, { estado: "aguardando", erro: "", tentativas: (cur.tentativas || 0) + 1, aviso: "nova tentativa automática após: " + e.message });
       else await atualizar(it.id, { estado: "erro", erro: e.message });
     }
@@ -73,6 +80,7 @@ async function cadastrar(it) {         // conferência terminada: pega o texto f
 
 async function passo() {
   if (!dono || ocupado) return;
+  if (Date.now() < pausaAte) return;      // espera combinada (cota da IA esgotada)
   ocupado = true;
   try {
     const lista = await todos();
@@ -106,6 +114,7 @@ async function desenhar() {
     if (it.estado === "conferindo") { if (it.docUrl) b.push(`<a href="${esc(it.docUrl)}" target="_blank">Abrir Docs</a>`); b.push(`<button data-a="conferido" data-id="${it.id}">✔ Terminei a conferência — cadastrar no Projudi</button>`); }
     if (it.estado === "cadastrando") { b.push(`<button data-a="projudi" data-id="${it.id}">Abrir o processo</button>`, `<button data-a="concluir" data-id="${it.id}">✔ Lancei no Projudi — próximo processo</button>`); }
     if (it.estado === "erro" && it.promptOpcoes?.length) b.push(`<br><select data-a-sel="${it.id}" title="Prompts que existem no seu Studio"><option value="">— escolha o prompt —</option>${it.promptOpcoes.map((o) => `<option value="${esc(o)}"${o === it.promptEscolhido ? " selected" : ""}>${esc(o)}</option>`).join("")}</select> <button data-a="usarprompt" data-id="${it.id}">Usar este prompt e analisar</button>`);
+    if (it.estado === "erro" && it.grande) b.push(`<button data-a="normal" data-id="${it.id}" title="Refaz este processo na análise normal do Studio (PDF/texto completo, sem o Módulo Turbo)">Usar a análise normal</button>`);
     b.push(`<button data-a="excluir" data-id="${it.id}" title="Tira este processo da fila e apaga o PDF guardado (não mexe no Projudi nem nos arquivos já baixados)">🗑 Excluir</button>`);
     return `<tr><td>${n + 1}</td><td>${esc(it.processo)}<br><small>${esc(it.tipo || "")}</small></td><td class="e-${it.estado}">${esc(ROTULO[it.estado] || it.estado)}${it.erro ? "<br>" + esc(it.erro) : ""}${it.aviso ? `<br><small>${esc(it.aviso)}</small>` : ""}${it.injecao ? (it.injecao.estado === "vermelha" ? `<br><small class="inj-v">🚨 Prompt injection nos autos: ${esc(it.injecao.texto || "confira a tarja vermelha no app")}</small>` : `<br><small class="inj-ok">✅ Prompt injection: nada encontrado</small>`) : ""}</td><td>${b.join(" ")}</td></tr>`;
   }).join("") : '<tr><td colspan="4">Fila vazia.</td></tr>';
@@ -129,6 +138,7 @@ $("linhas").addEventListener("click", async (ev) => {
   }
   if (a === "pular") { await fecharAbas((await todos()).find((x) => x.id === id)); await atualizar(id, { estado: "pulado" }); }
   if (a === "repetir") await atualizar(id, { estado: "aguardando", erro: "", rodada: 0 });
+  if (a === "normal") await atualizar(id, { modo: "analise", estado: "aguardando", erro: "", grande: false, cotaVezes: 0, tentativas: 0, rodada: 0, aviso: "refeito na análise normal" });
   if (a === "usar") { usarMinutaDoStudio((await todos()).find((x) => x.id === id)); return; }
   if (a === "conferido") await atualizar(id, { estado: "conferido" });
   if (a === "concluir") { await fecharAbas((await todos()).find((x) => x.id === id)); await atualizar(id, { estado: "concluido" }); }
@@ -173,7 +183,7 @@ $("impArq").onchange = async () => {
     ja.add(proc); n++;
     if (modo === "lupa" && !minutaAssessor) msgs.push(`${proc}: entrou na fila, mas sem a minuta do assessor (${motivoMinuta})`);
   }
-  $("impMsg").textContent = (n ? `${n} processo(s) adicionados à fila (${{ analise: "Análise", lupa: "Lupa do Magistrado", turbo: "Análise Turbo" }[modo]}). ` : "Nenhum arquivo novo. ") + msgs.join(" | ");
+  $("impMsg").textContent = (n ? `${n} processo(s) adicionados à fila (${{ analise: "Análise", lupa: "Lupa do Magistrado", turbo: "Análise Turbo", mesa: "Mesa de Audiência" }[modo]}). ` : "Nenhum arquivo novo. ") + msgs.join(" | ");
   $("impArq").value = ""; passo();
 };
 $("limpar").onclick = async () => { await remover((await todos()).filter((i) => ["concluido", "pulado"].includes(i.estado)).map((i) => i.id)); desenhar(); };

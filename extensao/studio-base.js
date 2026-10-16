@@ -172,7 +172,11 @@
       const t0 = Date.now(), rep = { vezes: 0, ate: 0 };
       for (;;) {
         const e = erroNaTela();
-        if (e && repetirSePassageiro(rep, e, () => { const b = document.getElementById("tour-execute-btn"); if (b && !b.disabled && /Gerar (Minuta|1ª Etapa)/i.test(texto(b))) b.click(); })) { await dorme(1000); continue; }
+        if (e && /tamanho|muito grande|grande demais|limite de (?:token|entrada)|processamento turbo demorou/i.test(e)) {
+        const err = new Error("O PDF/texto extraído deste processo é grande demais para o Módulo Turbo. Use a “análise normal” para este processo; a fila segue para o próximo.");
+        err.semRetry = true; err.grande = true; throw err;
+      }
+      if (e && repetirSePassageiro(rep, e, () => { const b = document.getElementById("tour-execute-btn"); if (b && !b.disabled && /Gerar (Minuta|1ª Etapa)/i.test(texto(b))) b.click(); })) { await dorme(1000); continue; }
         if (e) throw new Error("o app avisou: " + e);
         const pro = prosseguirEtapa2();      // se a 1ª etapa saiu mesmo assim, segue para a 2ª (minuta completa)
         if (ate1 && pro) {      // esteira automática: SÓ a 1ª etapa. Nunca aperta “Prosseguir para 2ª Etapa”; espera o app ficar ocioso (ou 2 min) e devolve
@@ -554,6 +558,40 @@
     return { ok: true, mensagem: "análise Turbo concluída", minuta: r.texto, minutaHtml: r.html };
   }
 
+
+  // Mesa de Audiência: abre a Mesa, cria uma audiência NOVA e entrega o PDF no campo “Selecionar PDF(s) dos Autos” (o app extrai e analisa sozinho).
+  async function mesa({ arquivoId, nome }) {
+    const bytes = arquivos.get(arquivoId);
+    if (!bytes) throw new Error("arquivo não recebido");
+    fecharJanelas();
+    const botaoNova = () => botao(/^\s*\+?\s*Nova\s*$/i);
+    if (!botaoNova()) {
+      const abrir = document.getElementById("btn-header-hearing-workbench-tools") || [...document.querySelectorAll("button")].find((b) => /Mesa de Audi[êe]ncias/i.test(b.title || texto(b)));
+      if (!abrir) throw new Error("não achei o botão “Mesa de Audiências” no app");
+      abrir.click();
+      if (!(await esperar(botaoNova, 20000))) throw new Error("a Mesa de Audiências não abriu");
+    }
+    botaoNova().click();
+    const input = await esperar(() => [...document.querySelectorAll("input[type=file]")].find((i) => /pdf/i.test(i.accept || "") && /txt/i.test(i.accept || "")), 15000);
+    if (!input) throw new Error("não achei o campo “Selecionar PDF(s) dos Autos” na Mesa");
+    const dt = new DataTransfer(); dt.items.add(new File([bytes], nome, { type: "application/pdf" }));
+    input.files = dt.files; input.dispatchEvent(new Event("change", { bubbles: true }));
+    const corpo = () => document.body.innerText || "";
+    await esperar(() => /Extraindo autos|mapeando partes|Falha ao processar/i.test(corpo()), 30000);      // começou (ou falhou logo)
+    const t0 = Date.now();
+    for (;;) {
+      const f = corpo().match(/Falha ao processar comando com IA[^\n]*|Por favor, selecione arquivos válidos[^\n]*/i);
+      if (f) { const err = new Error("a Mesa de Audiência avisou: " + f[0].slice(0, 220)); err.semRetry = true; throw err; }
+      if (!/Extraindo autos|mapeando partes/i.test(corpo()) && Date.now() - t0 > 4000) {
+        const resumo = [...document.querySelectorAll("textarea")].find((t) => t.value && t.value.length > 60);
+        if (resumo) break;
+      }
+      if (Date.now() - t0 > 12 * 60000) { const err = new Error("a análise na Mesa de Audiência não terminou em 12 minutos"); err.semRetry = true; throw err; }
+      await dorme(1500);
+    }
+    return { ok: true, mensagem: "enviado à Mesa de Audiência (nova audiência com o PDF analisado)", minuta: "" };
+  }
+
   chrome.runtime.onMessage.addListener((m, _s, responder) => {
     if (m?.acao === "studio-ping") { responder({ ok: true }); return false; }
     if (m?.acao === "studio-parte") {     // recebe um arquivo em pedaços
@@ -574,9 +612,9 @@
     }
     if (m?.acao === "studio-ler-minuta") { (m.processo ? carregarDoHistorico(m.processo) : Promise.resolve()).then(() => lerMinuta()).then((t) => responder({ ok: !!t, minuta: t, minutaHtml: minutaHtmlDoPainel(), erro: t ? "" : "não há minuta pronta na tela do app" })).catch((e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
     if (m?.acao === "studio-analisar") { window.__dicasPrompt = m.dicas || ""; window.__promptAproximado = ""; }
-    if (m?.acao === "studio-analisar" && m.modo === "turbo" && m.reqId) {      // análise longa: responde já e entrega o resultado pelo storage (o canal de mensagem pode cair no meio)
+    if (m?.acao === "studio-analisar" && (m.modo === "turbo" || m.modo === "mesa") && m.reqId) {      // análise longa: responde já e entrega o resultado pelo storage (o canal de mensagem pode cair no meio)
       const k = "studio_res_" + m.reqId;
-      turbo(m).catch((e) => ({ ok: false, erro: String(e.message || e), opcoes: e.opcoes })).then((r) => chrome.storage.local.set({ [k]: r }));
+      (m.modo === "mesa" ? mesa(m) : turbo(m)).catch((e) => ({ ok: false, erro: String(e.message || e), opcoes: e.opcoes, semRetry: !!e.semRetry, grande: !!e.grande })).then((r) => chrome.storage.local.set({ [k]: r }));
       responder({ ok: true, assincrono: true }); return false;
     }
     if (m?.acao === "studio-analisar") { (m.modo === "lupa" ? lupa(m) : m.modo === "turbo" ? turbo(m) : analisar(m)).then(responder, (e) => responder({ ok: false, erro: String(e.message || e), opcoes: e.opcoes })); return true; }
