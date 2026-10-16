@@ -164,5 +164,23 @@
     return { logado: logado(d), linhas, paginas };
   }
 
-  g.ProjudiParser = { parseLista, parseConclusoes, parseProcessos, parseAudiencias, semAcento };
+  // Movimentações do processo que interessam à pauta (intimação, citação, ofício, mandado, denúncia…): [{mov, data, texto, tipo}]
+  // Leitura aproximada: linhas de tabela cuja 1ª célula é o número da movimentação. O resultado é sempre sugestão a conferir.
+  function parseMovimentacoesPauta(html) {
+    const d = doc(html);
+    const out = [];
+    d.querySelectorAll("tr").forEach((tr) => {
+      if (tr.querySelector("table")) return;
+      const cel = [...tr.children].filter((c) => /^t[dh]$/i.test(c.tagName)).map((c) => norm(c.textContent));
+      if (cel.length < 3 || !/^\d{1,4}$/.test(cel[0])) return;
+      const texto = cel.slice(1).join(" | ");
+      const sa = semAcento(texto);
+      const tipo = /intima/.test(sa) ? "intimacao" : /cita[cç]|citacao/.test(sa) ? "citacao" : /oficio/.test(sa) ? "oficio" : /mandado/.test(sa) ? "mandado" : /denuncia/.test(sa) ? "denuncia" : /audiencia/.test(sa) ? "audiencia" : "";
+      if (!tipo) return;
+      out.push({ mov: parseInt(cel[0], 10), data: (cel.join(" ").match(/\d{2}\/\d{2}\/\d{4}/) || [""])[0], tipo, texto: texto.slice(0, 220) });
+    });
+    return out;
+  }
+
+  g.ProjudiParser = { parseLista, parseConclusoes, parseProcessos, parseAudiencias, parseMovimentacoesPauta, semAcento };
 })(globalThis);

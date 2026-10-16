@@ -28,6 +28,9 @@ def main():
         assert r["linhas"][0]["promovente"] == "Maria Teste" and r["linhas"][1]["promovido"] == "Fulano Silva" and r["linhas"][0]["serventia"].startswith("Comarca Teste"), r
         assert "Id_Processo=111" in r["linhas"][0]["url"] and len(r["paginas"]) == 3, r
 
+        mv = pg.evaluate("h => ProjudiParser.parseMovimentacoesPauta(h)", '<table><tr><td>95</td><td>10/05/2024</td><td>Intimação expedida</td></tr><tr><td>96</td><td>11/05/2024</td><td>Juntada de petição</td></tr><tr><td>101</td><td>12/05/2024</td><td>Ofício expedido</td></tr></table>')
+        assert [(m["mov"], m["tipo"]) for m in mv] == [(95, "intimacao"), (101, "oficio")], mv
+
         # tela nova: coluna “Aguardando assinatura” antes de “Não analisadas” + linha Total (antes: pré-analisadas saía somada e não analisadas zerada)
         html4 = ('<table><tr><th>Tipo Conclusão</th><th>Aguardando assinatura</th><th>Não analisadas</th><th>Pré-analisadas</th></tr>'
                  '<tr><td>Conclusão - Decisão</td><td>0</td><td><a href="x">5</a></td><td><a href="y">4</a></td></tr>'
