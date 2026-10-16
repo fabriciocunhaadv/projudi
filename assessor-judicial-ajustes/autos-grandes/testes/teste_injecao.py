@@ -66,6 +66,12 @@ def main():
         assert not d["testemunhas"][1].get("conferir"), d["testemunhas"][1]           # Ana Souza consta
         assert d["alertaInjecao"]["total"] >= 1 and d["alertaInjecao"]["achados"][0]["pagina"] == 3
         assert all(x.get("inj") is not None for x in log_())
+        # H) Copiloto da ata: devolve o documento alterado, sem scripts
+        html0 = '<div class="ata"><p class="titulo">ATA PRELIMINAR DE AUDIÊNCIA</p><p class="sub">1. Identificação</p><p>Conteúdo original da ata com texto suficiente para o teste do copiloto.</p></div>'
+        req = urllib.request.Request(f"http://127.0.0.1:{PS}/api/hearing-copilot", data=json.dumps({"actionType": "preliminary_minutes_edit", "instruction": "Acrescente uma seção de observações", "currentHtml": html0, "caseText": txt}).encode(), headers={"Content-Type": "application/json", "x-gemini-api-key": "AQ.Ab8-chave-um-aaaaaaaa", "x-gemini-api-key-pool": json.dumps(["AQ.Ab8-chave-um-aaaaaaaa"])})
+        with urllib.request.urlopen(req, timeout=300) as rr: h = json.loads(rr.read().decode())
+        print("H)", h["data"]["resumo"], h["data"]["html"][-120:])
+        assert "Conteúdo original" in h["data"]["html"] and "Acréscimo do copiloto" in h["data"]["html"] and "<script" not in h["data"]["html"].lower()
         # D) autos grandes SEM marcadores de página: antes falhava com a mensagem de 339 mil tokens; agora é classificado em blocos
         reset(); t = paginas(480, marcadores=False, tam=2600)
         print("D) tamanho", len(t), "chars ~", len(t) // 3.2 // 1000, "mil tokens")
