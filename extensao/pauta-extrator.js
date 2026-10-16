@@ -61,6 +61,7 @@ if (typeof globalThis !== "undefined") globalThis.PautaExtrator = { extrairPauta
 // Monta os dados da pauta a partir do que foi LIDO na Mesa de Audiência do Studio (abas 1–5 e ata preliminar). Roda na página da pauta (tem DOM).
 export function dadosDaMesa(lido) {
   const out = { artigo: "", dataFato: "", nascimentoReu: "", denunciaMov: null, recebimentoMov: null, pessoas: [], mandadoNaoDevolvido: null, alertas: [], resumo: "", fonte: "mesa" };
+  out.autor = String(lido?.cabecalho?.autor || "").trim(); out.reu = String(lido?.cabecalho?.reu || "").trim();
   const abas = lido?.abas || {};
   const tudo = Object.values(abas).join("\n");
   const art = tudo.match(/\bart(?:igo|s?\.)?\s*(\d+[-A-Z]?)(?:\s*,?\s*(caput|§\s*\d+[º°]?))?[^\n]{0,60}?C[óo]digo\s+Penal/i);

@@ -62,12 +62,32 @@ const celPessoas = (l) => { const d = l.dados; let h = l.erroMesa ? `<span class
   return h; };
 const celProc = (l) => `${esc(l.processo)}${l.dados?.artigo ? `\n\n${esc(l.dados.artigo)}` : ""}\n<span class="sug">${esc(l.status)}</span>`;
 
+// Criminal (modelo do juiz): AUTOR = réu/autor do fato; VÍTIMA/TESTEMUNHAS. Cível/Fazenda: AUTOR = promovente; RÉU = promovido; TESTEMUNHAS. Decide pelo conteúdo (MP como promovente ou artigo penal nos autos).
+const ehCriminal = (l) => /minist[eé]rio p[uú]blico/i.test(l.promovente || "") || !!l.dados?.artigo;
+const nomeAutor = (l) => (l.dados?.autor && String(l.dados.autor).trim()) || l.promovente || "";
+const nomeReu = (l) => (l.dados?.reu && String(l.dados.reu).trim()) || l.promovido || "";
+const avisosCiveis = (l) => { const d = l.dados; let h = l.erroMesa ? `<span class="alerta">${esc(l.erroMesa)}</span>` : "";
+  if (d) {
+    const t = d.pessoas.filter((p) => p.papel !== "vitima");
+    if (t.length) h += `${h ? "\n" : ""}<span class="dest">TESTEMUNHAS</span>` + t.map((p) => `\n<b>${esc(p.nome)}</b>${p.situacao ? "\n" + esc(p.situacao) : ""}`).join("");
+    if (d.alertas?.length) h += `\n<span class="alerta">Atenção:</span> ` + d.alertas.map(esc).join("; ");
+    h += `\n<span class="sug">[conferir nos autos]</span>`;
+  }
+  return h; };
+const celulaEd = (h) => `<td><div class="cel" contenteditable="true">${h}</div></td>`;
+
 function desenhar() {
   const dias = {};
   pauta.forEach((l) => (dias[l.data] = dias[l.data] || []).push(l));
-  $("saida").innerHTML = Object.keys(dias).sort().map((d) => `<div class="folha"><h2 class="dia">Audiências ${esc(dataBr(d))}</h2><table class="p"><thead><tr><th class="h">HORA</th><th class="n">PROCESSO</th><th>AUTOR</th><th>VÍTIMA/ TESTEMUNHAS</th></tr></thead><tbody>` +
-    dias[d].sort((a, b) => a.hora.localeCompare(b.hora)).map((l) => `<tr data-k="${chave(l.processo)}"><td class="h"><label class="nao-imprimir"><input type="checkbox" class="sel" ${l.marcado ? "checked" : ""}></label><br>${esc(l.hora.replace(":", "h").replace(/h00$/, ":00").replace("h", ":"))}</td>` +
-      `<td class="n"><div class="cel" contenteditable="true">${celProc(l)}</div></td><td><div class="cel" contenteditable="true">${celAutor(l)}</div></td><td><div class="cel" contenteditable="true">${celPessoas(l)}</div></td></tr>`).join("") + `</tbody></table></div>`).join("");
+  $("saida").innerHTML = Object.keys(dias).sort().map((d) => {
+    const crim = dias[d].filter(ehCriminal).length > dias[d].length / 2;
+    const cab = crim ? '<th>AUTOR</th><th>VÍTIMA/ TESTEMUNHAS</th>' : '<th>AUTOR</th><th>RÉU</th><th>TESTEMUNHAS / ATENÇÃO</th>';
+    return `<div class="folha"><h2 class="dia">Audiências ${esc(dataBr(d))}</h2><table class="p"><thead><tr><th class="h">HORA</th><th class="n">PROCESSO</th>${cab}</tr></thead><tbody>` +
+      dias[d].sort((a, b) => a.hora.localeCompare(b.hora)).map((l) => `<tr data-k="${chave(l.processo)}"><td class="h"><label class="nao-imprimir"><input type="checkbox" class="sel" ${l.marcado ? "checked" : ""}></label><br>${esc(l.hora.replace(":", "h").replace(/h00$/, ":00").replace("h", ":"))}</td>` +
+        `<td class="n"><div class="cel" contenteditable="true">${celProc(l)}</div></td>` +
+        (crim ? celulaEd(celAutor(l)) + celulaEd(celPessoas(l))
+              : celulaEd(`<span class="nome">${esc(nomeAutor(l))}</span>`) + celulaEd(`<span class="nome">${esc(nomeReu(l))}</span>`) + celulaEd(avisosCiveis(l))) + `</tr>`).join("") + `</tbody></table></div>`;
+  }).join("");
   document.querySelectorAll(".sel").forEach((c) => (c.onchange = () => { const k = c.closest("tr").dataset.k; pauta.find((l) => chave(l.processo) === k).marcado = c.checked; $("analisar").disabled = $("mesa").disabled = !pauta.some((l) => l.marcado); }));
   $("analisar").disabled = $("mesa").disabled = !pauta.some((l) => l.marcado);
 }
@@ -106,7 +126,7 @@ $("copiar").onclick = async () => {
   await navigator.clipboard.writeText(t); $("msg").textContent = "Pauta copiada.";
 };
 const aplicar = (k, v) => { const l = pauta.find((x) => chave(x.processo) === k); if (l && v?.dados) { l.dados = v.dados; return true; } return false; };      // usado nos testes
-window.__pauta = { get: () => pauta, desenhar, aplicar };
+window.__pauta = { get: () => pauta, set: (a) => { pauta = a; }, desenhar, aplicar };
 carregarServentias();
 
 // Mesa de Audiência: baixa o PDF completo (com OCR) de cada processo marcado e a esteira entrega ao Studio (Mesa > Nova > Selecionar PDF)
