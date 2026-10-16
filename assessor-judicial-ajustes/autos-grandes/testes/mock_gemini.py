@@ -33,7 +33,7 @@ class H(BaseHTTPRequestHandler):
                 b = json.dumps(corpo).encode()
                 self.send_response(429); self.send_header("Content-Type", "application/json"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
             a.append((now, n)); JAN[modelo] = a
-            LOG.append({"modelo": modelo, "tok": n, "res": 200, "parte": eh_parte, "inj": ("POSSÍVEL PROMPT INJECTION" in sist) or ("ALERTA DE SEGURANÇA — POSSÍVEL PROMPT" in raw)})
+            LOG.append({"modelo": modelo, "tok": n, "res": 200, "parte": eh_parte, "cart": "DISPOSITIVO OPERACIONAL PARA A ESCRIVANIA" in sist, "inj": ("POSSÍVEL PROMPT INJECTION" in sist) or ("ALERTA DE SEGURANÇA — POSSÍVEL PROMPT" in raw)})
         txt = ""
         for c in j.get("contents", []):
             for p in c.get("parts", []): txt += p.get("text", "")

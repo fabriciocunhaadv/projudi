@@ -31,6 +31,8 @@ def main():
         print("relatorio:", str(m.get("relatorio"))[:120]); print("fundamentacao:", str(m.get("fundamentacao"))[:120])
         assert "processing" not in str(m.get("relatorio")).lower() and "em processamento" not in str(m.get("relatorio")) and str(m.get("relatorio")).startswith("Relatório com os fatos"), m.get("relatorio")
         assert not str(m.get("fundamentacao")).lstrip().startswith("[") , "a fundamentação não pode ser o JSON bruto"
+        L = log_(); print("cartório:", [x.get("cart") for x in L if x["res"] == 200])
+        assert any(x.get("cart") for x in L if x["res"] == 200), "a regra do dispositivo para a escrivania deve ir na instrução"
         print("OK")
     finally:
         for p in (srv, mock):
