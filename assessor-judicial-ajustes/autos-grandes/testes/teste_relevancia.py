@@ -1,4 +1,6 @@
-import json, os, subprocess, sys, time, urllib.request, urllib.error, signal
+import json, os, subprocess, sys, time, urllib.request, urllib.error, signal, random
+random.seed(11)
+def unico(n): return " ".join("".join(random.choice("abcdefghijklmnopqrstuvwxyz") for _ in range(random.randint(3, 9))) for _ in range(n))
 APP = "/tmp/claude-0/work/app"; PM = 8899; PS = 3000
 def post(corpo):
     req = urllib.request.Request(f"http://127.0.0.1:{PS}/api/generate-minute", data=json.dumps(corpo).encode(), headers={"Content-Type": "application/json", "x-gemini-api-key-pool": json.dumps(["AQ.Ab8-chave-um-aaaaaaaa", "AQ.Ab8-chave-dois-bbbbbbb", "AQ.Ab8-chave-tres-ccccccc"])})
@@ -8,7 +10,7 @@ def paginas(spec, total):
     out = ""
     for i in range(1, total + 1):
         tipo, tam, ini, meio = spec.get(i, ("Petição", 1800, "", ""))
-        corpo = f"Movimentacao {i} - {tipo}\n" + ini + " " + ("Texto de conteúdo processual com partes, pedidos, decisões e certidões. " * 400)
+        corpo = f"Movimentacao {i} - {tipo}\n" + ini + " " + unico(1700)
         corpo = corpo[:tam]
         if meio: p = tam // 2; corpo = corpo[:p] + " " + meio + " " + corpo[p + len(meio) + 2:]
         out += f"[Página {i} de {total}]\n{corpo}\n\n"
@@ -55,14 +57,12 @@ def main():
         assert "FATO-803" not in t, "dispensável fora"
         assert "FATO-902" not in t, "meio do extrato (relevante) foi abreviado"
         assert L[-1]["res"] == 200 and L[-1]["tok"] <= 250000
-        # D) tudo essencial: não corta nada, avisa
+        # D) tudo essencial e único: dossiê por partes (antes: parava e pedia chave com faturamento)
         reset(); spec = {i: ("Petição", 2600, f"FATO-5{i%1000:02d} x" if i % 50 == 0 else "", "") for i in range(1, 401)}
-        try:
-            post({**base, "processText": paginas(spec, 400)}); resp = None
-        except urllib.error.HTTPError as ex: resp = ex.read().decode()
-        L = log_(); print("D) tudo essencial:", [(x["res"], x.get("p") or "final") for x in L], (resp or "")[:200])
-        assert not any(x["res"] == 200 and not x.get("p") for x in L), "não pode haver minuta com autos cortados"
-        assert resp is None or "faturamento" in resp or True
+        r = json.loads(post({**base, "processText": paginas(spec, 400)})); L = log_(); t = json.dumps(r, ensure_ascii=False)
+        print("D) tudo essencial:", [(x["res"], x.get("p") or "final") for x in L])
+        assert L[-1]["res"] == 200 and L[-1]["tok"] <= 250000 and any("/" in (x.get("p") or "") and x["res"] == 200 for x in L), L
+        for f in ("FATO-550", "FATO-510", "FATO-520"): assert f in t, f
         print("OK")
     finally:
         for p in (srv, mock):
