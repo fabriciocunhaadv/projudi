@@ -54,6 +54,13 @@ class H(BaseHTTPRequestHandler):
             resp = {"candidates": [{"content": {"role": "model", "parts": [{"text": b.decode()}]}, "finishReason": "STOP", "index": 0}], "usageMetadata": {"promptTokenCount": n_tok if False else 1, "candidatesTokenCount": 10, "totalTokenCount": 11}, "modelVersion": modelo}
             bb = json.dumps(resp).encode()
             self.send_response(200); self.send_header("Content-Type", "application/json"); self.send_header("Content-Length", str(len(bb))); self.end_headers(); self.wfile.write(bb); return
+        if "ATA PRELIMINAR" in txt and "ESTRITAMENTE em JSON" in txt:
+            ata = {"cabecalho": {"numeroProcesso": "5000001-11.2026.8.09.0166", "classe": "Procedimento Comum", "assunto": "Dano material"}, "partes": [{"polo": "ativo", "nome": "MARIA TESTE DA SILVA", "advogados": [{"nome": "Dr. Fulano", "oab": "GO 1"}], "localizacao": "Mov. 2, Arq. 1, Pág. 1"}],
+                   "resumo": "Ação de cobrança.", "testemunhas": [{"nome": "JOSE INVENTADO PEREIRA", "indicadaPor": "autor", "localizacao": "Mov. 2, Arq. 1, Pág. 3", "situacaoIntimacao": "intimada", "localizacaoIntimacao": "Mov. 999, Arq. 1, Pág. 1"}, {"nome": "Ana Souza", "indicadaPor": "reu", "localizacao": "Mov. 3, Arq. 1, Pág. 2", "situacaoIntimacao": "aguardando"}],
+                   "citacoesIntimacoes": [{"destinatario": "REU TESTE", "papel": "reu", "ato": "citacao", "resultado": "positiva", "data": "01/02/2026", "localizacao": "Mov. 3, Arq. 1, Pág. 2"}], "pedidosAudiencia": [], "pontosAtencao": [{"nivel": "alto", "texto": "Testemunha sem intimação", "localizacao": "Mov. 3"}], "pontosControvertidos": ["Valor devido"], "faltaProvar": "Pagamento"}
+            LOG[-1]["p"] = "ata"
+            b = json.dumps({"candidates": [{"content": {"role": "model", "parts": [{"text": json.dumps(ata)}]}, "finishReason": "STOP", "index": 0}], "usageMetadata": {"promptTokenCount": 10, "candidatesTokenCount": 10, "totalTokenCount": 20}}).encode()
+            self.send_response(200); self.send_header("Content-Type", "application/json"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
         mp = re.search(r"PARTE (\d+) DE (\d+) DOS AUTOS", txt)
         LOG[-1]["p"] = (mp.group(1) + "/" + mp.group(2)) if mp else ""
         LOG[-1]["chars"] = len(txt)
