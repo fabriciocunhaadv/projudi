@@ -50,7 +50,7 @@ async function analisar(it) {
     intervaloTurbo();
     if (await valida()) {      // esteira automática: uma nova tentativa sozinha antes de dar erro (o app pode ter estado ocupado)
       const cur = (await todos()).find((x) => x.id === it.id) || it;
-      const cota = /cota|quota|429|rate limit|\b503\b|alta demanda|pico tempor/i.test(e.message || "");
+      const cota = /cota|quota|429|rate limit|\b503\b|alta demanda|pico tempor|resposta do servidor incompleta|formato inv[áa]lido|reiniciando/i.test(e.message || "");
       if (cota && !e.opcoes?.length) {      // cota gratuita da IA esgotada: espera (a janela renova) e tenta o MESMO processo de novo; depois, não trava a fila
         const n = (cur.cotaVezes || 0) + 1;
         pausaAte = Date.now() + 3 * 60000;
