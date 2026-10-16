@@ -30,6 +30,7 @@ async function entregar(it, bytes, minuta, mensagem, html = "", injecao = null, 
 }
 
 async function analisar(it) {
+  const intervaloTurbo = () => { if (it.modo === "turbo") pausaAte = Math.max(pausaAte, Date.now() + 60000); };      // janela de 1 minuto da cota gratuita: o próximo Turbo espera 60 s
   const rodada = Date.now() + Math.random();
   await atualizar(it.id, { estado: "analisando", erro: "", rodada });
   const valida = async () => (await todos()).find((x) => x.id === it.id)?.rodada === rodada;      // o usuário pode ter escolhido outro caminho no meio
@@ -42,8 +43,10 @@ async function analisar(it) {
     if (comTexto && texto.replace(/\[Página \d+\]|\s/g, "").length < 200) throw new Error("não consegui extrair texto do PDF (o OCR pode não ter funcionado)");
     const r = await analisarNoStudio(bytes, { nome: it.pdfNome, prompt: it.prompt, modo: it.modo, tipo: "", processo: it.processo, minuta: it.minutaAssessor, motivoMinuta: it.motivoMinuta, dicas: it.serventia || "", texto, ate1: it.modo === "analise" });
     if (!(await valida())) return;
+    intervaloTurbo();
     await entregar(it, bytes, r.minuta, r.mensagem, r.minutaHtml || "", r.injecao || null, r.aproximado || "");
   } catch (e) {
+    intervaloTurbo();
     if (await valida()) {      // esteira automática: uma nova tentativa sozinha antes de dar erro (o app pode ter estado ocupado)
       const cur = (await todos()).find((x) => x.id === it.id) || it;
       const cota = /cota|quota|429|rate limit/i.test(e.message || "");
