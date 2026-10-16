@@ -50,12 +50,12 @@ async function analisar(it) {
     intervaloTurbo();
     if (await valida()) {      // esteira automática: uma nova tentativa sozinha antes de dar erro (o app pode ter estado ocupado)
       const cur = (await todos()).find((x) => x.id === it.id) || it;
-      const cota = /cota|quota|429|rate limit/i.test(e.message || "");
+      const cota = /cota|quota|429|rate limit|\b503\b|alta demanda|pico tempor/i.test(e.message || "");
       if (cota && !e.opcoes?.length) {      // cota gratuita da IA esgotada: espera (a janela renova) e tenta o MESMO processo de novo; depois, não trava a fila
         const n = (cur.cotaVezes || 0) + 1;
         pausaAte = Date.now() + 3 * 60000;
-        if (n <= 2) await atualizar(it.id, { estado: "aguardando", erro: "", cotaVezes: n, aviso: `Cota da IA esgotada: a fila espera 3 minutos e tenta de novo (${n}/2).` });
-        else await atualizar(it.id, { estado: "erro", erro: it.modo === "turbo" ? "O PDF/texto extraído é grande demais para o Módulo Turbo (ou a cota da IA esgotou). Use a “análise normal” para este processo." : "A cota gratuita da IA esgotou e não renovou a tempo. Tente de novo mais tarde ou peça a liberação da Chave Nativa.", grande: it.modo === "turbo", aviso: "A fila segue para o próximo processo depois de 3 minutos." });
+        if (n <= 2) await atualizar(it.id, { estado: "aguardando", erro: "", cotaVezes: n, aviso: `IA indisponível (cota ou sobrecarga do Google): a fila espera 3 minutos e tenta de novo (${n}/2).` });
+        else await atualizar(it.id, { estado: "erro", erro: it.modo === "turbo" ? "O PDF/texto extraído é grande demais para o Módulo Turbo (ou a cota da IA esgotou). Use a “análise normal” para este processo." : "A IA não respondeu (cota gratuita esgotada ou sobrecarga do Google) mesmo após esperar. Tente de novo mais tarde ou peça a liberação da Chave Nativa.", grande: it.modo === "turbo", aviso: "A fila segue para o próximo processo depois de 3 minutos." });
       } else if (e.semRetry) await atualizar(it.id, { estado: "erro", erro: e.message, grande: !!e.grande });      // autos grandes demais para o Turbo / Mesa travada: não repete e a fila segue
       else if (e.opcoes?.length) await atualizar(it.id, { estado: "erro", erro: e.message, promptOpcoes: e.opcoes, promptEscolhido: "" });      // sem prompt da matéria: o usuário escolhe na lista do Studio
       else if ((cur.tentativas || 0) < 1) await atualizar(it.id, { estado: "aguardando", erro: "", tentativas: (cur.tentativas || 0) + 1, aviso: "nova tentativa automática após: " + e.message });

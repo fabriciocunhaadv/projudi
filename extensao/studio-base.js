@@ -561,7 +561,7 @@
 
   // ---------- Mesa de Audiência ----------
   const corpoMesa = () => document.body.innerText || "";
-  const ERRO_MESA = /(Limite tempor[áa]rio de cota[^\n]*|Todas as \d+ chaves[^\n]*|Falha ao processar comando com IA[^\n]*|Erro 429[^\n]*|Quota Exceeded[^\n]*|Por favor, selecione arquivos v[áa]lidos[^\n]*)/i;
+  const ERRO_MESA = /(Limite tempor[áa]rio de cota[^\n]*|Todas as \d+ chaves[^\n]*|Falha ao processar comando com IA[^\n]*|Erro 429[^\n]*|Quota Exceeded[^\n]*|Os servidores de intelig[êe]ncia artificial[^\n]*|Erro 503[^\n]*|Por favor, selecione arquivos v[áa]lidos[^\n]*)/i;
   const botaoNova = () => botao(/^\s*\+?\s*Nova\s*$/i);
   const dig = (x) => String(x || "").replace(/\D/g, "");
   async function abrirMesa() {
