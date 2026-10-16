@@ -9,7 +9,7 @@ const BASE = "https://projudi.tjgo.jus.br/";
 const absoluta = (u) => (u ? new URL(u, BASE).href : BASE);
 
 const $ = (id) => document.getElementById(id), esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-let dono = false, ocupado = false, pausaAte = 0;
+let dono = false, ocupado = false, pausaAte = 0, pausaTurboAte = 0;
 
 // Esteira automática: com a 1ª etapa concluída no Studio o processo está "concluído" para a fila (a minuta fica no histórico do app) e o próximo já é enviado.
 // O Projudi só mostra o processo na serventia escolhida na sessão: entra nela antes de abrir (mesmo clique de “Serventias Disponíveis”).
@@ -30,7 +30,7 @@ async function entregar(it, bytes, minuta, mensagem, html = "", injecao = null, 
 }
 
 async function analisar(it) {
-  const intervaloTurbo = () => { if (it.modo === "turbo") pausaAte = Math.max(pausaAte, Date.now() + 60000); };      // janela de 1 minuto da cota gratuita: o próximo Turbo espera 60 s
+  const intervaloTurbo = () => { if (it.modo === "turbo") pausaTurboAte = Date.now() + 60000; };      // janela de 1 minuto da cota gratuita: o próximo Turbo espera 60 s
   const rodada = Date.now() + Math.random();
   await atualizar(it.id, { estado: "analisando", erro: "", rodada });
   const valida = async () => (await todos()).find((x) => x.id === it.id)?.rodada === rodada;      // o usuário pode ter escolhido outro caminho no meio
@@ -98,6 +98,7 @@ async function passo() {
     const bloqueiam = ["analisando", "recebida", "pausado"];      // só bloqueia enquanto o Studio trabalha (ou o usuário precisa escolher); conferência/Projudi não seguram a fila
     if (lista.some((i) => bloqueiam.includes(i.estado))) return;
     const prox = lista.find((i) => i.estado === "aguardando");
+    if (prox && prox.modo === "turbo" && Date.now() < pausaTurboAte) return;      // janela de 1 minuto da cota gratuita entre dois Turbo
     if (prox) await analisar(prox);
   } finally { ocupado = false; desenhar(); }
 }

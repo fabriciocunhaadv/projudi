@@ -13,13 +13,6 @@ export const lerPdf = (id) => comBanco("readonly", (s) => s.get(id));
 export const apagarPdf = (id) => comBanco("readwrite", (s) => s.delete(id));
 
 export async function enfileirar(item, bytes) {
-  // já está na fila (aguardando/analisando/pausado) com o mesmo processo e a mesma função: não duplica
-  try {
-    const dig = (x) => String(x || "").replace(/\D/g, "").slice(0, 9);
-    const atuais = (await todos()).filter((x) => ["aguardando", "analisando", "pausado"].includes(x.estado));
-    const igual = atuais.find((x) => dig(x.processo) && dig(x.processo) === dig(item.processo) && x.modo === item.modo);
-    if (igual) return igual.id;
-  } catch (e) { /* segue e enfileira */ }
   const id = "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
   await guardarPdf(id, bytes);
   await navigator.locks.request("esteira-ordem", async () => {
