@@ -284,15 +284,21 @@ export const HearingWorkbenchModal: React.FC<HearingWorkbenchModalProps> = ({
 
     try {
       const storedKey = getCustomApiKey() || '';
+      // Ata preliminar: análise simples, sem teses do gabinete nem base de conhecimento (menos peso e menos envio)
+      const simples = actionType === 'preliminary_minutes' || actionType === 'preliminary_minutes_edit';
       let activeKnowledgeDocs: any[] = [];
-      try {
-        activeKnowledgeDocs = (await getKnowledgeDocs()).filter(d => d.isActive);
-      } catch {}
+      if (!simples) {
+        try {
+          activeKnowledgeDocs = (await getKnowledgeDocs()).filter(d => d.isActive);
+        } catch {}
+      }
       let activeTesesText = "";
-      try {
-        const teses = await getCabinetTeses();
-        if (teses.isEnabled) activeTesesText = teses.text || "";
-      } catch {}
+      if (!simples) {
+        try {
+          const teses = await getCabinetTeses();
+          if (teses.isEnabled) activeTesesText = teses.text || "";
+        } catch {}
+      }
 
       const response = await fetch('/api/hearing-copilot', {
         method: 'POST',
@@ -714,7 +720,7 @@ export const HearingWorkbenchModal: React.FC<HearingWorkbenchModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="mesa-clara fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-0 sm:p-3 md:p-4 animate-in fade-in duration-200">
+    <div className="mesa-escura fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-0 sm:p-3 md:p-4 animate-in fade-in duration-200">
       <div
         className={`bg-slate-900 border-0 sm:border border-slate-700/80 rounded-none sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 transition-all duration-300 w-full ${
           isFullScreen ? 'h-full rounded-none' : 'max-w-7xl h-full sm:h-[94vh]'

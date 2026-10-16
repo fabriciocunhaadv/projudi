@@ -1,24 +1,30 @@
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Pauta de audiências</title>
 <style>
 body{font:14px Arial,sans-serif;margin:0;background:#f3f4f6;color:#111}
-.barra{background:#fff;border-bottom:1px solid #ddd;padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:end;position:sticky;top:0}
+.barra{background:#fff;border-bottom:1px solid #ddd;padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:end;position:sticky;top:0;z-index:5}
 .barra label{display:flex;flex-direction:column;font-size:12px;color:#555;gap:2px}.barra select,.barra input{padding:5px;font-size:13px}
 button{padding:6px 12px;cursor:pointer}.pri{background:#4f46e5;color:#fff;border:0;border-radius:4px}
 #msg{padding:6px 16px;color:#555;font-size:13px}
-.folha{background:#fff;max-width:900px;margin:14px auto;padding:28px 34px;box-shadow:0 1px 4px rgba(0,0,0,.15)}
-h2.dia{text-align:center;font-size:15pt;margin:6px 0 18px;text-transform:uppercase}
-table.p{width:100%;border-collapse:collapse}table.p td{vertical-align:top;padding:8px 6px;border-top:1px solid #ccc;font-size:10pt}
-td.h{width:52px;font-weight:bold}td.n{width:150px}td.n small{display:block;color:#555}
-.obs{min-height:30px;outline:none;white-space:pre-wrap}.obs:focus{background:#fffbe6}
-.sug{color:#7a4b00;background:#fff4d6;border-radius:3px;padding:0 3px}
-.parte b{display:block}.rot{font-size:8pt;color:#666;text-transform:uppercase}
-@media print{.barra,#msg{display:none}body{background:#fff}.folha{box-shadow:none;margin:0;padding:0;max-width:none}h2.dia{page-break-before:always}h2.dia:first-of-type{page-break-before:auto}tr{break-inside:avoid}}
+.folha{background:#fff;max-width:980px;margin:14px auto;padding:26px 30px;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+h2.dia{text-align:center;font-size:17pt;margin:4px 0 14px;font-weight:normal}
+table.p{width:100%;border-collapse:collapse;table-layout:fixed}
+table.p th,table.p td{border:1px solid #222;padding:4px 6px;vertical-align:top;text-align:left;font-size:11pt}
+table.p th{font-weight:normal;font-size:12pt}
+th.h,td.h{width:58px}th.n,td.n{width:150px}
+td.h{font-size:12pt}.nome{font-weight:bold;text-transform:uppercase}
+.cel{min-height:40px;outline:none;white-space:pre-wrap}.cel:focus{background:#fffbe6}
+.dest{background:#ffff00;padding:0 2px}.alerta{background:#ffb347;padding:0 2px}
+.sel{width:16px;height:16px}.nao-imprimir{font-size:11px;color:#555}
+.sug{font-size:9pt;color:#7a4b00}
+@media print{.barra,#msg,.nao-imprimir{display:none}body{background:#fff}.folha{box-shadow:none;margin:0;padding:0;max-width:none}h2.dia{page-break-before:always}h2.dia:first-of-type{page-break-before:auto}tr{break-inside:avoid}table.p{font-size:10pt}}
 </style></head><body>
 <div class="barra">
+ <label>Serventia<select id="serv"><option value="">(serventia atual da sessão)</option></select></label>
  <label>Tipo de audiência<select id="tipo"><option value="">Todas</option><option value="2">Conciliação</option><option value="7">Instrução</option><option value="10">Preliminar</option><option value="11">Una</option><option value="8">Instrução e Julgamento</option></select></label>
  <label>Situação<select id="fluxo"><option value="2">Pendentes</option><option value="1">Para hoje</option></select></label>
  <label>De<input type="date" id="de"></label><label>Até<input type="date" id="ate"></label>
- <label><span><input type="checkbox" id="lerProc" checked> Ler movimentações de cada processo (intimação, ofício, denúncia…)</span></label>
- <button class="pri" id="gerar">Gerar pauta</button><button id="imprimir">Imprimir / PDF</button><button id="copiar">Copiar texto</button>
-</div><div id="msg">Entre no Projudi na serventia desejada e clique em “Gerar pauta”.</div><div id="saida"></div>
-<script src="parser.js"></script><script src="pauta.js"></script></body></html>
+ <button class="pri" id="gerar">1. Ler a lista</button>
+ <button class="pri" id="analisar" disabled>2. Analisar processos marcados (baixar e ler autos)</button>
+ <button id="imprimir">Imprimir / PDF</button><button id="copiar">Copiar texto</button>
+</div><div id="msg">Entre no Projudi, escolha a serventia e clique em “Ler a lista”. Depois marque os processos e use “Analisar” para a extensão baixar os autos e preencher intimações e movimentações.</div><div id="saida"></div>
+<script src="parser.js"></script><script type="module" src="pauta.js"></script></body></html>
