@@ -1,5 +1,6 @@
 // Leitura da minuta que o assessor escreveu na pré-análise (botão Visualizar da Busca de Pré-Análises). Mesma lógica usada pela fila de download (lote.js),
 // aqui disponível também para a esteira (processos já baixados).
+import { chaveProc } from "./proc-chave.js";
 const BASE = "https://projudi.tjgo.jus.br/";
 const dorme = (ms) => new Promise((ok) => setTimeout(ok, ms));
 function carregou(tabId, ms = 60000) {
@@ -32,7 +33,7 @@ function htmlParaTexto(html) {
   return t;
 }
 export async function lerMinutaPre(item) {
-  const digitos = String(item.processo).replace(/\D/g, "").slice(0, 9), novas = [];
+  const digitos = chaveProc(item.processo), novas = [];
   const aoCriar = (t) => novas.push(t.id); chrome.tabs.onCreated.addListener(aoCriar);
   const tab = await chrome.tabs.create({ url: BASE + "PreAnalisarConclusao?PaginaAtual=6&tipo=todas", active: false });
   const motivo = { m: "" };
@@ -54,8 +55,9 @@ export async function lerMinutaPre(item) {
         document.addEventListener("submit", (e) => { if (e.target && e.target.tagName === "FORM") e.target.target = "_self"; }, true);
         const abrir = window.open; window.open = function (u) { if (u) { location.href = u; return window; } return abrir.apply(this, arguments); };
       }
+      const chave = (s) => { const t = String(s || ""), m = t.match(/(\d{1,7})[.\-](\d{2})(?!\d)/); return m ? m[1].padStart(7, "0") + m[2] : t.replace(/\D/g, "").slice(0, 9); };      // (roda na página do Projudi: o módulo não existe aqui)
       const linhas = [...document.querySelectorAll("tr")].filter((tr) => tr.querySelector("a[href*='Id_Processo']"));
-      const tr = linhas.find((r) => [...r.querySelectorAll("a[href*='Id_Processo']")].some((a) => (a.textContent || "").replace(/\D/g, "").slice(0, 9) === dig));
+      const tr = linhas.find((r) => [...r.querySelectorAll("a[href*='Id_Processo']")].some((a) => chave(a.textContent) === dig));
       if (!tr) return linhas.length ? "linhas:" + linhas.length : "";
       const b = tr.querySelector("button[title='Visualizar'],a[title='Visualizar'],[title='Visualizar']") || tr.querySelector("button.imgIcons");
       if (!b) return "sem-botao"; b.click(); return "clicou";

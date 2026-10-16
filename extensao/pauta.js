@@ -6,7 +6,8 @@ const BASE = "https://projudi.tjgo.jus.br/";
 const $ = (id) => document.getElementById(id);
 const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const chave = (p) => String(p).replace(/\D/g, "").slice(0, 9);
+import { chaveProc } from "./proc-chave.js";
+const chave = (p) => chaveProc(p);
 let pauta = [], servs = [];
 
 // O Projudi responde em ISO-8859-1 (windows-1252): ler como UTF-8 estraga os acentos.

@@ -2,6 +2,7 @@
 import { fazerOcr, fmt } from "./ocr-motor.js";
 import { textoDoPdf } from "./pdf-texto.js";
 import { extrairPauta } from "./pauta-extrator.js";
+import { chaveProc } from "./proc-chave.js";
 import { analisarNoStudio } from "./studio-cliente.js";
 import { enfileirar } from "./esteira-banco.js";
 
@@ -166,7 +167,7 @@ async function interceptado(idJob) {
     try {
       if (job.lote && (await chrome.storage.local.get("pauta_ativa")).pauta_ativa) {
         const dados = extrairPauta(await textoDoPdf(res.bytes));
-        await chrome.storage.local.set({ ["pauta_res_" + String(job.nome || "").replace(/\D/g, "").slice(0, 9)]: { dados, ts: Date.now(), pdf: arqPdf } });
+        await chrome.storage.local.set({ ["pauta_res_" + chaveProc(job.nome)]: { dados, ts: Date.now(), pdf: arqPdf } });
       }
     } catch (e) { log("⚠ pauta: " + e.message); }
     try { await salvar(new Blob([await textoDoPdf(res.bytes)], { type: "text/plain;charset=utf-8" }), num + "-OCR.txt"); log("Texto do PDF salvo: " + num + "-OCR.txt"); } catch (e) { log("⚠ não consegui salvar o .txt: " + e.message); }      // o texto de cada processo baixado fica ao lado do PDF

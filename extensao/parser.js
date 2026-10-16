@@ -41,7 +41,8 @@
     return { logado: true, linhas, serventiaTela };
   }
 
-  const RE_PROC = /\d{5,7}[.\-]\d{2}(?:\.\d{4}\.\d\.\d{2}\.\d{4})?/;
+  const RE_PROC = /\d{3,7}[.\-]\d{2}(?:\.\d{4}\.\d\.\d{2}\.\d{4})?/;
+  const padProc = (s) => String(s || "").replace(/^(\d{1,6})(?=[.\-]\d{2}(?!\d))/, (m) => m.padStart(7, "0"));      // o Projudi tira os zeros à esquerda: "57388.42" -> "0057388.42"
   const CAMPOS = [ // início do cabeçalho (sem acento) -> campo
     ["data inicio", "dataInicio"], ["data/hora", "dataInicio"], ["data pre", "dataPreAnalise"],
     ["usuario", "usuarioPreAnalise"], ["tipo de movimento", "tipoMovimento"], ["tipo da acao", "tipoAcao"]];
@@ -100,7 +101,7 @@
       const icone = tr.querySelector("[class*='cor_prioridade_']");
       const urgenciaTexto = norm(icone?.getAttribute("title") || icone?.getAttribute("alt"));
       const p = {
-        processo: completo ? completo[1] : cel[i].match(RE_PROC)[0],
+        processo: padProc(completo ? completo[1] : cel[i].match(RE_PROC)[0]),
         url: els[i].querySelector("a[href*='Id_Processo']")?.getAttribute("href") || "",
         idPendencia: tr.querySelector("input[name='pendencias']")?.value || "",
         urlPre: (() => { const a = [...tr.querySelectorAll("a[href]")].find((x) => /PreAnalis|Id_Pendencia/i.test(x.getAttribute("href") || "") && !/Id_Processo/i.test(x.getAttribute("href") || "")); return a ? a.getAttribute("href") : ""; })(),
@@ -156,7 +157,7 @@
       const link = tr.querySelector("a[href*='Id_Processo'], a[href*='Processo']") || cel[i(/^processo/, 1)]?.querySelector("a");
       linhas.push({
         serventia, dataHora: dh, data: `${m[3]}-${m[2]}-${m[1]}`, hora: `${m[4].padStart(2, "0")}:${m[5]}`,
-        processo: txt[i(/^processo/, 1)] || "", url: link ? link.getAttribute("href") : "",
+        processo: padProc(txt[i(/^processo/, 1)] || ""), url: link ? link.getAttribute("href") : "",
         promovente: txt[i(/^promovente/, 2)] || "", promovido: txt[i(/^promovido/, 3)] || "",
         responsavel: txt[i(/^responsavel/, 4)] || "", status: txt[i(/^status/, 5)] || "",
       });

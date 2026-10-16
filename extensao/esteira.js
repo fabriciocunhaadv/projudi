@@ -5,6 +5,7 @@ import { paragrafosDeHtml } from "./docs-core.js";
 import { textoDoPdf } from "./pdf-texto.js";
 import { vigiarAcordado, conferirAcordado } from "./acordado.js";
 import { lerMinutaPre } from "./minuta-pre.js";
+import { chaveProc } from "./proc-chave.js";
 const BASE = "https://projudi.tjgo.jus.br/";
 const absoluta = (u) => (u ? new URL(u, BASE).href : BASE);
 
@@ -165,15 +166,15 @@ $("impArq").onchange = async () => {
   // procura o processo (pelos 9 primeiros dígitos) entre os que o painel já conhece: traz serventia, links e prompt cadastrado
   const achar = (dig) => {
     for (const sv of estado?.serventias || []) for (const grupo of ["naoAnalisadas", "preAnalisadas"]) for (const p of sv.processos?.[grupo] || [])
-      if (String(p.processo).replace(/\D/g, "").slice(0, 9) === dig) return { ...p, serventia: sv.serventia, serventiaUrl: sv.url || "", situacao: grupo };
+      if (chaveProc(p.processo) === dig) return { ...p, serventia: sv.serventia, serventiaUrl: sv.url || "", situacao: grupo };
     return null;
   };
   const msgs = []; let n = 0; const ja = new Set((await todos()).map((i) => i.processo));
   for (const f of arqs) {
-    const cnj = (f.name.match(/\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/) || [])[0], curto = (f.name.match(/(\d{7})[-.](\d{2})(?!\d)/) || []);
-    const dig = cnj ? cnj.replace(/\D/g, "").slice(0, 9) : curto[1] ? curto[1] + curto[2] : "";
+    const cnj = (f.name.match(/\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/) || [])[0], curto = (f.name.match(/(\d{3,7})[-.](\d{2})(?!\d)/) || []);
+    const dig = cnj ? chaveProc(cnj) : curto[1] ? curto[1].padStart(7, "0") + curto[2] : "";
     if (!dig) { msgs.push(`${f.name}: sem número de processo no nome`); continue; }
-    const conhecido = achar(dig), proc = conhecido?.processo || cnj || `${curto[1]}.${curto[2]}`;
+    const conhecido = achar(dig), proc = conhecido?.processo || cnj || `${curto[1].padStart(7, "0")}.${curto[2]}`;
     if (ja.has(proc)) { msgs.push(`${proc}: já está na fila`); continue; }
     const chaveServ = conhecido && Object.keys(automacao).find((x) => k(x) === k(conhecido.serventia));
     const prompt = promptDigitado || (chaveServ && automacao[chaveServ]?.prompt) || (conhecido && globalThis.Sugestoes ? Sugestoes.prompt(conhecido.serventia) : "");

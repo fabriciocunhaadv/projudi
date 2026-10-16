@@ -1,3 +1,4 @@
+import { chaveProc } from "./proc-chave.js";
 import { montarPdf, nomePadrao, semBarra, acharServentia } from "./modelos-pdf.js";
 import { enviarBase } from "./studio-cliente.js";
 import { manterAcordado } from "./acordado.js";
@@ -52,7 +53,7 @@ function htmlParaTexto(html) {
   return t;
 }
 async function lerMinutaPre(item) {
-  const digitos = String(item.processo).replace(/\D/g, "").slice(0, 9), novas = [];
+  const digitos = chaveProc(item.processo), novas = [];
   const aoCriar = (t) => novas.push(t.id); chrome.tabs.onCreated.addListener(aoCriar);
   const tab = await chrome.tabs.create({ url: BASE + "PreAnalisarConclusao?PaginaAtual=6&tipo=todas", active: false });
   const motivo = { m: "" };
@@ -74,8 +75,9 @@ async function lerMinutaPre(item) {
         document.addEventListener("submit", (e) => { if (e.target && e.target.tagName === "FORM") e.target.target = "_self"; }, true);
         const abrir = window.open; window.open = function (u) { if (u) { location.href = u; return window; } return abrir.apply(this, arguments); };
       }
+      const chave = (s) => { const t = String(s || ""), m = t.match(/(\d{1,7})[.\-](\d{2})(?!\d)/); return m ? m[1].padStart(7, "0") + m[2] : t.replace(/\D/g, "").slice(0, 9); };      // (roda na página do Projudi: o módulo não existe aqui)
       const linhas = [...document.querySelectorAll("tr")].filter((tr) => tr.querySelector("a[href*='Id_Processo']"));
-      const tr = linhas.find((r) => [...r.querySelectorAll("a[href*='Id_Processo']")].some((a) => (a.textContent || "").replace(/\D/g, "").slice(0, 9) === dig));
+      const tr = linhas.find((r) => [...r.querySelectorAll("a[href*='Id_Processo']")].some((a) => chave(a.textContent) === dig));
       if (!tr) return linhas.length ? "linhas:" + linhas.length : "";
       const b = tr.querySelector("button[title='Visualizar'],a[title='Visualizar'],[title='Visualizar']") || tr.querySelector("button.imgIcons");
       if (!b) return "sem-botao"; b.click(); return "clicou";
@@ -115,7 +117,7 @@ async function paginaInvalida(tabId) {
 }
 // Pega um link NOVO do processo na lista da serventia (a lista é da serventia ativa na sessão: escolhe a do processo antes).
 async function urlFresca(item) {
-  const dig = String(item.processo || "").replace(/\D/g, "").slice(0, 9), lista = BASE + (item.situacao === "preAnalisadas" ? "PreAnalisarConclusao?PaginaAtual=6&tipo=todas" : "PreAnalisarConclusao?PaginaAtual=2");
+  const dig = chaveProc(item.processo), lista = BASE + (item.situacao === "preAnalisadas" ? "PreAnalisarConclusao?PaginaAtual=6&tipo=todas" : "PreAnalisarConclusao?PaginaAtual=2");
   const tab = await chrome.tabs.create({ url: lista, active: false });
   try {
     if (item.serventiaUrl) {
@@ -126,7 +128,8 @@ async function urlFresca(item) {
     await carregou(tab.id); await dorme(1500);
     for (let k = 0; k < 10; k++) {
       const r = await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, args: [dig], func: (d) => {
-        const a = [...document.querySelectorAll("a[href*='Id_Processo']")].find((x) => (x.textContent || "").replace(/\D/g, "").slice(0, 9) === d);
+        const chave = (s) => { const t = String(s || ""), m = t.match(/(\d{1,7})[.\-](\d{2})(?!\d)/); return m ? m[1].padStart(7, "0") + m[2] : t.replace(/\D/g, "").slice(0, 9); };
+        const a = [...document.querySelectorAll("a[href*='Id_Processo']")].find((x) => chave(x.textContent) === d);
         return a ? a.href : "";
       } }).catch(() => []);
       const h = r.map((x) => x.result).find(Boolean); if (h) return h;

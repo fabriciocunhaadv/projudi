@@ -31,6 +31,14 @@ def main():
         mv = pg.evaluate("h => ProjudiParser.parseMovimentacoesPauta(h)", '<table><tr><td>95</td><td>10/05/2024</td><td>Intimação expedida</td></tr><tr><td>96</td><td>11/05/2024</td><td>Juntada de petição</td></tr><tr><td>101</td><td>12/05/2024</td><td>Ofício expedido</td></tr></table>')
         assert [(m["mov"], m["tipo"]) for m in mv] == [(95, "intimacao"), (101, "oficio")], mv
 
+        # números SEM os zeros à esquerda (o Projudi mostra "57388.42" em vez de "0057388-42"): entram na lista, já completados com 7 dígitos
+        htmlz = ('<table><tr><th>Processo</th><th>Data Início</th></tr>'
+                 '<tr><td><a href="BuscaProcesso?Id_Processo=1">5000085.67</a></td><td>14/09/2026 18:05:21</td></tr>'
+                 '<tr><td><a href="BuscaProcesso?Id_Processo=2">57388.42</a></td><td>13/10/2026 17:10:34</td></tr>'
+                 '<tr><td><a href="BuscaProcesso?Id_Processo=3">1234.56</a></td><td>12/10/2026 09:00:00</td></tr></table>')
+        r = pg.evaluate("h => ProjudiParser.parseProcessos(h).processos.map((p) => p.processo)", htmlz)
+        assert r == ["5000085.67", "0057388.42", "0001234.56"], r
+
         # tela nova: coluna “Aguardando assinatura” antes de “Não analisadas” + linha Total (antes: pré-analisadas saía somada e não analisadas zerada)
         html4 = ('<table><tr><th>Tipo Conclusão</th><th>Aguardando assinatura</th><th>Não analisadas</th><th>Pré-analisadas</th></tr>'
                  '<tr><td>Conclusão - Decisão</td><td>0</td><td><a href="x">5</a></td><td><a href="y">4</a></td></tr>'
