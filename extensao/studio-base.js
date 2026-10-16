@@ -559,37 +559,105 @@
   }
 
 
-  // Mesa de Audiência: abre a Mesa, cria uma audiência NOVA e entrega o PDF no campo “Selecionar PDF(s) dos Autos” (o app extrai e analisa sozinho).
-  async function mesa({ arquivoId, nome }) {
-    const bytes = arquivos.get(arquivoId);
-    if (!bytes) throw new Error("arquivo não recebido");
+  // ---------- Mesa de Audiência ----------
+  const corpoMesa = () => document.body.innerText || "";
+  const ERRO_MESA = /(Limite tempor[áa]rio de cota[^\n]*|Todas as \d+ chaves[^\n]*|Falha ao processar comando com IA[^\n]*|Erro 429[^\n]*|Quota Exceeded[^\n]*|Por favor, selecione arquivos v[áa]lidos[^\n]*)/i;
+  const botaoNova = () => botao(/^\s*\+?\s*Nova\s*$/i);
+  const dig = (x) => String(x || "").replace(/\D/g, "");
+  async function abrirMesa() {
     fecharJanelas();
-    const botaoNova = () => botao(/^\s*\+?\s*Nova\s*$/i);
-    if (!botaoNova()) {
-      const abrir = document.getElementById("btn-header-hearing-workbench-tools") || [...document.querySelectorAll("button")].find((b) => /Mesa de Audi[êe]ncias/i.test(b.title || texto(b)));
-      if (!abrir) throw new Error("não achei o botão “Mesa de Audiências” no app");
-      abrir.click();
-      if (!(await esperar(botaoNova, 20000))) throw new Error("a Mesa de Audiências não abriu");
-    }
-    botaoNova().click();
-    const input = await esperar(() => [...document.querySelectorAll("input[type=file]")].find((i) => /pdf/i.test(i.accept || "") && /txt/i.test(i.accept || "")), 15000);
-    if (!input) throw new Error("não achei o campo “Selecionar PDF(s) dos Autos” na Mesa");
-    const dt = new DataTransfer(); dt.items.add(new File([bytes], nome, { type: "application/pdf" }));
-    input.files = dt.files; input.dispatchEvent(new Event("change", { bubbles: true }));
-    const corpo = () => document.body.innerText || "";
-    await esperar(() => /Extraindo autos|mapeando partes|Falha ao processar/i.test(corpo()), 30000);      // começou (ou falhou logo)
-    const t0 = Date.now();
+    if (botaoNova()) return;
+    const abrir = document.getElementById("btn-header-hearing-workbench-tools") || [...document.querySelectorAll("button")].find((b) => /Mesa de Audi[êe]ncias/i.test(b.title || texto(b)));
+    if (!abrir) throw new Error("não achei o botão “Mesa de Audiências” no app");
+    abrir.click();
+    if (!(await esperar(botaoNova, 20000))) throw new Error("a Mesa de Audiências não abriu");
+  }
+  const resumoDaMesa = () => {      // textarea “Resumo Fático da Lide” da aba Briefing (só ela indica que a análise terminou: o texto bruto dos autos também é uma caixa de texto)
+    const h = [...document.querySelectorAll("span,h3,h4,label,div")].find((e) => !e.children.length && /Resumo F[áa]tico da Lide/i.test(texto(e)));
+    for (let n = h; n; n = n.parentElement) { const ta = n.querySelector && n.querySelector("textarea"); if (ta) return ta.value || ""; }
+    return "";
+  };
+  const erroDaMesa = () => { const m = corpoMesa().match(ERRO_MESA); return m ? m[0].trim().slice(0, 260) : ""; };
+  const falhar = (msg) => { const err = new Error("a Mesa de Audiência avisou: " + msg); err.semRetry = true; return err; };
+  async function aguardarBriefing(t0) {
     for (;;) {
-      const f = corpo().match(/Falha ao processar comando com IA[^\n]*|Por favor, selecione arquivos válidos[^\n]*/i);
-      if (f) { const err = new Error("a Mesa de Audiência avisou: " + f[0].slice(0, 220)); err.semRetry = true; throw err; }
-      if (!/Extraindo autos|mapeando partes/i.test(corpo()) && Date.now() - t0 > 4000) {
-        const resumo = [...document.querySelectorAll("textarea")].find((t) => t.value && t.value.length > 60);
-        if (resumo) break;
-      }
-      if (Date.now() - t0 > 12 * 60000) { const err = new Error("a análise na Mesa de Audiência não terminou em 12 minutos"); err.semRetry = true; throw err; }
+      const e = erroDaMesa(); if (e) throw falhar(e);
+      if (!/Extraindo autos|mapeando partes/i.test(corpoMesa()) && Date.now() - t0 > 5000 && resumoDaMesa().length > 40) return;
+      if (Date.now() - t0 > 12 * 60000) throw falhar("a análise não terminou em 12 minutos");
       await dorme(1500);
     }
-    return { ok: true, mensagem: "enviado à Mesa de Audiência (nova audiência com o PDF analisado)", minuta: "" };
+  }
+
+  // Cria uma audiência NOVA na Mesa e entrega o PDF (o app extrai e analisa sozinho). Em nova tentativa (retomar), reanalisa a audiência que ficou aberta, sem duplicar.
+  // Com comAta, gera também a ata preliminar (intimações e movimentações) e a fecha.
+  async function mesa({ arquivoId, nome, retomar, comAta }) {
+    const bytes = arquivos.get(arquivoId);
+    if (!bytes) throw new Error("arquivo não recebido");
+    await abrirMesa();
+    const rean = botao(/Reanalisar com IA/i);
+    let t0 = Date.now();
+    if (retomar && rean && corpoMesa().includes(String(nome).replace(/\.pdf$/i, "").slice(0, 14))) { rean.click(); await dorme(2500); }
+    else {
+      botaoNova().click();
+      const input = await esperar(() => [...document.querySelectorAll("input[type=file]")].find((i) => /pdf/i.test(i.accept || "") && /txt/i.test(i.accept || "")), 15000);
+      if (!input) throw new Error("não achei o campo “Selecionar PDF(s) dos Autos” na Mesa");
+      const dt = new DataTransfer(); dt.items.add(new File([bytes], nome, { type: "application/pdf" }));
+      input.files = dt.files; input.dispatchEvent(new Event("change", { bubbles: true }));
+      if (!(await esperar(() => /Extraindo autos|mapeando partes/i.test(corpoMesa()), 30000))) { const e = erroDaMesa(); if (e) throw falhar(e); }
+      t0 = Date.now();
+    }
+    await aguardarBriefing(t0);
+    if (comAta) await gerarAta();
+    return { ok: true, mensagem: "enviado à Mesa de Audiência (nova audiência com o PDF analisado" + (comAta ? " e ata preliminar" : "") + ")", minuta: "" };
+  }
+  const visualizadorAta = () => document.querySelector("[data-testid=ata-preliminar-viewer]");
+  async function gerarAta() {      // botão “Ata preliminar”/“Abrir ata preliminar” da aba Briefing; o app gera e abre o visualizador
+    const bt = document.querySelector("[data-testid=btn-ata-preliminar]");
+    if (!bt) throw falhar("não achei o botão da ata preliminar");
+    bt.click();
+    const t0 = Date.now();
+    for (;;) {
+      if (visualizadorAta()) return;
+      const e = erroDaMesa(); if (e) throw falhar(e);
+      if (Date.now() - t0 > 10 * 60000) throw falhar("a ata preliminar não terminou em 10 minutos");
+      await dorme(1500);
+    }
+  }
+  const fecharAta = async () => { if (!visualizadorAta()) return; window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); await esperar(() => !visualizadorAta(), 5000); };
+
+  // Lê da Mesa os dados de uma audiência já cadastrada: cabeçalho, abas 1 a 5 (texto das caixas) e a ata preliminar (HTML do documento).
+  async function mesaLer({ processo }) {
+    await abrirMesa();
+    const busca = [...document.querySelectorAll("input")].find((i) => /Buscar processo ou parte/i.test(i.placeholder || ""));
+    if (busca) { definirValor(busca, ""); await dorme(300); }
+    const alvo = dig(processo).slice(0, 9);
+    const cartao = () => [...document.querySelectorAll("div")].find((d) => /rounded-xl/.test(d.className) && /cursor-pointer/.test(d.className) && dig(texto(d)).startsWith(alvo) && visivel(d));
+    const c = await esperar(cartao, 10000);
+    if (!c) throw new Error("não achei a audiência " + processo + " na Mesa (envie o processo à Mesa antes)");
+    c.click(); await dorme(1200);
+    const campo = (rot) => { const i = [...document.querySelectorAll("input")].find((x) => new RegExp("^" + rot, "i").test(texto(x.parentElement || x))); return i ? i.value : ""; };
+    const procInput = [...document.querySelectorAll("input")].find((i) => /N[ºo°]?\s*do Processo/i.test(i.placeholder || ""));
+    const cabecalho = { processo: procInput ? procInput.value : "", autor: campo("Autor"), reu: campo("R[ée]u"), assunto: campo("Assunto") };
+    const raiz = document.querySelector(".mesa-escura") || document.body;
+    const textoDaAba = () => {
+      const cl = raiz.cloneNode(true);
+      cl.querySelectorAll("textarea,input").forEach((e) => { const v = e.value || ""; e.replaceWith(Object.assign(document.createElement("pre"), { textContent: v })); });
+      const t = (cl.innerText || cl.textContent || "").replace(/\n{3,}/g, "\n\n");
+      const i = t.lastIndexOf("5. Ata"); return i >= 0 ? t.slice(i + 6).trim() : t;
+    };
+    const abas = {};
+    for (const [k, rx] of [["briefing", /^\s*1\.\s*Briefing/i], ["roteiro", /^\s*2\.\s*Roteiro/i], ["deliberacoes", /^\s*3\.\s*Delibera/i], ["sentenca", /^\s*4\.\s*Senten/i], ["ata", /^\s*5\.\s*Ata/i]]) {
+      const b = botao(rx); if (!b) { abas[k] = ""; continue; }
+      b.click(); await dorme(900); abas[k] = textoDaAba().slice(0, 30000);
+    }
+    botao(/^\s*1\.\s*Briefing/i)?.click(); await dorme(500);
+    let ataHtml = "";
+    const bta = document.querySelector("[data-testid=btn-ata-preliminar]");
+    if (bta && /Abrir ata preliminar/i.test(texto(bta))) {      // só abre se a ata já existe (não gasta IA)
+      bta.click();
+      if (await esperar(visualizadorAta, 15000)) { await dorme(500); ataHtml = document.querySelector("[data-testid=ata-documento]")?.innerHTML || ""; await fecharAta(); }
+    }
+    return { ok: true, cabecalho, abas, ataHtml };
   }
 
   chrome.runtime.onMessage.addListener((m, _s, responder) => {
@@ -612,9 +680,9 @@
     }
     if (m?.acao === "studio-ler-minuta") { (m.processo ? carregarDoHistorico(m.processo) : Promise.resolve()).then(() => lerMinuta()).then((t) => responder({ ok: !!t, minuta: t, minutaHtml: minutaHtmlDoPainel(), erro: t ? "" : "não há minuta pronta na tela do app" })).catch((e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
     if (m?.acao === "studio-analisar") { window.__dicasPrompt = m.dicas || ""; window.__promptAproximado = ""; }
-    if (m?.acao === "studio-analisar" && (m.modo === "turbo" || m.modo === "mesa") && m.reqId) {      // análise longa: responde já e entrega o resultado pelo storage (o canal de mensagem pode cair no meio)
+    if (m?.acao === "studio-analisar" && (m.modo === "turbo" || m.modo === "mesa" || m.modo === "mesa-ler") && m.reqId) {      // análise longa: responde já e entrega o resultado pelo storage (o canal de mensagem pode cair no meio)
       const k = "studio_res_" + m.reqId;
-      (m.modo === "mesa" ? mesa(m) : turbo(m)).catch((e) => ({ ok: false, erro: String(e.message || e), opcoes: e.opcoes, semRetry: !!e.semRetry, grande: !!e.grande })).then((r) => chrome.storage.local.set({ [k]: r }));
+      (m.modo === "mesa" ? mesa(m) : m.modo === "mesa-ler" ? mesaLer(m) : turbo(m)).catch((e) => ({ ok: false, erro: String(e.message || e), opcoes: e.opcoes, semRetry: !!e.semRetry, grande: !!e.grande })).then((r) => chrome.storage.local.set({ [k]: r }));
       responder({ ok: true, assincrono: true }); return false;
     }
     if (m?.acao === "studio-analisar") { (m.modo === "lupa" ? lupa(m) : m.modo === "turbo" ? turbo(m) : analisar(m)).then(responder, (e) => responder({ ok: false, erro: String(e.message || e), opcoes: e.opcoes })); return true; }

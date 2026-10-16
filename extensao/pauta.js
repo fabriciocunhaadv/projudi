@@ -1,5 +1,7 @@
 // Pauta geral de audiências: lê a lista do Projudi (por serventia), baixa os autos dos processos marcados pela esteira automática (lote)
 // e preenche a pauta com o que o texto do processo informa (intimações, ofícios, denúncia…). Tudo editável e marcado "conferir".
+import { analisarNoStudio } from "./studio-cliente.js";
+import { dadosDaMesa } from "./pauta-extrator.js";
 const BASE = "https://projudi.tjgo.jus.br/";
 const $ = (id) => document.getElementById(id);
 const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
@@ -45,8 +47,9 @@ async function lerLista() {
 // ---- desenho no formato da pauta do gabinete: HORA | PROCESSO | AUTOR | VÍTIMA/TESTEMUNHAS ----
 const celAutor = (l) => { const d = l.dados; return `<span class="nome">${esc(l.promovido)}</span>` + (d ? [
   d.nascimentoReu && `Data de nascimento do réu: ${esc(d.nascimentoReu)}`, d.dataFato && `Data do fato: ${esc(d.dataFato)}`,
-  d.denunciaMov != null && `Denúncia – mov. ${d.denunciaMov}`, d.recebimentoMov != null && `Recebeu denúncia – mov. ${d.recebimentoMov}`].filter(Boolean).map((x) => "\n" + x).join("") + "\n<span class=\"sug\">[conferir nos autos]</span>" : ""); };
-const celPessoas = (l) => { const d = l.dados; let h = l.promovente ? `<span class="rot">Promovente:</span> <b>${esc(l.promovente)}</b>` : "";
+  d.denunciaMov != null && `Denúncia – mov. ${d.denunciaMov}`, d.recebimentoMov != null && `Recebeu denúncia – mov. ${d.recebimentoMov}`].filter(Boolean).map((x) => "\n" + x).join("") + (d.alertas?.length ? "\n<span class=\"alerta\">Atenção:</span> " + d.alertas.map(esc).join("; ") : "") + "\n<span class=\"sug\">[conferir nos autos]</span>" : ""); };
+const celPessoas = (l) => { const d = l.dados; let h = l.erroMesa ? `<span class="alerta">${esc(l.erroMesa)}</span>\n` : "";
+  h += l.promovente ? `<span class="rot">Promovente:</span> <b>${esc(l.promovente)}</b>` : "";
   if (d) {
     const v = d.pessoas.filter((p) => p.papel === "vitima"), t = d.pessoas.filter((p) => p.papel !== "vitima");
     const pes = (p) => `\n<b>${esc(p.nome)}</b>${p.situacao ? "\n" + esc(p.situacao) : ""}`;
@@ -78,27 +81,30 @@ $("gerar").onclick = async () => {
   } catch (e) { $("msg").textContent = "Erro: " + (e.message || e); } finally { $("gerar").disabled = false; }
 };
 
-// esteira automática: o lote baixa o PDF completo de cada processo marcado (dentro da serventia) e o OCR devolve os dados da pauta
+// 3) Consulta a Mesa de Audiência do Studio (abas Briefing, Roteiro, Deliberações, Sentença, Ata e ata preliminar) de cada processo marcado e monta a pauta.
 $("analisar").onclick = async () => {
-  const marcados = pauta.filter((l) => l.marcado && l.url);
-  if (!marcados.length) { $("msg").textContent = "Marque ao menos um processo (com link na lista)."; return; }
-  const id = "pauta" + Date.now();
-  const itens = marcados.map((l) => ({ processo: l.processo, url: l.url, classificador: "pauta", serventia: l.serventiaNome || "", serventiaUrl: l.serventiaUrl || "", situacao: "" }));
-  await chrome.storage.local.set({ pauta_ativa: true, ["lote_" + id]: { itens, pasta: "Projudi/Pauta", opcoes: { studio: { ativo: false } } } });
-  chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + id), active: false });
-  $("msg").textContent = `Esteira em andamento: ${marcados.length} processo(s). A pauta é preenchida aqui conforme cada processo termina (pode levar alguns minutos por processo).`;
+  const marcados = pauta.filter((l) => l.marcado);
+  if (!marcados.length) { $("msg").textContent = "Marque ao menos um processo."; return; }
+  $("analisar").disabled = true;
+  let feitos = 0;
+  for (const l of marcados) {
+    $("msg").textContent = `Lendo a Mesa de Audiência: ${feitos + 1} de ${marcados.length} (${l.processo})…`;
+    try {
+      const lido = await analisarNoStudio(null, { modo: "mesa-ler", processo: l.processo, texto: "x" });
+      l.dados = dadosDaMesa(lido); l.erroMesa = "";
+    } catch (e) { l.erroMesa = e.message || String(e); }
+    feitos++; desenhar();
+  }
+  $("analisar").disabled = false;
+  const falhas = marcados.filter((l) => l.erroMesa).length;
+  $("msg").textContent = `Pauta montada com a Mesa: ${marcados.length - falhas} de ${marcados.length} processo(s).` + (falhas ? ` ${falhas} não estavam na Mesa: use “2. Enviar marcados à Mesa” antes.` : " Confira os itens em amarelo.");
 };
-const aplicar = (k, v) => { const l = pauta.find((x) => chave(x.processo) === k); if (l && v?.dados) { l.dados = v.dados; return true; } return false; };
-chrome.storage.onChanged.addListener((c, area) => {
-  if (area !== "local") return; let mudou = false;
-  Object.keys(c).filter((k) => k.startsWith("pauta_res_") && c[k].newValue).forEach((k) => { if (aplicar(k.slice(10), c[k].newValue)) mudou = true; });
-  if (mudou) { const ed = document.activeElement; if (!ed?.classList?.contains("cel")) { desenhar(); $("msg").textContent = `${pauta.filter((l) => l.dados).length} de ${pauta.filter((l) => l.marcado).length} processo(s) analisado(s).`; } }
-});
 $("imprimir").onclick = () => window.print();
 $("copiar").onclick = async () => {
   const t = [...document.querySelectorAll(".folha")].map((f) => f.querySelector("h2").textContent + "\n" + [...f.querySelectorAll("tbody tr")].map((tr) => [...tr.querySelectorAll("td")].map((c) => c.innerText.replace(/\n+/g, " / ").trim()).join("  |  ")).join("\n")).join("\n\n");
   await navigator.clipboard.writeText(t); $("msg").textContent = "Pauta copiada.";
 };
+const aplicar = (k, v) => { const l = pauta.find((x) => chave(x.processo) === k); if (l && v?.dados) { l.dados = v.dados; return true; } return false; };      // usado nos testes
 window.__pauta = { get: () => pauta, desenhar, aplicar };
 carregarServentias();
 
@@ -108,7 +114,7 @@ $("mesa").onclick = async () => {
   if (!marcados.length) { $("msg").textContent = "Marque ao menos um processo (com link na lista)."; return; }
   const id = "pautamesa" + Date.now();
   const itens = marcados.map((l) => ({ processo: l.processo, url: l.url, classificador: "pauta", serventia: l.serventiaNome || "", serventiaUrl: l.serventiaUrl || "", situacao: "" }));
-  await chrome.storage.local.remove("pauta_ativa");
+  await chrome.storage.local.set({ pauta_mesa_ata: $("comAta").checked });
   await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/Pauta", opcoes: { studio: { ativo: true, modo: "mesa", docs: false } } } });
   chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + id), active: false });
   $("msg").textContent = `${marcados.length} processo(s) em download/OCR. Cada um entra na esteira e vira uma audiência NOVA na Mesa de Audiência do Studio (mantenha a aba do Assessor aberta e logada).`;

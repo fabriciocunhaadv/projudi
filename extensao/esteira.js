@@ -41,7 +41,8 @@ async function analisar(it) {
     const comTexto = it.modo === "turbo" || ((it.modo === "analise" || (it.modo === "lupa" && it.minutaAssessor)) && esteiraConfig.entrada === "txt");      // Turbo: sempre texto; esteira principal: conforme a escolha do usuário (txt ou PDF)
     const texto = comTexto ? await textoDoPdf(bytes) : "";
     if (comTexto && texto.replace(/\[Página \d+\]|\s/g, "").length < 200) throw new Error("não consegui extrair texto do PDF (o OCR pode não ter funcionado)");
-    const r = await analisarNoStudio(bytes, { nome: it.pdfNome, prompt: it.prompt, modo: it.modo, tipo: "", processo: it.processo, minuta: it.minutaAssessor, motivoMinuta: it.motivoMinuta, dicas: it.serventia || "", texto, ate1: it.modo === "analise" });
+    const comAta = it.modo === "mesa" ? !!(await chrome.storage.local.get("pauta_mesa_ata")).pauta_mesa_ata : false;
+    const r = await analisarNoStudio(bytes, { retomar: !!it.cotaVezes, comAta, nome: it.pdfNome, prompt: it.prompt, modo: it.modo, tipo: "", processo: it.processo, minuta: it.minutaAssessor, motivoMinuta: it.motivoMinuta, dicas: it.serventia || "", texto, ate1: it.modo === "analise" });
     if (!(await valida())) return;
     intervaloTurbo();
     await entregar(it, bytes, r.minuta, r.mensagem, r.minutaHtml || "", r.injecao || null, r.aproximado || "");

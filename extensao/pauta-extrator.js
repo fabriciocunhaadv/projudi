@@ -57,3 +57,36 @@ export function extrairPauta(texto) {
   return out;
 }
 if (typeof globalThis !== "undefined") globalThis.PautaExtrator = { extrairPauta };
+
+// Monta os dados da pauta a partir do que foi LIDO na Mesa de Audiência do Studio (abas 1–5 e ata preliminar). Roda na página da pauta (tem DOM).
+export function dadosDaMesa(lido) {
+  const out = { artigo: "", dataFato: "", nascimentoReu: "", denunciaMov: null, recebimentoMov: null, pessoas: [], mandadoNaoDevolvido: null, alertas: [], resumo: "", fonte: "mesa" };
+  const abas = lido?.abas || {};
+  const tudo = Object.values(abas).join("\n");
+  const art = tudo.match(/\bart(?:igo|s?\.)?\s*(\d+[-A-Z]?)(?:\s*,?\s*(caput|§\s*\d+[º°]?))?[^\n]{0,60}?C[óo]digo\s+Penal/i);
+  if (art) out.artigo = `art. ${art[1]}${art[2] ? ", " + art[2] : ""} do Código Penal`;
+  const fato = tudo.match(/(?:data\s+do\s+fato|no\s+dia|em)\s*:?\s*(\d{2}\/\d{2}\/\d{4})/i); if (fato) out.dataFato = fato[1];
+  const nasc = tudo.match(/data\s+de\s+nascimento\s*:?\s*(\d{2}\/\d{2}\/\d{4})/i); if (nasc) out.nascimentoReu = nasc[1];
+  const den = tudo.match(/den[úu]ncia[^\n]{0,40}?mov(?:imenta[cç][aã]o|\.)?\s*(\d+)/i); if (den) out.denunciaMov = +den[1];
+  const rec = tudo.match(/(?:receb\w+|recebimento)[^\n]{0,40}den[úu]ncia[^\n]{0,40}?mov(?:imenta[cç][aã]o|\.)?\s*(\d+)/i); if (rec) out.recebimentoMov = +rec[1];
+  const resumo = (abas.briefing || "").match(/Resumo F[áa]tico da Lide[\s\S]{0,40}?\n+([\s\S]{40,700}?)\n\s*\n/i); if (resumo) out.resumo = resumo[1].replace(/\s+/g, " ").trim();
+  if (lido?.ataHtml && typeof DOMParser !== "undefined") {
+    const d = new DOMParser().parseFromString(`<div id="r">${lido.ataHtml}</div>`, "text/html");
+    const mov = (t) => { const m = String(t || "").match(/Mov\.?\s*(\d+(?:\s*(?:,|e)\s*\d+)*)/i); return m ? m[1].replace(/\s*e\s*/g, ", ") : ""; };
+    const tx = (e) => (e.textContent || "").replace(/\s+/g, " ").trim();
+    d.querySelectorAll("table").forEach((t) => {
+      const cab = [...t.querySelectorAll("th")].map(tx).map(sa);
+      const linhas = [...t.querySelectorAll("tbody tr")].map((tr) => [...tr.children].map(tx));
+      if (cab[0] === "testemunha") linhas.forEach((c) => {
+        const intim = sa(c[3] || ""), onde = mov(c[4]) || mov(c[3]);
+        const sit = /negativ|nao intimad|nao localizad/.test(intim) ? `Não intimado${onde ? " mov. " + onde : ""}` : /intimad/.test(intim) ? `Intimado${onde ? " mov. " + onde : ""}` : intim && !/nao consta/.test(intim) ? c[3] : "";
+        out.pessoas.push({ nome: c[0].replace(/\s+—.*$/, ""), papel: "testemunha", situacao: sit + (/conferir/i.test(c[4] || "") ? " [conferir]" : "") });
+      });
+      if (cab[0] === "destinatario") linhas.forEach((c) => { if (/negativ|nao localizad|aguardando/.test(sa(c[2] || ""))) out.alertas.push(`${c[1] || "Ato"} de ${c[0]}: ${c[2]}${mov(c[4]) ? " (mov. " + mov(c[4]) + ")" : ""}`); });
+      if (cab[0] === "pedido") linhas.forEach((c) => out.alertas.push(`Pedido: ${c[0]} (${c[1]}) — ${/sem decisao/.test(sa(c[3] || "")) ? "sem decisão" : c[3]}${mov(c[4]) ? " (mov. " + mov(c[4]) + ")" : ""}`));
+    });
+    d.querySelectorAll(".quadro li.alto").forEach((li) => out.alertas.push(tx(li)));
+    d.querySelectorAll(".meta").forEach((m) => { if (/^\s*(Promotor|Vítima|Vitima)/i.test(tx(m))) { const v = tx(m).replace(/^[^:]*:\s*/, ""); if (/^v[ií]tima/i.test(tx(m))) out.pessoas.push({ nome: v, papel: "vitima", situacao: "" }); } });
+  }
+  return out;
+}

@@ -38,13 +38,14 @@ with sync_playwright() as p:
     pg.wait_for_function("document.querySelectorAll('#serv option').length > 1")
     pg.select_option("#serv", "0"); pg.click("#gerar"); pg.wait_for_selector(".folha", timeout=15000)
     t = pg.inner_text("#saida"); assert "Antônio José Teste" in t and "13:30" in t and "Audiências 10/11/2026" in t, t
-    ex = pg.evaluate("""async (txt) => { const m = await import('./pauta-extrator.js'); return m.extrairPauta(txt); }""", TEXTO)
+    ata = '<div class="ata"><p class="meta"><span class="rot">Vítima:</span> <b>Beltrana de Souza Lima</b></p><table><thead><tr><th>Testemunha</th><th>Indicada por</th><th>Onde foi indicada</th><th>Intimação</th><th>Onde consta a intimação</th></tr></thead><tbody><tr><td>Cicrano Alves Pereira</td><td>Autor</td><td>Mov. 3</td><td>Não intimada</td><td>Mov. 57, Arq. 1, Pág. 2</td></tr><tr><td>Josuel Alves dos Santos</td><td>Autor</td><td>Mov. 3</td><td>Intimada (10/05/2026)</td><td>Mov. 64, Arq. 2, Pág. 1</td></tr></tbody></table><div class="quadro"><p class="qt">ATENÇÃO</p><ul><li class="alto">Depoimento pessoal da parte contrária: pedido do réu — NÃO analisado (Mov. 5)</li></ul></div></div>'
+    lido = {"abas": {"briefing": "Resumo Fático da Lide\nAção penal pelo art. 147 do Código Penal. Fato em 07/09/2023. Denúncia mov. 32.", "deliberacoes": "Recebimento da denúncia mov. 41"}, "ataHtml": ata}
+    ex = pg.evaluate("""async (l) => { const m = await import('./pauta-extrator.js'); return m.dadosDaMesa(l); }""", lido)
     print(ex)
-    assert ex["artigo"].startswith("art. 147") and ex["dataFato"] == "07/09/2023" and ex["nascimentoReu"] == "15/01/2002" and ex["denunciaMov"] == 32 and ex["recebimentoMov"] == 41, ex
+    assert ex["artigo"].startswith("art. 147") and ex["dataFato"] == "07/09/2023" and ex["denunciaMov"] == 32, ex
     nomes = {x["nome"]: x for x in ex["pessoas"]}
-    assert "Beltrana de Souza Lima" in nomes and nomes["Beltrana de Souza Lima"]["papel"] == "vitima", ex
-    assert "Não intimado mov. 57" in nomes["Cicrano Alves Pereira"]["situacao"] and "endereço inexistente" in nomes["Cicrano Alves Pereira"]["situacao"], ex
-    assert "Intimado mov. 64" in nomes["Josuel Alves dos Santos"]["situacao"], ex
+    assert "Não intimado mov. 57" in nomes["Cicrano Alves Pereira"]["situacao"] and "Intimado mov. 64" in nomes["Josuel Alves dos Santos"]["situacao"] and nomes["Beltrana de Souza Lima"]["papel"] == "vitima", ex
+    assert any("NÃO analisado" in a for a in ex["alertas"]), ex
     pg.evaluate("(d) => { const g = window.__pauta; g.get().forEach((l) => g.aplicar(l.processo.replace(/\\D/g,'').slice(0,9), {dados: d})); g.desenhar(); }", ex)
     t = pg.inner_text("#saida"); assert "VÍTIMA" in t and "TESTEMUNHAS" in t and "Denúncia – mov. 32" in t, t
     pg.screenshot(path="/tmp/claude-0/work/ui/pauta2.png"); b.close()

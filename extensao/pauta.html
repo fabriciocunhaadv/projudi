@@ -24,8 +24,9 @@ td.h{font-size:12pt}.nome{font-weight:bold;text-transform:uppercase}
  <label>Situação<select id="fluxo"><option value="2">Pendentes</option><option value="1">Para hoje</option></select></label>
  <label>De<input type="date" id="de"></label><label>Até<input type="date" id="ate"></label>
  <button class="pri" id="gerar">1. Ler a lista</button>
- <button class="pri" id="analisar" disabled>2. Analisar processos marcados (baixar e ler autos)</button>
- <button class="pri" id="mesa" disabled title="Baixa o PDF de cada processo marcado, faz o OCR e entrega à Mesa de Audiência do Studio (nova audiência + PDF)">3. Enviar marcados à Mesa de Audiência</button>
+ <label style="flex-direction:row;align-items:center;gap:4px"><input type="checkbox" id="comAta" checked> gerar também a ata preliminar (intimações e movimentações)</label>
+ <button class="pri" id="mesa" disabled title="Baixa o PDF de cada processo marcado, faz o OCR e entrega à Mesa de Audiência do Studio (nova audiência + PDF)">2. Enviar marcados à Mesa de Audiência</button>
+ <button class="pri" id="analisar" disabled title="Consulta a Mesa de Audiência do Studio (Briefing, Roteiro, Deliberações, Sentença, Ata) de cada processo marcado e monta a pauta">3. Analisar processos marcados (consulta a Mesa)</button>
  <button id="imprimir">Imprimir / PDF</button><button id="copiar">Copiar texto</button>
-</div><div id="msg">Entre no Projudi, escolha a serventia e clique em “Ler a lista”. Depois marque os processos e use “Analisar” para a extensão baixar os autos e preencher intimações e movimentações.</div><div id="saida"></div>
+</div><div id="msg">Entre no Projudi, escolha a serventia e clique em “Ler a lista”. Depois marque os processos, use “2. Enviar à Mesa” (baixa o PDF, faz o OCR e envia ao Studio) e, quando a esteira terminar, “3. Analisar”: a extensão lê a Mesa de Audiência de cada processo e monta a pauta.</div><div id="saida"></div>
 <script src="parser.js"></script><script type="module" src="pauta.js"></script></body></html>

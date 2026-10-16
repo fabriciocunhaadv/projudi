@@ -43,7 +43,7 @@ export async function enviarBase(nome, bytes, substituir = false) {          // 
 export async function analisarNoStudio(bytes, opcoes) {
   const aba = await acharStudio();
   const arquivoId = opcoes.texto ? "" : await enviarArquivo(aba.id, bytes);
-  if (opcoes.modo === "turbo" || opcoes.modo === "mesa") return analisarTurbo(aba, arquivoId, opcoes);
+  if (opcoes.modo === "turbo" || opcoes.modo === "mesa" || opcoes.modo === "mesa-ler") return analisarTurbo(aba, arquivoId, opcoes);
   const r = await chrome.tabs.sendMessage(aba.id, { acao: "studio-analisar", arquivoId, ...opcoes });
   if (!r?.ok) throw Object.assign(new Error(r?.erro || "o app não confirmou a análise"), { opcoes: r?.opcoes });
   return r;
