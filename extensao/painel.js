@@ -5,6 +5,26 @@ const BASE = "https://projudi.tjgo.jus.br/";
 const link = (p) => (p.url ? new URL(p.url, BASE).href : "");
 const ROTULO = { naoAnalisadas: "Não analisadas", preAnalisadas: "Pré-analisadas" };
 let estado = null, aberto = false;
+// Dois perfis (dois juízes) na MESMA unidade listam os mesmos processos: cada processo aparece uma só vez (o do primeiro perfil lido) e o perfil repetido não soma de novo.
+function deduplicar(e) {
+  if (!e?.serventias) return e;
+  const unidade = (n) => String(n || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+  const vistos = new Map();
+  for (const s of e.serventias) {
+    const k = unidade(s.serventia), set = vistos.get(k) || new Set(); vistos.set(k, set);
+    const primeira = set.size === 0 && !s.__lida;
+    let removidos = 0, lidos = 0;
+    for (const tipo of ["naoAnalisadas", "preAnalisadas"]) {
+      const lista = s.processos?.[tipo] || [];
+      lidos += lista.length;
+      const nova = lista.filter((p) => { const id = String(p.processo || "").replace(/\D/g, "").slice(0, 13) || p.processo; if (set.has(id)) { removidos++; return false; } set.add(id); return true; });
+      if (s.processos) s.processos[tipo] = nova;
+    }
+    s.__lida = true;
+    if (!primeira && lidos > 0 && removidos === lidos) { s.repetida = true; s.linhas = (s.linhas || []).map((l) => ({ ...l, naoAnalisadas: 0, preAnalisadas: 0 })); }
+  }
+  return e;
+}
 // Situação de cada processo na automação: baixado / em que etapa da esteira (Studio, Google Docs, Projudi) está.
 let sitProc = {};
 const incluidos = new Set();          // já baixados que o usuário marcou de novo à mão
@@ -67,7 +87,7 @@ function desenhar() {
     tNa += na; tPre += pre; tUrg += urg;
     const lis = (k) => (s.processos?.[k] || []).length;
     const c = (n, k) => `<td class="n ${n ? "alerta" : "zero"}">${n}${n !== lis(k) && (n || lis(k)) ? `<br><small>(lista: ${lis(k)})</small>` : ""}</td>`;
-    h += `<tr><td><a href="${esc(s.url)}" target="_blank">${esc(s.serventia)}</a>${s.erro ? `<br><span class="erro">${esc(s.erro)}</span>` : ""}${(s.avisos || []).map((a) => `<br><span class="aviso">⚠ ${a.tipo === "naoAnalisadas" ? "não analisadas" : "pré-analisadas"}: a tela inicial conta ${a.esperado}, mas só ${a.lido} vieram na lista</span>`).join("")}</td><td>${esc(s.perfil)}</td>${c(na, "naoAnalisadas")}${c(pre, "preAnalisadas")}<td class="n ${urg ? "alerta" : "zero"}">${urg}</td></tr>`;
+    h += `<tr><td><a href="${esc(s.url)}" target="_blank">${esc(s.serventia)}</a>${s.repetida ? "<br><small>(mesma unidade de outro perfil: processos já contados acima)</small>" : ""}${s.erro ? `<br><span class="erro">${esc(s.erro)}</span>` : ""}${(s.avisos || []).map((a) => `<br><span class="aviso">⚠ ${a.tipo === "naoAnalisadas" ? "não analisadas" : "pré-analisadas"}: a tela inicial conta ${a.esperado}, mas só ${a.lido} vieram na lista</span>`).join("")}</td><td>${esc(s.perfil)}</td>${c(na, "naoAnalisadas")}${c(pre, "preAnalisadas")}<td class="n ${urg ? "alerta" : "zero"}">${urg}</td></tr>`;
   }
   h += `<tr><th colspan="2">Total</th><th class="n">${tNa}</th><th class="n">${tPre}</th><th class="n">${tUrg}</th></tr></table>`;
 
@@ -176,9 +196,9 @@ function csv() {
 }
 
 (async () => {
-  estado = (await chrome.storage.local.get("estado")).estado;
+  estado = deduplicar((await chrome.storage.local.get("estado")).estado);
   await carregarSituacao();
-  chrome.storage.onChanged.addListener((c, area) => { if (area === "local" && c.estado) { estado = c.estado.newValue; desenhar(); } });
+  chrome.storage.onChanged.addListener((c, area) => { if (area === "local" && c.estado) { estado = deduplicar(c.estado.newValue); desenhar(); } });
   chrome.storage.onChanged.addListener(async (c, area) => {      // andamento da fila/esteira: atualiza a coluna "Situação na automação"
     if (area === "local" && Object.keys(c).some((k) => k === "baixados" || k.startsWith("esteira_"))) { await carregarSituacao(); desenhar(); }
   });
@@ -215,7 +235,8 @@ function csv() {
     const fila = window.__candidatos || [];   // já na ordem de trabalho
     if (!fila.length) return;
     const hoje = new Date().toISOString().slice(0, 10), id = String(Date.now());
-    const itens = fila.map((p) => ({ processo: p.processo, url: p.url, classificador: nomeCls(p), serventia: p.serventia, situacao: p.tipo, urlPre: p.urlPre || "", serventiaUrl: p.serventiaUrl || "", arquivoModelos: automacao[p.serventia]?.arquivoModelos || "", prompt: automacao[p.serventia]?.prompt || "", pasta: `Projudi/${hoje}/${[p.serventia, nomeCls(p)].map((x) => String(x).replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60).replace(/[\s.]+$/g, "")).join("/")}` }));
+    const vistosLote = new Set();      // o mesmo processo nunca entra duas vezes no lote (ex.: dois perfis/juízes na mesma unidade)
+    const itens = fila.filter((p) => { const k = String(p.processo).replace(/\D/g, "").slice(0, 13) || p.processo; if (vistosLote.has(k)) return false; vistosLote.add(k); return true; }).map((p) => ({ processo: p.processo, url: p.url, classificador: nomeCls(p), serventia: p.serventia, situacao: p.tipo, urlPre: p.urlPre || "", serventiaUrl: p.serventiaUrl || "", arquivoModelos: automacao[p.serventia]?.arquivoModelos || "", prompt: automacao[p.serventia]?.prompt || "", pasta: `Projudi/${hoje}/${[p.serventia, nomeCls(p)].map((x) => String(x).replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60).replace(/[\s.]+$/g, "")).join("/")}` }));
     await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/" + hoje, opcoes: { atualizarBase: opcoes.atualizarBase, studio: { ativo: opcoes.studio, modo: opcoes.modo, docs: false } } } });
     chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + id) });
   });
