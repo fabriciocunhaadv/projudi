@@ -101,7 +101,7 @@
   const erroSemPrompt = (prompt, raiz, onde) => { const e = new Error(`não achei o prompt “${prompt}” ${onde}, nem outro da mesma matéria${dicaTraducao()} — escolha abaixo um prompt da lista do seu Studio`); e.opcoes = opcoesDePrompt(raiz); return e; };
   const erroNaTela = () => { const t = document.querySelector("[data-rht-toaster]"); const x = t ? texto(t) : ""; return /erro|falha|inv[aá]lid|limite|quota|n[aã]o foi poss/i.test(x) ? x : ""; };
   // Falha passageira dos servidores de IA (alta demanda, 503, tempo de fila): espera 5 s e aperta o botão de novo (até 6 vezes).
-  const transitorio = (msg) => /alta demanda|503|timeout de fila|reten[cç][aã]o em fila|tente novamente|tentar novamente|sobrecarg|indispon[ií]vel/i.test(msg || "");
+  const transitorio = (msg) => !/processamento turbo demorou/i.test(msg || "") && /alta demanda|503|timeout de fila|reten[cç][aã]o em fila|tente novamente|tentar novamente|sobrecarg|indispon[ií]vel/i.test(msg || "");
   function repetirSePassageiro(estado, e, apertar) {
     if (!transitorio(e) || estado.vezes >= 6) return false;
     if (Date.now() < estado.ate) return true;       // o mesmo aviso ainda está na tela
@@ -545,7 +545,7 @@
       const e = erroNaTela();
       if (e && repetirSePassageiro(rep, e, () => { const r2 = painelTurbo(), b = r2 && botaoExecutarTurbo(r2); if (b && !b.disabled && /Executar/i.test(texto(b))) b.click(); })) { await dorme(1000); continue; }
       if (e) throw new Error("o app avisou: " + e);
-      if (Date.now() - t0 > 10 * 60000) throw new Error("o Módulo Turbo demorou mais de 10 minutos");
+      if (Date.now() - t0 > 16 * 60000) throw new Error("o Módulo Turbo demorou mais de 16 minutos");
       await dorme(1000);
     }
     await dorme(1500);
