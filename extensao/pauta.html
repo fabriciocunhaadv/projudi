@@ -26,7 +26,7 @@ td.h{font-size:12pt}.nome{font-weight:bold;text-transform:uppercase}
  <button class="pri" id="gerar">1. Ler a lista</button>
  <label style="flex-direction:row;align-items:center;gap:4px"><input type="checkbox" id="comAta" checked> gerar também a ata preliminar (intimações e movimentações)</label>
  <button class="pri" id="mesa" disabled title="Baixa o PDF de cada processo marcado, faz o OCR e entrega à Mesa de Audiência do Studio (nova audiência + PDF)">2. Enviar marcados à Mesa de Audiência</button>
- <button class="pri" id="analisar" disabled title="Consulta a Mesa de Audiência do Studio (Briefing, Roteiro, Deliberações, Sentença, Ata) de cada processo marcado e monta a pauta">3. Analisar processos marcados (consulta a Mesa)</button>
+ <button class="pri" id="analisar" hidden style="display:none" disabled title="Consulta a Mesa de Audiência do Studio (Briefing, Roteiro, Deliberações, Sentença, Ata) de cada processo marcado e monta a pauta">3. Analisar processos marcados (consulta a Mesa)</button>
  <button id="imprimir">Imprimir / PDF</button><button id="copiar">Copiar texto</button>
-</div><div id="msg">Entre no Projudi, escolha a serventia e clique em “Ler a lista”. Depois marque os processos, use “2. Enviar à Mesa” (baixa o PDF, faz o OCR e envia ao Studio) e, quando a esteira terminar, “3. Analisar”: a extensão lê a Mesa de Audiência de cada processo e monta a pauta.</div><div id="saida"></div>
+</div><div id="msg">Entre no Projudi, escolha a serventia e clique em “Ler a lista”. Depois marque os processos para usar “2. Enviar marcados à Mesa de Audiência” (baixa o PDF, faz o OCR e envia ao Studio) ou imprima/copie a pauta.</div><div id="saida"></div>
 <script src="parser.js"></script><script type="module" src="pauta.js"></script></body></html>
