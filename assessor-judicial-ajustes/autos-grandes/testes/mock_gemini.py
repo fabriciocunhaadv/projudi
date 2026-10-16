@@ -78,6 +78,8 @@ class H(BaseHTTPRequestHandler):
             texto = json.dumps({"processNumber": "5530114-61.2025.8.09.0166", "author": "AUTOR TESTE", "defendant": "RÉU TESTE", "judicialUnit": "Vara Teste", "pendingMatter": "Sentença",
                 "actType": "SENTENÇA", "relatorio": "Relatório com os fatos: " + ", ".join(fatos) + ". " + "Narrativa do processo. " * 120,
                 "fundamentacao": par, "dispositivo": "Dispositivo operacional completo. " * 20})
+        import os
+        if os.environ.get("MOCK_ARRAY") and not eh_parte: texto = "[ " + texto + " ]"
         resp = {"candidates": [{"content": {"role": "model", "parts": [{"text": texto}]}, "finishReason": "STOP", "index": 0}],
                 "usageMetadata": {"promptTokenCount": n, "candidatesTokenCount": 3000, "totalTokenCount": n + 3000}, "modelVersion": modelo}
         b = json.dumps(resp).encode()
