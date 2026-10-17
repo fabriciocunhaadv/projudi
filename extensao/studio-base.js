@@ -660,6 +660,8 @@
     return { ok: true, cabecalho, abas, ataHtml };
   }
 
+  // avisa o app de que é a esteira (e não uma pessoa) que está operando: ele não abre a pergunta de OCR e escolhe o OCR sozinho
+  const automatico = (p) => { document.documentElement.dataset.assessorAuto = "1"; return p.finally(() => { delete document.documentElement.dataset.assessorAuto; }); };
   chrome.runtime.onMessage.addListener((m, _s, responder) => {
     if (m?.acao === "studio-ping") { responder({ ok: true }); return false; }
     if (m?.acao === "studio-parte") {     // recebe um arquivo em pedaços
@@ -682,10 +684,10 @@
     if (m?.acao === "studio-analisar") { window.__dicasPrompt = m.dicas || ""; window.__promptAproximado = ""; }
     if (m?.acao === "studio-analisar" && (m.modo === "turbo" || m.modo === "mesa" || m.modo === "mesa-ler") && m.reqId) {      // análise longa: responde já e entrega o resultado pelo storage (o canal de mensagem pode cair no meio)
       const k = "studio_res_" + m.reqId;
-      (m.modo === "mesa" ? mesa(m) : m.modo === "mesa-ler" ? mesaLer(m) : turbo(m)).catch((e) => ({ ok: false, erro: String(e.message || e), opcoes: e.opcoes, semRetry: !!e.semRetry, grande: !!e.grande })).then((r) => chrome.storage.local.set({ [k]: r }));
+      automatico(m.modo === "mesa" ? mesa(m) : m.modo === "mesa-ler" ? mesaLer(m) : turbo(m)).catch((e) => ({ ok: false, erro: String(e.message || e), opcoes: e.opcoes, semRetry: !!e.semRetry, grande: !!e.grande })).then((r) => chrome.storage.local.set({ [k]: r }));
       responder({ ok: true, assincrono: true }); return false;
     }
-    if (m?.acao === "studio-analisar") { (m.modo === "lupa" ? lupa(m) : m.modo === "turbo" ? turbo(m) : analisar(m)).then(responder, (e) => responder({ ok: false, erro: String(e.message || e), opcoes: e.opcoes })); return true; }
+    if (m?.acao === "studio-analisar") { automatico(m.modo === "lupa" ? lupa(m) : m.modo === "turbo" ? turbo(m) : analisar(m)).then(responder, (e) => responder({ ok: false, erro: String(e.message || e), opcoes: e.opcoes })); return true; }
     return false;
   });
 
