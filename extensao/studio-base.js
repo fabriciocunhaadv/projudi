@@ -546,11 +546,15 @@
     }
     const exec = await esperar(() => { const b = botaoExecutarTurbo(raiz); return b && !b.disabled && /Executar/i.test(texto(b)) ? b : null; }, 60000);
     if (!exec) throw new Error("o botão “Executar Análise Turbo” não ficou disponível");
+    const gigantesAntes = new Set(listaGigantes().map((g) => g.id));
     const rotulo = texto(exec); exec.click();
     // 1) começou (o botão muda ou some) 2) terminou (aparece o resultado: “Abrir no Editor” + aba “Minuta Completa”)
     const t0 = Date.now(), rep = { vezes: 0, ate: 0 };
-    await esperar(() => { const b = botaoExecutarTurbo(raiz); return erroNaTela() || !b || b.disabled || texto(b) !== rotulo || resultadoTurbo(); }, 20000);
+    const novoGigante = () => listaGigantes().find((g) => !gigantesAntes.has(g.id));
+    await esperar(() => { const b = botaoExecutarTurbo(raiz); return erroNaTela() || !b || b.disabled || texto(b) !== rotulo || resultadoTurbo() || novoGigante(); }, 20000);
     for (;;) {
+      const gig = novoGigante();      // processo gigante: o app lê em lotes, em segundo plano, e a minuta vai para o Histórico; a fila segue
+      if (gig) return { ok: true, gigante: true, jobId: gig.id, mensagem: "processo gigante: o Studio está lendo em lotes, em segundo plano" };
       if (resultadoTurbo()) break;
       const e = erroNaTela();
       if (e && repetirSePassageiro(rep, e, () => { const r2 = painelTurbo(), b = r2 && botaoExecutarTurbo(r2); if (b && !b.disabled && /Executar/i.test(texto(b))) b.click(); })) { await dorme(1000); continue; }
