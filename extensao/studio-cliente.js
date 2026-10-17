@@ -50,6 +50,14 @@ export async function analisarNoStudio(bytes, opcoes) {
 }
 
 // Lê a minuta que já está pronta na tela do app (sem analisar de novo).
+// Andamento dos processos gigantes que o app do Studio lê em lotes, em segundo plano
+export async function consultarGigantes() {
+  const aba = await acharStudio();
+  const r = await chrome.tabs.sendMessage(aba.id, { acao: "studio-gigantes" });
+  if (!r?.ok) throw new Error("não consegui consultar os processos gigantes do app");
+  return r.jobs || [];
+}
+
 export async function lerMinutaAtual(processo = "") {
   const aba = await acharStudio();
   const r = await chrome.tabs.sendMessage(aba.id, { acao: "studio-ler-minuta", processo });

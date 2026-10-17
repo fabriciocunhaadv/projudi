@@ -128,6 +128,8 @@
   const caixaDuasEtapas = () => [...document.querySelectorAll("label")].find((l) => /Execu[cç][aã]o em 2 Etapas/i.test(texto(l)) && visivel(l))?.querySelector("input[type=checkbox]");
   const prosseguirEtapa2 = () => botao(/Prosseguir para (a )?2ª Etapa/i);
 
+  // Resumo dos processos gigantes que o app está lendo em lotes (o app o publica no atributo data-gigantes da página)
+  const listaGigantes = () => { try { return JSON.parse(document.documentElement.dataset.gigantes || "[]"); } catch { return []; } };
   async function analisar({ arquivoId, nome, prompt, tipo, texto: textoAutos, ate1, processo }) {
     const bytes = arquivos.get(arquivoId);
     if (!bytes && !textoAutos) throw new Error("arquivo não recebido");
@@ -167,10 +169,14 @@
         exec = await esperar(() => { const b = document.getElementById("tour-execute-btn"); return b && !b.disabled ? b : null; }, 150000);
       }
       if (!exec) { const b = document.getElementById("tour-execute-btn"); throw new Error("o botão “Gerar Minuta Judicial” não ficou disponível (estado do botão: " + (b ? `“${texto(b).slice(0, 60)}”, ${b.disabled ? "desabilitado" : "habilitado"}` : "não encontrado") + ")"); }
+      const gigantesAntes = new Set(listaGigantes().map((g) => g.id));
       exec.click();
-      if (!(await esperar(() => executando() || resultadoPronto() || erroNaTela(), 60000))) throw new Error("a análise não começou");
+      const novoGigante = () => listaGigantes().find((g) => !gigantesAntes.has(g.id));
+      if (!(await esperar(() => executando() || resultadoPronto() || erroNaTela() || novoGigante(), 60000))) throw new Error("a análise não começou");
       const t0 = Date.now(), rep = { vezes: 0, ate: 0 };
       for (;;) {
+        const gig = novoGigante();      // processo gigante (acima do limite da análise normal): o app lê em lotes, em segundo plano; a fila segue
+        if (gig) return { ok: true, gigante: true, jobId: gig.id, mensagem: "processo gigante: o Studio está lendo em lotes, em segundo plano" };
         const e = erroNaTela();
         if (e && /tamanho|muito grande|grande demais|limite de (?:token|entrada)|processamento turbo demorou/i.test(e)) {
         const err = new Error("O PDF/texto extraído deste processo é grande demais para o Módulo Turbo. Use a “análise normal” para este processo; a fila segue para o próximo.");
@@ -664,6 +670,7 @@
   const automatico = (p) => { document.documentElement.dataset.assessorAuto = "1"; return p.finally(() => { delete document.documentElement.dataset.assessorAuto; }); };
   chrome.runtime.onMessage.addListener((m, _s, responder) => {
     if (m?.acao === "studio-ping") { responder({ ok: true }); return false; }
+    if (m?.acao === "studio-gigantes") { responder({ ok: true, jobs: listaGigantes() }); return false; }
     if (m?.acao === "studio-parte") {     // recebe um arquivo em pedaços
       const p = partes.get(m.id) || []; const bin = atob(m.b64), b = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);

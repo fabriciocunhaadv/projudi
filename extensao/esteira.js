@@ -1,5 +1,5 @@
 import { todos, atualizar, lerPdf, remover, enfileirar, ROTULO, ATIVOS } from "./esteira-banco.js";
-import { analisarNoStudio, lerMinutaAtual } from "./studio-cliente.js";
+import { analisarNoStudio, lerMinutaAtual, consultarGigantes } from "./studio-cliente.js";
 import { criarDocumento, abrirLadoALado, lerDocumento, tipoDaMinuta, nomeDoc } from "./docs-api.js";
 import { paragrafosDeHtml } from "./docs-core.js";
 import { textoDoPdf } from "./pdf-texto.js";
@@ -45,6 +45,7 @@ async function analisar(it) {
     const comAta = it.modo === "mesa" ? !!(await chrome.storage.local.get("pauta_mesa_ata")).pauta_mesa_ata : false;
     const r = await analisarNoStudio(bytes, { retomar: !!it.cotaVezes, comAta, nome: it.pdfNome, prompt: it.prompt, modo: it.modo, tipo: "", processo: it.processo, minuta: it.minutaAssessor, motivoMinuta: it.motivoMinuta, dicas: it.serventia || "", texto, ate1: it.modo === "analise" });
     if (!(await valida())) return;
+    if (r.gigante) { await atualizar(it.id, { estado: "gigante", erro: "", jobId: r.jobId, aviso: "Processo gigante: o Studio lê os autos em lotes, em segundo plano (pode levar de minutos a horas). A fila segue; a minuta será pega no Histórico quando ficar pronta." }); return; }
     intervaloTurbo();
     await entregar(it, bytes, r.minuta, r.mensagem, r.minutaHtml || "", r.injecao || null, r.aproximado || "");
   } catch (e) {
@@ -83,12 +84,28 @@ async function cadastrar(it) {         // conferência terminada: pega o texto f
   await atualizar(it.id, { estado: "cadastrando", textoFinal: texto, htmlFinal: html, aviso, projudiTab: aba.id, inserido: false });
 }
 
+// Processos gigantes lidos em lotes pelo Studio: confere o andamento (no máximo a cada 45 s) e, quando a minuta fica pronta no Histórico, segue o fluxo normal.
+let ultimaConsultaGigantes = 0;
+async function verificarGigantes(lista) {
+  const gig = lista.filter((i) => i.estado === "gigante");
+  if (!gig.length || Date.now() - ultimaConsultaGigantes < 45000) return;
+  ultimaConsultaGigantes = Date.now();
+  let jobs; try { jobs = await consultarGigantes(); } catch (e) { return; }      // aba do Studio fechada: tenta de novo depois
+  for (const it of gig) {
+    const j = jobs.find((x) => x.id === it.jobId);
+    if (!j) { await atualizar(it.id, { aviso: "Processo gigante: não encontrei o trabalho no Studio (a aba foi recarregada?). Use “Usar a minuta do Studio” se ele já terminou, ou envie de novo." }); continue; }
+    if (j.status === "concluido") await usarMinutaDoStudio(it);
+    else if (j.status === "erro" || j.status === "cancelado") await atualizar(it.id, { estado: "erro", erro: j.status === "cancelado" ? "O processo gigante foi cancelado no Studio." : "O processo gigante parou no Studio: " + (j.erro || "veja o painel “Gigantes” do app e clique em Retomar.") });
+  }
+}
+
 async function passo() {
   if (!dono || ocupado) return;
   if (Date.now() < pausaAte) return;      // espera combinada (cota da IA esgotada)
   ocupado = true;
   try {
     const lista = await todos();
+    await verificarGigantes(lista);
     const rec = lista.find((i) => i.estado === "recebida");      // minuta enviada pelo botão da tela do Studio
     if (rec) { await atualizar(rec.id, { estado: "analisando", rodada: Date.now() + Math.random() }); try { await entregar(rec, await lerPdf(rec.id), rec.minutaRecebida, "", rec.htmlRecebido || ""); } catch (e) { await atualizar(rec.id, { estado: "erro", erro: e.message }); } return; }
     const conf = lista.find((i) => i.estado === "conferido");
