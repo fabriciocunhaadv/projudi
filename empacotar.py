@@ -21,4 +21,6 @@ with zipfile.ZipFile(alvo, "w", zipfile.ZIP_DEFLATED) as z:
         if f.is_dir() or f.name.startswith(".") or f.suffix in {".md", ".map"}: continue
         z.writestr(str(f.relative_to(raiz)), json.dumps(m, indent=2, ensure_ascii=False) if f.name == "manifest.json" and f.parent == raiz else f.read_bytes())
 anterior.write_text(versao)
+for velho in saida.glob("projudi-extensao-*.zip"):      # a pasta guarda só a última versão: o pacote novo substitui os antigos
+    if velho != alvo: velho.unlink()
 print("Gerado:", alvo, f"({alvo.stat().st_size / 1048576:.1f} MB)")
