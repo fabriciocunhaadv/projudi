@@ -99,9 +99,16 @@
   // Sem o prompt (nem parecido da mesma matéria): o erro leva a lista de prompts do Studio para a esteira deixar o usuário escolher.
   const opcoesDePrompt = (raiz) => [...new Set([...(raiz || document).querySelectorAll("select"), ...document.querySelectorAll("select")].flatMap((s) => [...s.options].map((o) => o.text.trim()).filter((t) => /Área Judicial|Area Judicial/i.test(t))))];
   const erroSemPrompt = (prompt, raiz, onde) => { const e = new Error(`não achei o prompt “${prompt}” ${onde}, nem outro da mesma matéria${dicaTraducao()} — escolha abaixo um prompt da lista do seu Studio`); e.opcoes = opcoesDePrompt(raiz); return e; };
-  const erroNaTela = () => { const t = document.querySelector("[data-rht-toaster]"); const x = t ? texto(t) : ""; return /erro|falha|inv[aá]lid|limite|quota|n[aã]o foi poss/i.test(x) ? x : ""; };
+  const erroNaTela = () => {
+    const t = document.querySelector("[data-rht-toaster]"); const x = t ? texto(t) : "";
+    if (/erro|falha|inv[aá]lid|limite|quota|n[aã]o foi poss/i.test(x)) return x;
+    // faixa vermelha do app (“…Por favor, clique em ‘Tentar Novamente’”): não é um aviso rápido, fica fixa no topo da tela
+    const bt = botao(/^Tentar Novamente$/i);
+    if (bt) { let el = bt.parentElement; for (let i = 0; i < 4 && el && texto(el).length < 60; i++) el = el.parentElement; const y = el ? texto(el) : ""; if (y.length > 20) return y.slice(0, 400); }
+    return "";
+  };
   // Falha passageira dos servidores de IA (alta demanda, 503, tempo de fila): espera 5 s e aperta o botão de novo (até 6 vezes).
-  const transitorio = (msg) => !/processamento turbo demorou/i.test(msg || "") && /alta demanda|503|timeout de fila|reten[cç][aã]o em fila|tente novamente|tentar novamente|sobrecarg|indispon[ií]vel/i.test(msg || "");
+  const transitorio = (msg) => !/processamento turbo demorou/i.test(msg || "") && /alta demanda|503|timeout de fila|reten[cç][aã]o em fila|tente novamente|tentar novamente|sobrecarg|indispon[ií]vel|interrompida momentaneamente|conex[aã]o com a intelig[eê]ncia/i.test(msg || "");
   function repetirSePassageiro(estado, e, apertar) {
     if (!transitorio(e) || estado.vezes >= 6) return false;
     if (Date.now() < estado.ate) return true;       // o mesmo aviso ainda está na tela
@@ -171,9 +178,13 @@
       }
       if (!exec) { const b = document.getElementById("tour-execute-btn"); throw new Error("o botão “Gerar Minuta Judicial” não ficou disponível (estado do botão: " + (b ? `“${texto(b).slice(0, 60)}”, ${b.disabled ? "desabilitado" : "habilitado"}` : "não encontrado") + ")"); }
       const gigantesAntes = new Set(listaGigantes().map((g) => g.id));
+      // o resultado do processo anterior pode continuar na tela quando este começa: só vale como pronto o que MUDOU depois do clique
+      const assinatura = () => ((document.getElementById("tour-meta-parties-box")?.innerText || "").replace(/\s+/g, " ").slice(0, 300)) + "|" + ((document.querySelector("div.font-serif")?.innerText || "").replace(/\s+/g, " ").slice(0, 400));
+      const antes = resultadoPronto() ? assinatura() : "";
+      const resultadoNovo = () => resultadoPronto() && (!antes || assinatura() !== antes);
       exec.click();
       const novoGigante = () => listaGigantes().filter((g) => !gigantesAntes.has(g.id)).sort((x, y) => (x.parte || 0) - (y.parte || 0))[0];      // processo em partes: acompanha a Parte 1
-      if (!(await esperar(() => executando() || resultadoPronto() || erroNaTela() || novoGigante(), 60000))) throw new Error("a análise não começou");
+      if (!(await esperar(() => executando() || resultadoNovo() || erroNaTela() || novoGigante(), 60000))) throw new Error("a análise não começou");
       const t0 = Date.now(), rep = { vezes: 0, ate: 0 };
       for (;;) {
         const gig = novoGigante();      // processo gigante (acima do limite da análise normal): o app lê em lotes, em segundo plano; a fila segue
@@ -189,11 +200,11 @@
         if (ate1 && pro) {      // esteira automática: SÓ a 1ª etapa. Nunca aperta “Prosseguir para 2ª Etapa”; espera o app ficar ocioso (ou 2 min) e devolve
           if (!rep.pro1) rep.pro1 = Date.now();
           const ocupadoAinda = /Processando/i.test(texto(document.getElementById("tour-execute-btn") || document.body).slice(0, 200));
-          if (resultadoPronto() && (!ocupadoAinda || Date.now() - rep.pro1 > 120000)) break;
+          if (resultadoNovo() && (!ocupadoAinda || Date.now() - rep.pro1 > 120000)) break;
           await dorme(1000); continue;
         }
       if (pro && !pro.disabled && !rep.etapa2) { rep.etapa2 = pro; pro.click(); await dorme(1500); continue; }
-      if (!executando() && resultadoPronto() && !prosseguirEtapa2() && !(rep.etapa2 && rep.etapa2.isConnected)) break;      // com a 2ª etapa em curso o botão fica na tela (“Executando…”) até terminar
+      if (!executando() && resultadoNovo() && !prosseguirEtapa2() && !(rep.etapa2 && rep.etapa2.isConnected)) break;      // com a 2ª etapa em curso o botão fica na tela (“Executando…”) até terminar
         if (Date.now() - t0 > 20 * 60000) throw new Error("a análise demorou mais de 20 minutos");
         await dorme(1000);
       }
@@ -202,7 +213,7 @@
     }
     // confere se a minuta é mesmo DESTE processo: o app, sem ler o PDF, devolve número 0000000-00… e “Parte Autora/Parte Ré” e guardaria tudo como um processo só
     const dig = String(processo || "").replace(/\D/g, ""), caixa = document.getElementById("tour-meta-parties-box");
-    if (dig.length >= 7 && caixa && !(caixa.innerText || "").replace(/\D/g, "").includes(dig.slice(0, 7))) throw new Error(`a minuta saiu com dados que não são de ${processo} (o app mostrou “${(caixa.innerText || "").replace(/\s+/g, " ").trim().slice(0, 90)}”): ele não leu os autos. Apague esse registro no Histórico do app e tente de novo`);
+    if (dig.length >= 7 && caixa && !(caixa.innerText || "").replace(/\D/g, "").includes(dig.slice(0, 7))) throw new Error(`a minuta saiu com dados que não são de ${processo} (o app mostrou “${(caixa.innerText || "").replace(/\s+/g, " ").trim().slice(0, 90)}”): o app mostrou o resultado de outro processo (provavelmente o anterior) e esta análise não foi concluída. NADA foi apagado do Histórico; use “Analisar de novo”.`);
     // o app avisa quando o ato foi (ou não) gravado no Histórico; sem isso a esteira dava o processo por salvo sem estar
     let historico = null;
     if (document.documentElement.dataset.historicoSuporte === "1") {

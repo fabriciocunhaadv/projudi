@@ -12,7 +12,7 @@ export async function textoDoPdf(bytes) {
       if (y !== null && yy !== y && !t.endsWith("\n")) t += "\n";
       t += it.str || ""; if (it.hasEOL) t += "\n"; y = yy;
     }
-    paginas.push(`[Página ${i}]\n` + t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim());
+    paginas.push(`[Página ${i} de ${pdf.numPages}]\n` + t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim());
     page.cleanup();
   }
   await pdf.destroy();
