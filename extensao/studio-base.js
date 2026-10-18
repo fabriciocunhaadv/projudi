@@ -131,6 +131,7 @@
   // Resumo dos processos gigantes que o app está lendo em lotes (o app o publica no atributo data-gigantes da página)
   const listaGigantes = () => { try { return JSON.parse(document.documentElement.dataset.gigantes || "[]"); } catch { return []; } };
   async function analisar({ arquivoId, nome, prompt, tipo, texto: textoAutos, ate1, processo }) {
+    const inicioAnalise = Date.now();
     const bytes = arquivos.get(arquivoId);
     if (!bytes && !textoAutos) throw new Error("arquivo não recebido");
     fecharJanelas();
@@ -202,7 +203,13 @@
     // confere se a minuta é mesmo DESTE processo: o app, sem ler o PDF, devolve número 0000000-00… e “Parte Autora/Parte Ré” e guardaria tudo como um processo só
     const dig = String(processo || "").replace(/\D/g, ""), caixa = document.getElementById("tour-meta-parties-box");
     if (dig.length >= 7 && caixa && !(caixa.innerText || "").replace(/\D/g, "").includes(dig.slice(0, 7))) throw new Error(`a minuta saiu com dados que não são de ${processo} (o app mostrou “${(caixa.innerText || "").replace(/\s+/g, " ").trim().slice(0, 90)}”): ele não leu os autos. Apague esse registro no Histórico do app e tente de novo`);
-    return { ok: true, mensagem: "análise concluída" + (window.__promptAproximado ? " — " + window.__promptAproximado : ""), aproximado: window.__promptAproximado || "", minuta: await lerMinuta(), minutaHtml: minutaHtmlDoPainel(), injecao: lerInjecao() };
+    // o app avisa quando o ato foi (ou não) gravado no Histórico; sem isso a esteira dava o processo por salvo sem estar
+    let historico = null;
+    if (document.documentElement.dataset.historicoSuporte === "1") {
+      historico = await esperar(() => { try { const h = JSON.parse(document.documentElement.dataset.historicoSalvo || "null"); return h && h.t >= inicioAnalise ? h : null; } catch (e) { return null; } }, 90000);
+    }
+    const avisoHistorico = historico ? (historico.ok ? "" : " ⚠ ATENÇÃO: a minuta NÃO foi gravada no Histórico do app (" + (historico.erro || "erro desconhecido") + "). Ela está na tela; salve/copie antes de limpar.") : (document.documentElement.dataset.historicoSuporte === "1" ? " ⚠ O app não confirmou a gravação no Histórico em 90 s: confira se o processo aparece lá." : "");
+    return { ok: true, historicoErro: historico ? (historico.ok ? "" : historico.erro || "erro") : "", mensagem: "análise concluída" + avisoHistorico + (window.__promptAproximado ? " — " + window.__promptAproximado : ""), aproximado: window.__promptAproximado || "", minuta: await lerMinuta(), minutaHtml: minutaHtmlDoPainel(), injecao: lerInjecao() };
   }
 
   // Tarja de "prompt injection" do app (vermelha: com a movimentação/arquivo/página; verde: nada encontrado). Lida da tela, sem mexer nela.

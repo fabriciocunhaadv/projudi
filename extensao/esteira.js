@@ -26,7 +26,8 @@ async function abrirNoProjudi(it, url, active = true) {
 }
 
 async function entregar(it, bytes, minuta, mensagem, html = "", injecao = null, aproximado = "") {
-  const aviso = (it.modo === "analise" ? "1ª etapa concluída no Studio; a minuta está no histórico do app (use “Prosseguir para 2ª Etapa” lá para a revisão)." : mensagem) + (aproximado && !String(mensagem).includes(aproximado) ? " ⚠ " + aproximado : (it.modo === "analise" && aproximado ? " ⚠ " + aproximado : ""));
+  const avisoHist = (String(mensagem).match(/ ⚠ (?:ATENÇÃO: a minuta NÃO foi gravada|O app não confirmou)[^—]*/) || [""])[0];
+  const aviso = (it.modo === "analise" ? "1ª etapa concluída no Studio; a minuta está no histórico do app (use “Prosseguir para 2ª Etapa” lá para a revisão)." + avisoHist : mensagem) + (aproximado && !String(mensagem).includes(aproximado) ? " ⚠ " + aproximado : (it.modo === "analise" && aproximado ? " ⚠ " + aproximado : ""));
   return atualizar(it.id, { estado: "concluido", minuta: minuta || "", minutaHtml: html, tipo: tipoDaMinuta(minuta), aviso, injecao });
 }
 
