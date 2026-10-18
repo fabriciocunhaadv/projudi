@@ -171,7 +171,7 @@
       if (!exec) { const b = document.getElementById("tour-execute-btn"); throw new Error("o botão “Gerar Minuta Judicial” não ficou disponível (estado do botão: " + (b ? `“${texto(b).slice(0, 60)}”, ${b.disabled ? "desabilitado" : "habilitado"}` : "não encontrado") + ")"); }
       const gigantesAntes = new Set(listaGigantes().map((g) => g.id));
       exec.click();
-      const novoGigante = () => listaGigantes().find((g) => !gigantesAntes.has(g.id));
+      const novoGigante = () => listaGigantes().filter((g) => !gigantesAntes.has(g.id)).sort((x, y) => (x.parte || 0) - (y.parte || 0))[0];      // processo em partes: acompanha a Parte 1
       if (!(await esperar(() => executando() || resultadoPronto() || erroNaTela() || novoGigante(), 60000))) throw new Error("a análise não começou");
       const t0 = Date.now(), rep = { vezes: 0, ate: 0 };
       for (;;) {
@@ -550,7 +550,7 @@
     const rotulo = texto(exec); exec.click();
     // 1) começou (o botão muda ou some) 2) terminou (aparece o resultado: “Abrir no Editor” + aba “Minuta Completa”)
     const t0 = Date.now(), rep = { vezes: 0, ate: 0 };
-    const novoGigante = () => listaGigantes().find((g) => !gigantesAntes.has(g.id));
+    const novoGigante = () => listaGigantes().filter((g) => !gigantesAntes.has(g.id)).sort((x, y) => (x.parte || 0) - (y.parte || 0))[0];      // processo em partes: acompanha a Parte 1
     await esperar(() => { const b = botaoExecutarTurbo(raiz); return erroNaTela() || !b || b.disabled || texto(b) !== rotulo || resultadoTurbo() || novoGigante(); }, 20000);
     for (;;) {
       const gig = novoGigante();      // processo gigante: o app lê em lotes, em segundo plano, e a minuta vai para o Histórico; a fila segue

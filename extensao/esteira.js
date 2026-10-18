@@ -94,6 +94,18 @@ async function verificarGigantes(lista) {
   for (const it of gig) {
     const j = jobs.find((x) => x.id === it.jobId);
     if (!j) { await atualizar(it.id, { aviso: "Processo gigante: não encontrei o trabalho no Studio (a aba foi recarregada?). Use “Usar a minuta do Studio” se ele já terminou, ou envie de novo." }); continue; }
+    if (j.uniao) {      // processo muito grande: lido em partes; a minuta única só sai depois que o Studio une as partes
+      const unida = jobs.find((x) => x.serie === it.jobId);
+      if (unida) {
+        if (unida.status === "concluido") await usarMinutaDoStudio(it);
+        else if (unida.status === "erro" || unida.status === "cancelado") await atualizar(it.id, { estado: "erro", erro: "A união das partes parou no Studio: " + (unida.erro || "veja o painel “Gigantes” do app e clique em Retomar.") });
+        else await atualizar(it.id, { aviso: "Processo muito grande: as partes já foram lidas e o Studio está redigindo a minuta única (" + unida.status + ")." });
+        continue;
+      }
+      if (j.status === "erro" || j.status === "cancelado") await atualizar(it.id, { estado: "erro", erro: "Uma parte do processo parou no Studio: " + (j.erro || "veja o painel “Gigantes” do app e clique em Retomar.") });
+      else await atualizar(it.id, { aviso: "Processo muito grande: o Studio lê as partes uma de cada vez (primeira: " + j.status + ") e depois une tudo numa só minuta." });
+      continue;
+    }
     if (j.status === "concluido") await usarMinutaDoStudio(it);
     else if (j.status === "erro" || j.status === "cancelado") await atualizar(it.id, { estado: "erro", erro: j.status === "cancelado" ? "O processo gigante foi cancelado no Studio." : "O processo gigante parou no Studio: " + (j.erro || "veja o painel “Gigantes” do app e clique em Retomar.") });
   }
