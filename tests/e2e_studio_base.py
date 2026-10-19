@@ -31,7 +31,7 @@ class H(http.server.BaseHTTPRequestHandler):
 def main():
     tmp = Path(tempfile.mkdtemp()); ext = tmp / "ext"
     shutil.copytree(RAIZ, ext)
-    m = ext / "manifest.json"; m.write_text(m.read_text().replace("https://*.ai.studio/*", "http://localhost/*"))
+    m = ext / "manifest.json"; m.write_text(m.read_text().replace("https://assessor-judicial.ai.studio/*", "http://localhost/*"))
     j = ext / "modelos.js"; j.write_text(j.read_text().replace("https://assessor-judicial.ai.studio/", "http://localhost:8773/"))
     srv = http.server.HTTPServer(("localhost", 8773), H)
     threading.Thread(target=srv.serve_forever, daemon=True).start()

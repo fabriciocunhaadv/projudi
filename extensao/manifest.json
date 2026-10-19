@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Conclusões Projudi",
-  "version": "1.0.29",
+  "version": "1.0.30",
   "description": "Confere automaticamente as conclusões não analisadas e pré-analisadas de cada serventia no Projudi/TJGO.",
   "permissions": [
     "activeTab",
@@ -18,7 +18,7 @@
   ],
   "host_permissions": [
     "https://*.tjgo.jus.br/*",
-    "https://*.ai.studio/*",
+    "https://assessor-judicial.ai.studio/*",
     "https://docs.googleapis.com/*",
     "https://docs.google.com/*"
   ],
@@ -74,7 +74,7 @@
     },
     {
       "matches": [
-        "https://*.ai.studio/*"
+        "https://assessor-judicial.ai.studio/*"
       ],
       "js": [
         "studio-diag.js"
@@ -83,7 +83,7 @@
     },
     {
       "matches": [
-        "https://*.ai.studio/*"
+        "https://assessor-judicial.ai.studio/*"
       ],
       "js": [
         "prompt-similar.js",
@@ -93,7 +93,7 @@
     },
     {
       "matches": [
-        "https://*.ai.studio/*"
+        "https://assessor-judicial.ai.studio/*"
       ],
       "js": [
         "studio-main.js"

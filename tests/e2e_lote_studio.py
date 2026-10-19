@@ -85,7 +85,7 @@ class HS(http.server.BaseHTTPRequestHandler):
 def main():
     tmp = Path(tempfile.mkdtemp()); ext = tmp / "ext"
     shutil.copytree(RAIZ, ext)
-    m = ext / "manifest.json"; m.write_text(m.read_text().replace("https://*.tjgo.jus.br/*", "http://localhost/*").replace("https://*.ai.studio/*", "http://127.0.0.1/*").replace("https://docs.google.com/document/*", "http://127.0.0.1/*"))
+    m = ext / "manifest.json"; m.write_text(m.read_text().replace("https://*.tjgo.jus.br/*", "http://localhost/*").replace("https://assessor-judicial.ai.studio/*", "http://127.0.0.1/*").replace("https://docs.google.com/document/*", "http://127.0.0.1/*"))
     d = ext / "docs-api.js"; d.write_text(d.read_text().replace("https://docs.googleapis.com/v1/documents", "http://127.0.0.1:8777/v1/documents").replace("https://docs.google.com/document/d/", "http://127.0.0.1:8777/d/").replace("const token = () =>", "const token = async () => 'tok-teste'; const _t = () =>"))
     m.write_text(m.read_text().replace("COLE_AQUI_O_CLIENT_ID", "teste"))
     c = ext / "studio-cliente.js"; c.write_text(c.read_text().replace("https://assessor-judicial.ai.studio/", "http://127.0.0.1:8774/"))

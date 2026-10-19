@@ -20,9 +20,9 @@ m["name"] = "Conclusões Projudi (TESTE)"
 m["action"]["default_title"] = "Conclusões Projudi (TESTE)"
 if "COLE_AQUI" in json.dumps(m.get("oauth2", {})):
     m.pop("oauth2", None); m["permissions"] = [x for x in m.get("permissions", []) if x != "identity"]
-m["host_permissions"] = [h for h in m["host_permissions"] if h != "https://*.ai.studio/*"] + ["https://ai.studio/*", "https://*.run.app/*", "https://aistudio.google.com/*"]
+m["host_permissions"] = [h for h in m["host_permissions"] if h != "https://assessor-judicial.ai.studio/*"] + ["https://ai.studio/*", "https://*.run.app/*", "https://aistudio.google.com/*"]
 for cs in m["content_scripts"]:
-    if "https://*.ai.studio/*" in cs["matches"]:
+    if "https://assessor-judicial.ai.studio/*" in cs["matches"]:
         cs["matches"] = PAGINAS_TESTE + ["https://*.run.app/*"]      # a página do AI Studio com o app de teste (o app roda num quadro *.run.app dentro dela)
         cs["all_frames"] = True
 alvo = saida / f"projudi-extensao-TESTE-{versao}.zip"

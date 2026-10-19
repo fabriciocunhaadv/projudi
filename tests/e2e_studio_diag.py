@@ -19,7 +19,7 @@ class H(http.server.BaseHTTPRequestHandler):
 def main():
     tmp = Path(tempfile.mkdtemp()); ext = tmp / "ext"
     shutil.copytree(RAIZ, ext)
-    m = ext / "manifest.json"; m.write_text(m.read_text().replace("https://*.ai.studio/*", "http://localhost/*"))
+    m = ext / "manifest.json"; m.write_text(m.read_text().replace("https://assessor-judicial.ai.studio/*", "http://localhost/*"))
     srv = http.server.HTTPServer(("localhost", 8771), H)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     exe = os.environ.get("CHROMIUM_PATH") or glob.glob("/opt/pw-browsers/chromium-*/chrome-linux*/chrome")[0]
