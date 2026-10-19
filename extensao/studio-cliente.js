@@ -79,7 +79,7 @@ async function analisarTurbo(aba, arquivoId, opcoes) {
     const aba2 = await chrome.tabs.get(aba.id).catch(() => null);
     if (!aba2) throw new Error("a aba do assessor-judicial foi fechada durante a análise");
     carregando = aba2.status === "loading" ? carregando + 1 : 0;
-    if (carregando > 10) throw new Error("a aba do assessor-judicial recarregou durante a análise");
+    if (carregando > 90) throw new Error("a aba do assessor-judicial recarregou durante a análise (ficou mais de 3 minutos carregando; confira se o Studio terminou de atualizar e tente de novo)");      // o Studio pode demorar a reabrir depois de uma atualização
     if (Date.now() - t0 > 18 * 60000) throw new Error("o Módulo Turbo/Mesa não terminou em 18 minutos");
     await dorme(2000);
   }
