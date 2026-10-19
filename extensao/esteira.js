@@ -151,13 +151,16 @@ async function desenhar() {
     if (it.estado === "cadastrando") { b.push(`<button data-a="projudi" data-id="${it.id}">Abrir o processo</button>`, `<button data-a="concluir" data-id="${it.id}">✔ Lancei no Projudi — próximo processo</button>`); }
     if (it.estado === "erro" && it.promptOpcoes?.length) b.push(`<br><select data-a-sel="${it.id}" title="Prompts que existem no seu Studio"><option value="">— escolha o prompt —</option>${it.promptOpcoes.map((o) => `<option value="${esc(o)}"${o === it.promptEscolhido ? " selected" : ""}>${esc(o)}</option>`).join("")}</select> <button data-a="usarprompt" data-id="${it.id}">Usar este prompt e analisar</button>`);
     if (it.estado === "erro" && it.grande) b.push(`<button data-a="normal" data-id="${it.id}" title="Refaz este processo na análise normal do Studio (PDF/texto completo, sem o Módulo Turbo)">Usar a análise normal</button>`);
+    if (it.modo === "mesa" && it.estado === "concluido") b.push(`<label title="Inclui esta audiência na pauta (formato do modelo do gabinete)"><input type="checkbox" data-pauta="${it.id}" ${it.pautaSel ? "checked" : ""}> incluir na pauta</label>`);
     b.push(`<button data-a="excluir" data-id="${it.id}" title="Tira este processo da fila e apaga o PDF guardado (não mexe no Projudi nem nos arquivos já baixados)">🗑 Excluir</button>`);
     return `<tr><td>${n + 1}</td><td>${esc(it.processo)}<br><small>${esc(it.tipo || "")}</small></td><td class="e-${it.estado}">${esc(ROTULO[it.estado] || it.estado)}${it.erro ? "<br>" + esc(it.erro) : ""}${it.aviso ? `<br><small>${esc(it.aviso)}</small>` : ""}${it.injecao ? (it.injecao.estado === "vermelha" ? `<br><small class="inj-v">🚨 Prompt injection nos autos: ${esc(it.injecao.texto || "confira a tarja vermelha no app")}</small>` : `<br><small class="inj-ok">✅ Prompt injection: nada encontrado</small>`) : ""}</td><td>${b.join(" ")}</td></tr>`;
   }).join("") : '<tr><td colspan="4">Fila vazia.</td></tr>';
+  const conc = lista.filter((x) => x.modo === "mesa" && x.estado === "concluido"), marc = conc.filter((x) => x.pautaSel);
+  $("pautaBarra").style.display = conc.length ? "" : "none"; $("pautaN").textContent = marc.length; $("pautaGerar").disabled = !marc.length;
   $("status").textContent = dono ? "" : "Outra aba da esteira já está em execução; esta mostra apenas o andamento.";
 }
 
-$("linhas").addEventListener("change", async (ev) => { const s = ev.target.closest("select[data-a-sel]"); if (s) await atualizar(s.dataset.aSel, { promptEscolhido: s.value }); });
+$("linhas").addEventListener("change", async (ev) => { const pc = ev.target.closest("input[data-pauta]"); if (pc) { await atualizar(pc.dataset.pauta, { pautaSel: pc.checked }); desenhar(); return; } const s = ev.target.closest("select[data-a-sel]"); if (s) await atualizar(s.dataset.aSel, { promptEscolhido: s.value }); });
 $("linhas").addEventListener("click", async (ev) => {
   const b = ev.target.closest("button[data-a]"); if (!b) return;
   const id = b.dataset.id, a = b.dataset.a;
@@ -266,3 +269,7 @@ setInterval(async () => {
 // O computador não entra em espera enquanto houver processo na fila ou em análise (só a aba dona da fila dá o sinal).
 vigiarAcordado("esteira", async () => dono && (await todos()).some((i) => ["aguardando", "analisando", "recebida"].includes(i.estado)));
 setInterval(conferirAcordado, 60000);
+
+// Pauta de audiências: abre a pauta (modelo do gabinete) com as audiências concluídas que o usuário marcou
+$("pautaTodos").onclick = async () => { for (const x of (await todos()).filter((i) => i.modo === "mesa" && i.estado === "concluido")) await atualizar(x.id, { pautaSel: true }); desenhar(); };
+$("pautaGerar").onclick = async () => { const ids = (await todos()).filter((i) => i.modo === "mesa" && i.estado === "concluido" && i.pautaSel).map((i) => i.id); if (ids.length) chrome.tabs.create({ url: chrome.runtime.getURL("pauta-doc.html?ids=" + ids.join(",")) }); };
