@@ -691,7 +691,11 @@
 
   // avisa o app de que é a esteira (e não uma pessoa) que está operando: ele não abre a pergunta de OCR e escolhe o OCR sozinho
   const automatico = (p) => { document.documentElement.dataset.assessorAuto = "1"; return p.finally(() => { delete document.documentElement.dataset.assessorAuto; }); };
+  // Quando o app roda dentro de uma moldura (página do AI Studio com o app num iframe *.run.app), a extensão entra nas duas páginas: a de fora
+  // (sem o app) fica calada e só a moldura que tem o app responde, para as mensagens não irem para o quadro errado.
+  const quadroSemApp = () => window.top === window && !document.getElementById("tour-input-panel") && !!document.querySelector("iframe[src*='run.app']");
   chrome.runtime.onMessage.addListener((m, _s, responder) => {
+    if (quadroSemApp()) return false;
     if (m?.acao === "studio-ping") { responder({ ok: true }); return false; }
     if (m?.acao === "studio-gigantes") { responder({ ok: true, jobs: listaGigantes() }); return false; }
     if (m?.acao === "studio-parte") {     // recebe um arquivo em pedaços

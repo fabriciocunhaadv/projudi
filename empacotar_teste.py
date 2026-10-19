@@ -2,13 +2,14 @@
 """Gera publicacao-teste/projudi-extensao-TESTE-<versao>.zip: a MESMA extensão, mas ligada ao app de TESTE (construcao-nova).
 Diferenças em relação ao pacote da loja (empacotar.py):
   - nome "Conclusões Projudi (TESTE)" e ID próprio (sem "key"), para conviver com a extensão oficial;
-  - as telas do Studio (content scripts) passam a ser *.run.app em vez de *.ai.studio (o app de teste roda em ais-dev-/ais-pre-…run.app);
+  - as telas do Studio (content scripts) passam a ser https://ai.studio/apps/<id do app de teste> (e *.run.app, se o app rodar numa moldura) em vez de *.ai.studio;
   - se não houver aba do app de teste aberta, a esteira avisa em vez de abrir o Studio PUBLICADO.
 Instalar: descompacte o .zip numa pasta e use chrome://extensions → Modo do desenvolvedor → Carregar sem compactação.
 Use UMA das duas extensões por vez no Projudi (desative a oficial enquanto testa), senão os botões aparecem em dobro."""
 import json, zipfile
 from pathlib import Path
 
+APP_TESTE = "https://ai.studio/apps/ce9bc744-6a53-4141-a2bf-80e69447e6b3*"      # app "assessor-judicial-construcao-nova" no AI Studio
 raiz = Path(__file__).parent / "extensao"
 m = json.loads((raiz / "manifest.json").read_text())
 versao = m["version"]
@@ -18,10 +19,10 @@ m["name"] = "Conclusões Projudi (TESTE)"
 m["action"]["default_title"] = "Conclusões Projudi (TESTE)"
 if "COLE_AQUI" in json.dumps(m.get("oauth2", {})):
     m.pop("oauth2", None); m["permissions"] = [x for x in m.get("permissions", []) if x != "identity"]
-m["host_permissions"] = [h for h in m["host_permissions"] if h != "https://*.ai.studio/*"] + ["https://*.run.app/*", "https://aistudio.google.com/*"]
+m["host_permissions"] = [h for h in m["host_permissions"] if h != "https://*.ai.studio/*"] + ["https://ai.studio/*", "https://*.run.app/*", "https://aistudio.google.com/*"]
 for cs in m["content_scripts"]:
     if "https://*.ai.studio/*" in cs["matches"]:
-        cs["matches"] = ["https://*.run.app/*"]
+        cs["matches"] = [APP_TESTE, "https://*.run.app/*"]      # o endereço do app de teste e, se ele rodar numa moldura, o quadro *.run.app
         cs["all_frames"] = True
 alvo = saida / f"projudi-extensao-TESTE-{versao}.zip"
 with zipfile.ZipFile(alvo, "w", zipfile.ZIP_DEFLATED) as z:
