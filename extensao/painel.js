@@ -143,7 +143,6 @@ function desenhar() {
       `<label class="radio"><input type="radio" name="modoStudio" data-modo="analise" ${opcoes.modo === "analise" ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> Análise dos processos (Gerar Minuta Judicial)</label>` +
       `<label class="radio"><input type="radio" name="modoStudio" data-modo="lupa" ${opcoes.modo === "lupa" ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> Lupa do Magistrado <small>(pega a minuta do assessor em “Visualizar” das pré-analisadas, sobe os autos na Lupa e clica em Auditar)</small></label>` +
       `<label class="radio"><input type="radio" name="modoStudio" data-modo="turbo" ${opcoes.modo === "turbo" ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> ⚡ Análise Turbo <small>(Módulo Turbo Independente: anexa o PDF com OCR, Auto-detectar, e gera)</small></label>` +
-      `<label class="radio"><input type="radio" name="modoStudio" data-modo="mesa" ${opcoes.modo === "mesa" ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> ⚖ Mesa de Audiência <small>(cria uma audiência nova na Mesa e entrega o PDF com OCR para análise)</small></label>` +
       `<label>Enviar os autos ao Studio como: <select data-entrada ${opcoes.studio ? "" : "disabled"}><option value="pdf" ${entradaStudio === "pdf" ? "selected" : ""}>PDF (arquivo completo)</option><option value="txt" ${entradaStudio === "txt" ? "selected" : ""}>texto extraído do PDF com OCR (mais rápido)</option></select> <small>(o .txt de cada processo também é salvo ao lado do PDF)</small></label></div>`;
     h += `<p><button id="baixarLote" ${fila2.length ? "" : "disabled"}>⬇ Baixar PDFs dos ${fila2.length} processo(s)</button> <small>Ordem da fila: “${esc(Ordenar.MODOS[$("modo").value])}”. Cada processo gera <b>número-OCR.pdf</b>.</small></p></div>`;
     window.__candidatos = fila2;
@@ -211,6 +210,7 @@ function csv() {
   automacao = (await chrome.storage.sync.get("automacao")).automacao || {};
   entradaStudio = ((await chrome.storage.sync.get("esteiraConfig")).esteiraConfig || {}).entrada || "pdf";
   opcoes = { ...opcoes, ...((await chrome.storage.sync.get("opcoesLote")).opcoesLote || {}) };
+  if (opcoes.modo === "mesa") opcoes.modo = "analise";      // a Mesa de Audiência fica só na tela da Pauta de audiências
   $("conteudo").addEventListener("change", (e) => {
     const t = e.target, dado = t.dataset || {};
     if (dado.entrada !== undefined) { entradaStudio = t.value; chrome.storage.sync.get("esteiraConfig").then(({ esteiraConfig = {} }) => chrome.storage.sync.set({ esteiraConfig: { ...esteiraConfig, entrada: t.value } })); return; }
