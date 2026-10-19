@@ -3,6 +3,7 @@
 (() => {
   if (window.__projudiStudioBase) return;
   window.__projudiStudioBase = true;
+  try { document.documentElement.dataset.assessorExtensao = chrome.runtime.getManifest().version; } catch (e) { /* sem manifest */ }      // o app mostra a tarja “instale a extensão” só quando este aviso não existe
   const dorme = (ms) => new Promise((ok) => setTimeout(ok, ms));
   const visivel = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
   const texto = (e) => (e.textContent || "").replace(/\s+/g, " ").trim();
