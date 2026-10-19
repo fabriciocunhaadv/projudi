@@ -55,7 +55,7 @@ export async function lerMinutaPre(item) {
         document.addEventListener("submit", (e) => { if (e.target && e.target.tagName === "FORM") e.target.target = "_self"; }, true);
         const abrir = window.open; window.open = function (u) { if (u) { location.href = u; return window; } return abrir.apply(this, arguments); };
       }
-      const chave = (s) => { const t = String(s || ""), m = t.match(/(\d{1,7})[.\-](\d{2})(?!\d)/); return m ? m[1].padStart(7, "0") + m[2] : t.replace(/\D/g, "").slice(0, 9); };      // (roda na página do Projudi: o módulo não existe aqui)
+      const chave = (s) => { const t = String(s || ""), m = t.match(/(\d{1,7})[.\-](\d{1,2})(?!\d)/); return m ? m[1].padStart(7, "0") + m[2].padStart(2, "0") : t.replace(/\D/g, "").slice(0, 9); };      // (roda na página do Projudi: o módulo não existe aqui)
       const linhas = [...document.querySelectorAll("tr")].filter((tr) => tr.querySelector("a[href*='Id_Processo']"));
       const tr = linhas.find((r) => [...r.querySelectorAll("a[href*='Id_Processo']")].some((a) => chave(a.textContent) === dig));
       if (!tr) return linhas.length ? "linhas:" + linhas.length : "";

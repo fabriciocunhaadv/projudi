@@ -603,7 +603,7 @@
     if (!(await esperar(botaoNova, 20000))) throw new Error("a Mesa de Audiências não abriu");
   }
   const resumoDaMesa = () => {      // textarea “Resumo Fático da Lide” da aba Briefing (só ela indica que a análise terminou: o texto bruto dos autos também é uma caixa de texto)
-    const h = [...document.querySelectorAll("span,h3,h4,label,div")].find((e) => !e.children.length && /Resumo F[áa]tico da Lide/i.test(texto(e)));
+    const h = [...document.querySelectorAll("span,h3,h4,label,div")].find((e) => /^Resumo F[áa]tico da Lide$/i.test(texto(e)) && ![...e.children].some((c) => /Resumo F[áa]tico/i.test(texto(c))));      // o título tem um ícone dentro (não é folha)
     for (let n = h; n; n = n.parentElement) { const ta = n.querySelector && n.querySelector("textarea"); if (ta) return ta.value || ""; }
     return "";
   };

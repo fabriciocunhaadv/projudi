@@ -201,8 +201,8 @@ $("impArq").onchange = async () => {
   };
   const msgs = []; let n = 0; const ja = new Set((await todos()).map((i) => i.processo));
   for (const f of arqs) {
-    const cnj = (f.name.match(/\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/) || [])[0], curto = (f.name.match(/(\d{3,7})[-.](\d{2})(?!\d)/) || []);
-    const dig = cnj ? chaveProc(cnj) : curto[1] ? curto[1].padStart(7, "0") + curto[2] : "";
+    const cnj = (f.name.match(/\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/) || [])[0], curto = (f.name.match(/(\d{3,7})[-.](\d{1,2})(?!\d)/) || []);
+    const dig = cnj ? chaveProc(cnj) : curto[1] ? curto[1].padStart(7, "0") + curto[2].padStart(2, "0") : "";
     if (!dig) { msgs.push(`${f.name}: sem número de processo no nome`); continue; }
     const conhecido = achar(dig), proc = conhecido?.processo || cnj || `${curto[1].padStart(7, "0")}.${curto[2]}`;
     if (ja.has(proc)) { msgs.push(`${proc}: já está na fila`); continue; }

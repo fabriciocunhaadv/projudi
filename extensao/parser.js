@@ -41,8 +41,8 @@
     return { logado: true, linhas, serventiaTela };
   }
 
-  const RE_PROC = /\d{3,7}[.\-]\d{2}(?:\.\d{4}\.\d\.\d{2}\.\d{4})?/;
-  const padProc = (s) => String(s || "").replace(/^(\d{1,6})(?=[.\-]\d{2}(?!\d))/, (m) => m.padStart(7, "0"));      // o Projudi tira os zeros à esquerda: "57388.42" -> "0057388.42"
+  const RE_PROC = /(?<![\d.,\/-])\d{3,7}[.\-]\d{1,2}(?![\d,\/-])(?:\.\d{4}\.\d\.\d{2}\.\d{4})?/;      // o DV pode vir com 1 dígito: o Projudi tira o zero à esquerda ("5556191.5" = DV 05)
+  const padProc = (s) => String(s || "").replace(/^(\d{1,7})([.\-])(\d{1,2})(?!\d)/, (m, a, sep, dv) => a.padStart(7, "0") + sep + dv.padStart(2, "0"));      // o Projudi tira os zeros à esquerda: "57388.42" -> "0057388.42"
   const CAMPOS = [ // início do cabeçalho (sem acento) -> campo
     ["data inicio", "dataInicio"], ["data/hora", "dataInicio"], ["data pre", "dataPreAnalise"],
     ["usuario", "usuarioPreAnalise"], ["tipo de movimento", "tipoMovimento"], ["tipo da acao", "tipoAcao"]];
