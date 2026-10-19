@@ -693,7 +693,10 @@
   const automatico = (p) => { document.documentElement.dataset.assessorAuto = "1"; return p.finally(() => { delete document.documentElement.dataset.assessorAuto; }); };
   // Quando o app roda dentro de uma moldura (página do AI Studio com o app num iframe *.run.app), a extensão entra nas duas páginas: a de fora
   // (sem o app) fica calada e só a moldura que tem o app responde, para as mensagens não irem para o quadro errado.
-  const quadroSemApp = () => window.top === window && !document.getElementById("tour-input-panel") && !!document.querySelector("iframe[src*='run.app']");
+  // O app pode estar em qualquer nível de molduras aninhadas (AI Studio → moldura de segurança → app): quem não tem o app na tela e está numa moldura
+  // (ou tem molduras dentro) fica calado; responde só o quadro que tem o app. O app publicado, sozinho na aba, responde sempre.
+  const temApp = () => !!document.getElementById("tour-input-panel") || !!document.getElementById("tour-execute-btn");
+  const quadroSemApp = () => !temApp() && (window.top !== window || !!document.querySelector("iframe"));
   chrome.runtime.onMessage.addListener((m, _s, responder) => {
     if (quadroSemApp()) return false;
     if (m?.acao === "studio-ping") { responder({ ok: true }); return false; }

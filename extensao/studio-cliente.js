@@ -10,8 +10,8 @@ export async function acharStudio() {
     try { if ((await chrome.tabs.sendMessage(aba.id, { acao: "studio-ping" }))?.ok) return aba; } catch (e) { /* ainda carregando */ }
     if (i === 3) {      // aba aberta antes de a extensão ser (re)carregada: o script antigo morreu; injeta o novo sem precisar atualizar a página
       try {
-        await chrome.scripting.executeScript({ target: { tabId: aba.id }, func: () => { delete window.__projudiStudioBase; } });
-        await chrome.scripting.executeScript({ target: { tabId: aba.id }, files: ["studio-base.js"] });
+        await chrome.scripting.executeScript({ target: { tabId: aba.id, allFrames: true }, func: () => { delete window.__projudiStudioBase; } });
+        await chrome.scripting.executeScript({ target: { tabId: aba.id, allFrames: true }, files: ["studio-base.js"] });
       } catch (e) { /* sem permissão: segue esperando */ }
     }
     await dorme(1000);
