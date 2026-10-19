@@ -150,6 +150,7 @@
     if (prompt && (!sel || !escolherPrompt(sel, prompt))) throw erroSemPrompt(prompt, document, "na lista do app");
     await dorme(400);
     if (tipo && !/auto/i.test(tipo)) { const bt = botao(new RegExp("^" + tipo + "$", "i"), painel); if (bt) bt.click(); }
+    else { const ba = botao(/Auto-?Detectar/i, painel); if (ba) ba.click(); }
     if (textoAutos) {      // entrada “Texto / Casos”: cola o texto do PDF com OCR (bem mais rápido que enviar o PDF)
       const bt = [...painel.querySelectorAll("button")].find((b) => /^Texto/i.test(texto(b)) && visivel(b)); if (bt) bt.click();
       const ta = await esperar(() => [...painel.querySelectorAll("textarea")].find(visivel), 10000);
