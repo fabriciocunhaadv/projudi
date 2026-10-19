@@ -136,7 +136,7 @@ $("mesa").onclick = async () => {
   if (!marcados.length) { $("msg").textContent = "Marque ao menos um processo (com link na lista)."; return; }
   const id = "pautamesa" + Date.now();
   const itens = marcados.map((l) => ({ processo: l.processo, url: l.url, classificador: "pauta", serventia: l.serventiaNome || "", serventiaUrl: l.serventiaUrl || "", situacao: "", audData: l.data || "", audHora: l.hora || "", audPromovente: l.promovente || "", audPromovido: l.promovido || "", audTipo: $("tipo").value ? ($("tipo").selectedOptions[0]?.textContent || "") : "" }));
-  await chrome.storage.local.set({ pauta_mesa_ata: $("comAta").checked });
+  await chrome.storage.local.set({ pauta_mesa_ata: false });      // a ata preliminar o usuário gera depois, na Mesa (deixa o envio mais rápido)
   await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/Pauta", opcoes: { studio: { ativo: true, modo: "mesa", docs: false } } } });
   chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + id), active: false });
   $("msg").textContent = `${marcados.length} processo(s) em download/OCR. Cada um entra na esteira e vira uma audiência NOVA na Mesa de Audiência do Studio (mantenha a aba do Assessor aberta e logada).`;
