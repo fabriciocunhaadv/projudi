@@ -695,9 +695,13 @@
     const cabecalho = { processo: procInput ? procInput.value : "", autor: campo("Autor"), reu: campo("R[ée]u"), assunto: campo("Assunto") };
     const raiz = document.querySelector(".mesa-escura") || document.body;
     const textoDaAba = () => {
-      const cl = raiz.cloneNode(true);
-      cl.querySelectorAll("textarea,input").forEach((e) => { const v = e.value || ""; e.replaceWith(Object.assign(document.createElement("pre"), { textContent: v })); });
-      const t = (cl.innerText || cl.textContent || "").replace(/\n{3,}/g, "\n\n");
+      // As caixas de texto (textarea/input) guardam o conteúdo no VALOR: troca por texto. A cópia vai para um contêiner fora da tela, JÁ na página,
+      // para o innerText respeitar as quebras de linha dos blocos (numa cópia solta ele devolve tudo emendado, sem linhas).
+      const orig = [...raiz.querySelectorAll("textarea,input")], cl = raiz.cloneNode(true);
+      [...cl.querySelectorAll("textarea,input")].forEach((e, i) => { const v = (orig[i] && orig[i].value) || e.value || ""; e.replaceWith(Object.assign(document.createElement("pre"), { textContent: v })); });
+      const host = document.createElement("div"); host.style.cssText = "position:fixed;left:-99999px;top:0;width:1100px;pointer-events:none"; host.appendChild(cl); document.body.appendChild(host);
+      let bruto = ""; try { bruto = host.innerText || ""; } finally { host.remove(); }
+      const t = (bruto || cl.textContent || "").replace(/\n{3,}/g, "\n\n");
       const i = t.lastIndexOf("5. Ata"); return i >= 0 ? t.slice(i + 6).trim() : t;
     };
     const abas = {};

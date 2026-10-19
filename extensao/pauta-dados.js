@@ -2,7 +2,7 @@
 // A pauta é só de EVENTOS ESPECÍFICOS (intimações, advogados, testemunhas, datas, denúncia, requerimentos). Nada é inventado: cada linha é um trecho
 // que já está escrito no Studio (encurtado, com a movimentação); o que não for achado fica em branco. Não usa a ata preliminar.
 const sa = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-const MAX_EVENTOS = 8, MAX_CHARS = 170;
+const MAX_EVENTOS = 8, MAX_CHARS = 200;
 
 // remove os rótulos de tela do app (menus, botões) que aparecem junto do texto das abas
 const RUIDO = /^(copiar|copiar perguntas|adicionar ponto|salvar ficha|reanalisar com ia|abrir ata preliminar|ata preliminar|selecionar pdf\(s\) dos autos|ver \/ editar texto bruto dos autos|pe[çc]as analisadas:?|carregar pdf dos autos|resumo f[áa]tico da lide|fatos e provas do autor|fatos e contraprovas do r[ée]u|pedido contraposto \/ reconven[çc][ãa]o|diagn[óo]stico probat[óo]rio.*|n[úu]cleo f[áa]tico.*|matriz de pontos.*|alertas & armadilhas.*|rol de depoentes.*|perguntas sugeridas.*)$/i;
@@ -58,7 +58,7 @@ export function dadosPautaMesa(lido, extra = {}) {
   linhas.forEach((l, i) => {
     const antes = pessoas.size;
     if (PAPEL.test(l) && i > 0 && !PAPEL.test(linhas[i - 1]) && linhas[i - 1].length < 80) juntar(linhas[i - 1], l);
-    const m = l.match(/^(.{6,80}?)\s+(TESTEMUNHA (?:AUTOR|REU|RÉU)|INFORMANTE|PERITO|V[ÍI]TIMA)\b/); if (m) juntar(m[1], m[2]);
+    const m = l.match(/^(.{6,80}?)\s*(TESTEMUNHA (?:AUTOR|REU|RÉU)|INFORMANTE|PERITO|V[ÍI]TIMA)\b/); if (m) juntar(m[1], m[2]);
     if (pessoas.size > antes) atual = [...pessoas.values()].pop();
     else if (atual && !PAPEL.test(l) && !/^objeto da oitiva/i.test(l)) atual.extra = (atual.extra || "") + " " + l;      // linhas do card da testemunha (intimação, ofício…)
   });
@@ -81,12 +81,22 @@ export function dadosPautaMesa(lido, extra = {}) {
   const nomesTest = out.testemunhas.map((t) => sa(t.nome));
   const doCard = new Set([...pessoas.values()].flatMap((p) => frases(p.extra || "").map((f) => sa(f))));
   const ev = [], usado = new Set();
+  const adiciona = (texto, alerta) => { const c = curta(texto), k = sa(c).slice(0, 60); if (!c || usado.has(k) || ev.length >= MAX_EVENTOS) return; usado.add(k); ev.push({ texto: c, alerta: !!alerta }); };
+  // 1) "Alertas & Armadilhas Processuais" do Briefing: só os que tratam da AUDIÊNCIA em si (redesignação, videoconferência, intimações, testemunhas, ofícios…)
+  const brief = String(abas.briefing || ""), iAl = brief.search(/Alertas\s*&\s*Armadilhas[^\n]*\n/i);
+  const KEY_ALERTA = /(audi[êe]ncia|redesign|videoconfer|zoom|intim|cita[cç]|testemunh|of[ií]cio|mandado|adiament|ausen|compare|dilig|per[ií]cia|carta precat|dispensa)/i;
+  if (iAl >= 0) for (const l of brief.slice(iAl).split("\n").slice(1).map((t) => t.trim())) {
+    if (l.length < 25 || /^nenhum alerta/i.test(l) || !KEY_ALERTA.test(l)) continue;
+    adiciona(l.replace(/\(?\s*link:?\s*https?:\/\/\S+\)?/gi, "").replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim(), /n[ãa]o (?:foi )?(?:intimad|citad|localizad)|sem intima|ausen/i.test(l));
+  }
+  // 2) pedido contraposto / reconvenção, se houver
+  const iPc = brief.search(/Pedido Contraposto \/ Reconven[çc][ãa]o\s*\n/i);
+  if (iPc >= 0) { const pc = brief.slice(iPc).split("\n").slice(1).map((t) => t.trim()).find((t) => t && !RUIDO.test(t)); if (pc && !/^(n[ãa]o h[áa]|nenhum|inexist|sem )/i.test(pc) && pc.length > 15) adiciona("Pedido contraposto/reconvenção: " + pc, true); }
   for (const f of todasFrases) {
     const x = sa(f); if (!/\bmov/.test(x) || doCard.has(x)) continue;
     if (nomesTest.some((n) => { const t = n.split(" ").filter((w) => w.length > 3); return t.length && t.every((w) => x.includes(w)) && x.length < 400 && !/\bparte\b/.test(x); })) continue;      // já está na linha da testemunha
     if (!(EV_INTIM.test(x) || EV_PEDIDO.test(x))) continue;
-    const c = curta(f), k = sa(c).slice(0, 60); if (usado.has(k)) continue; usado.add(k);
-    ev.push({ texto: c, alerta: /n[ãa]o intimad|sem intima|endereco inexistente|negativ|n[ãa]o compareceu|sem decis|pendente/.test(x) });
+    adiciona(f, /n[ãa]o intimad|sem intima|endereco inexistente|negativ|n[ãa]o compareceu|sem decis|pendente/.test(x));
     if (ev.length >= MAX_EVENTOS) break;
   }
   out.eventos = ev;
