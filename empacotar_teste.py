@@ -9,7 +9,8 @@ Use UMA das duas extensões por vez no Projudi (desative a oficial enquanto test
 import json, zipfile
 from pathlib import Path
 
-APP_TESTE = "https://ai.studio/apps/ce9bc744-6a53-4141-a2bf-80e69447e6b3*"      # app "assessor-judicial-construcao-nova" no AI Studio
+APP_ID = "ce9bc744-6a53-4141-a2bf-80e69447e6b3"      # app "assessor-judicial-construcao-nova" no AI Studio
+PAGINAS_TESTE = [f"https://ai.studio/apps/{APP_ID}*", f"https://aistudio.google.com/apps/{APP_ID}*"]      # a página do editor/preview (a aba que o Chrome mostra)
 raiz = Path(__file__).parent / "extensao"
 m = json.loads((raiz / "manifest.json").read_text())
 versao = m["version"]
@@ -22,7 +23,7 @@ if "COLE_AQUI" in json.dumps(m.get("oauth2", {})):
 m["host_permissions"] = [h for h in m["host_permissions"] if h != "https://*.ai.studio/*"] + ["https://ai.studio/*", "https://*.run.app/*", "https://aistudio.google.com/*"]
 for cs in m["content_scripts"]:
     if "https://*.ai.studio/*" in cs["matches"]:
-        cs["matches"] = [APP_TESTE, "https://*.run.app/*"]      # o endereço do app de teste e, se ele rodar numa moldura, o quadro *.run.app
+        cs["matches"] = PAGINAS_TESTE + ["https://*.run.app/*"]      # a página do AI Studio com o app de teste (o app roda num quadro *.run.app dentro dela)
         cs["all_frames"] = True
 alvo = saida / f"projudi-extensao-TESTE-{versao}.zip"
 with zipfile.ZipFile(alvo, "w", zipfile.ZIP_DEFLATED) as z:
