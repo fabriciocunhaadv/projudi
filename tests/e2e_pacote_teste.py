@@ -7,8 +7,7 @@ from playwright.sync_api import sync_playwright
 ZIP = sorted(Path(__file__).parent.parent.glob("publicacao-teste/projudi-extensao-TESTE-*.zip"))[-1]
 APP_ID = "ce9bc744-6a53-4141-a2bf-80e69447e6b3"
 APP = """<html><head><meta charset="utf-8"><title>Assessor Judicial</title></head><body>
-<div id="tour-input-panel"><select><option>Outros Área Judicial - Criminal</option></select></div>
-<button id="tour-execute-btn">Gerar Minuta</button>
+<div id="conteudo">Minuta (Tela Cheia): o app está na tela cheia da minuta, sem a área de entrada dos autos</div>
 <script>document.documentElement.dataset.gigantes = JSON.stringify([{id:'g1', processo:'0000001-00.2026.8.09.0001', status:'lendo', historicoId:'', erro:''}]);</script></body></html>"""
 MOLDURA_SIMPLES = f"<html><body><h1>AI Studio</h1><iframe src='https://ais-dev-teste.us-east1.run.app/?_aistudio_auth_token=x' style='width:800px;height:600px'></iframe></body></html>"
 MOLDURA_ANINHADA = "<html><body><h1>AI Studio</h1><iframe src='https://sandbox-x.scf.usercontent.goog/shim' style='width:800px;height:600px'></iframe></body></html>"

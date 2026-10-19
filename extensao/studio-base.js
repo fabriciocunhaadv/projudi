@@ -695,7 +695,8 @@
   // (sem o app) fica calada e só a moldura que tem o app responde, para as mensagens não irem para o quadro errado.
   // O app pode estar em qualquer nível de molduras aninhadas (AI Studio → moldura de segurança → app): quem não tem o app na tela e está numa moldura
   // (ou tem molduras dentro) fica calado; responde só o quadro que tem o app. O app publicado, sozinho na aba, responde sempre.
-  const temApp = () => !!document.getElementById("tour-input-panel") || !!document.getElementById("tour-execute-btn");
+  // o app tem o título "Assessor Judicial" e vários elementos fixos; a tela cheia da minuta, por exemplo, não tem a área de entrada dos autos
+  const temApp = () => /^Assessor Judicial/i.test(document.title || "") || !!document.querySelector("#tour-input-panel, #tour-execute-btn, [data-testid=gigantes-selo], #tour-result-tabs");
   const quadroSemApp = () => !temApp() && (window.top !== window || !!document.querySelector("iframe"));
   chrome.runtime.onMessage.addListener((m, _s, responder) => {
     if (quadroSemApp()) return false;
