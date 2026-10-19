@@ -12,39 +12,26 @@ const sa = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLow
 let itens = [];
 
 const linhaSit = (t, alerta) => (t ? `\n<span class="${alerta ? "alerta" : ""}">${esc(t)}</span>` : "");
-const advs = (p) => (p.advogados || []).filter(Boolean).map((a) => "\n" + esc(a)).join("");
-function blocoParte(p, rotulo) {
-  return (rotulo ? `<span class="rot">${esc(rotulo)}: </span>` : "") + `<span class="nome">${esc(p.nome)}</span>${linhaSit(p.situacao, p.alerta)}${advs(p)}`;
-}
-const ehReu = (p) => /requerid|r[ée]u|acusad|denunciad|investigad/i.test(p.rot || "");
-const ehAutor = (p) => /requerent|autor|exequent|impetrant/i.test(p.rot || "");
-const ehMP = (p) => /minist[eé]rio p[uú]blico|promotor/i.test((p.rot || "") + " " + (p.nome || ""));
 
 function celulas(it) {
   const d = it.dados, nomeReu = it.audPromovido || "", nomeAutor = it.audPromovente || "";
   const proc = d?.processo || it.processo;
   const c2 = `<div class="proc"><div>${esc(proc)}${it.audTipo ? `<div class="tipo">${esc(String(it.audTipo).toUpperCase())}</div>` : ""}</div>${d?.artigo ? `<div class="art">${esc(d.artigo)}</div>` : ""}</div>`;
   if (!d) return { c2, c3: `<span class="nome">${esc(nomeReu || nomeAutor)}</span>\n<span class="alerta">${esc(it.erroLeitura || "Mesa de Audiência não lida: abra a audiência na Mesa e use “Reler a Mesa”.")}</span>`, c4: "" };
-  const reu = d.partes.find(ehReu) || (nomeReu ? { nome: nomeReu, advogados: [], situacao: "", alerta: false } : null);
-  const autor = d.partes.find((p) => ehAutor(p) && !ehMP(p)) || (nomeAutor ? { nome: nomeAutor, advogados: [], situacao: "", alerta: false } : null);
   const notas = [];
   if (d.fatos.dataFato) notas.push(`Data do fato: ${d.fatos.dataFato}`);
   if (d.fatos.nascimento) notas.push(`Data de nascimento do autor: ${d.fatos.nascimento}`);
-  d.observacoes.forEach((o) => notas.push(o));
   if (d.fatos.denunciaMov != null) notas.push(`Denúncia mov. ${d.fatos.denunciaMov}`);
   if (d.fatos.recebimentoMov != null) notas.push(`Recebeu denúncia mov. ${d.fatos.recebimentoMov}`);
-  const alertas = d.alertas.map((a) => `<span class="${a.alto ? "alerta" : ""}">${esc(a.texto)}</span>`);
-  let c3;
-  if (d.criminal) {
-    c3 = (reu ? blocoParte(reu) : `<span class="alerta">[réu não identificado na Mesa]</span>`) + (notas.length ? "\n\n" + notas.map(esc).join("\n") : "") + (alertas.length ? "\n\n" + alertas.join("\n") : "");
-  } else {
-    c3 = [autor && blocoParte(autor, "AUTOR"), reu && blocoParte(reu, "RÉU")].filter(Boolean).join("\n\n") + (notas.length ? "\n\n" + notas.map(esc).join("\n") : "") + (alertas.length ? "\n\n" + alertas.join("\n") : "");
-  }
-  if (d.semAta) c3 += `\n<span class="sug nao-imprimir">[sem ata preliminar no Studio: partes, intimações e pedidos podem estar incompletos. Gere a ata na Mesa e use “Reler a Mesa”.]</span>`;
-  const pes = (p) => `\n<span class="nome">${esc(p.nome)}</span>${linhaSit(p.situacao, p.alerta)}${p.conferir ? ' <span class="sug nao-imprimir">[conferir]</span>' : ""}`;
+  const advTxt = d.advogados.length ? d.advogados.map(esc).join("\n") : "";
+  const evs = d.eventos.map((e) => `<span class="${e.alerta ? "alerta" : ""}">${esc(e.texto)}</span>`);
+  const corpo = [advTxt, notas.map(esc).join("\n"), evs.join("\n")].filter(Boolean).join("\n\n");
+  const c3 = (d.criminal ? `<span class="nome">${esc(nomeReu || nomeAutor)}</span>` : [nomeAutor && `<span class="rot">AUTOR: </span><span class="nome">${esc(nomeAutor)}</span>`, nomeReu && `<span class="rot">RÉU: </span><span class="nome">${esc(nomeReu)}</span>`].filter(Boolean).join("\n"))
+    + (corpo ? "\n\n" + corpo : "") + (d.vazio ? `\n<span class="sug nao-imprimir">[nada localizado nas abas da Mesa para esta audiência: confira o Briefing e o Roteiro no Studio e use “Reler a Mesa”.]</span>` : "");
+  const pes = (p) => `\n<span class="nome">${esc(p.nome)}</span>${p.lado ? ` <span class="peq">(${esc(p.lado)})</span>` : ""}${linhaSit(p.situacao, p.alerta)}`;
   const vit = d.testemunhas.filter((t) => t.papel === "vitima"), tes = d.testemunhas.filter((t) => t.papel !== "vitima");
   let c4 = "";
-  if (d.criminal && vit.length) c4 += `<span class="dest">VÍTIMA</span>` + vit.map(pes).join("");
+  if (vit.length) c4 += `<span class="dest">VÍTIMA</span>` + vit.map(pes).join("");
   if (tes.length) c4 += (c4 ? "\n" : "") + `<span class="dest">TESTEMUNHAS</span>` + tes.map(pes).join("");
   return { c2, c3, c4 };
 }
@@ -66,14 +53,14 @@ async function ler(it, forcar) {
   try {
     const lido = await analisarNoStudio(null, { modo: "mesa-ler", processo: it.processo, texto: "x" });
     it.dados = dadosPautaMesa(lido, { autor: it.audPromovente }); it.erroLeitura = "";
-    await atualizar(it.id, { pautaDados: it.dados, pautaEm: Date.now() });
+    await atualizar(it.id, { pautaDados: it.dados, pautaEm: Date.now(), pautaV: 2 });
   } catch (e) { it.dados = null; it.erroLeitura = e.message || String(e); }
 }
 
 async function montar(forcar) {
   const ids = (new URLSearchParams(location.search).get("ids") || "").split(",").filter(Boolean);
   const todosItens = await todos();
-  itens = ids.map((id) => todosItens.find((x) => x.id === id)).filter(Boolean).map((x) => ({ ...x, dados: forcar ? null : x.pautaDados || null }));
+  itens = ids.map((id) => todosItens.find((x) => x.id === id)).filter(Boolean).map((x) => ({ ...x, dados: forcar || x.pautaV !== 2 ? null : x.pautaDados || null }));
   desenhar();
   let n = 0;
   for (const it of itens) {

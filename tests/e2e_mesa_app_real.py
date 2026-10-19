@@ -41,6 +41,11 @@ try:
         print("resultado:", r, dt, "s")
         dh = pg.evaluate("[document.querySelector('input[type=date]')?.value, document.querySelector('input[type=time]')?.value]")
         print("data/hora na Mesa:", dh, "| erros de página:", erros[:2])
+        pg.keyboard.press("Escape"); pg.wait_for_timeout(800); abas = {}
+        for k, rx in [("briefing", "1. Briefing"), ("roteiro", "2. Roteiro"), ("deliberacoes", "3. Delibera"), ("sentenca", "4. Senten"), ("ata", "5. Ata")]:
+            pg.get_by_role("button", name=rx).first.click(); pg.wait_for_timeout(1200)
+            abas[k] = pg.evaluate("document.querySelector('.mesa-escura')?.innerText || document.body.innerText")
+        json.dump(abas, open("/tmp/claude-0/work/mob/abas_mesa.json", "w"), ensure_ascii=False, indent=1)
         pg.screenshot(path="/tmp/claude-0/work/mob/mesa_real.png")
         assert r["ok"], r
         assert dh == ["2026-11-18", "14:30"], dh
