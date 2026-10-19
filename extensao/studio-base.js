@@ -613,14 +613,15 @@
     for (;;) {
       const e = erroDaMesa(); if (e) throw falhar(e);
       if (!/Extraindo autos|mapeando partes/i.test(corpoMesa()) && Date.now() - t0 > 5000 && resumoDaMesa().length > 40) return;
-      if (Date.now() - t0 > 12 * 60000) throw falhar("a análise não terminou em 12 minutos");
+      if (Date.now() - t0 > 25000 && !mesaOcupada() && resumoDaMesa().length <= 40) { await dorme(4000); if (!mesaOcupada() && resumoDaMesa().length <= 40) throw falhar("a análise da Mesa terminou sem gerar o briefing (veja o aviso na tela da Mesa)"); }
+      if (Date.now() - t0 > 20 * 60000) throw falhar("a análise não terminou em 20 minutos");
       await dorme(1500);
     }
   }
 
   // Cria uma audiência NOVA na Mesa e entrega o PDF (o app extrai e analisa sozinho). Em nova tentativa (retomar), reanalisa a audiência que ficou aberta, sem duplicar.
   // Com comAta, gera também a ata preliminar (intimações e movimentações) e a fecha.
-  async function mesa({ arquivoId, nome, retomar, comAta }) {
+  async function mesa({ arquivoId, nome, retomar, comAta, audData, audHora }) {
     const bytes = arquivos.get(arquivoId);
     if (!bytes) throw new Error("arquivo não recebido");
     await abrirMesa();
@@ -629,6 +630,7 @@
     if (retomar && rean && corpoMesa().includes(String(nome).replace(/\.pdf$/i, "").slice(0, 14))) { rean.click(); await dorme(2500); }
     else {
       botaoNova().click();
+      await definirDataHoraMesa(audData, audHora);
       const input = await esperar(() => [...document.querySelectorAll("input[type=file]")].find((i) => /pdf/i.test(i.accept || "") && /txt/i.test(i.accept || "")), 15000);
       if (!input) throw new Error("não achei o campo “Selecionar PDF(s) dos Autos” na Mesa");
       const dt = new DataTransfer(); dt.items.add(new File([bytes], nome, { type: "application/pdf" }));
@@ -637,19 +639,42 @@
       t0 = Date.now();
     }
     await aguardarBriefing(t0);
-    if (comAta) await gerarAta();
-    return { ok: true, mensagem: "enviado à Mesa de Audiência (nova audiência com o PDF analisado" + (comAta ? " e ata preliminar" : "") + ")", minuta: "" };
+    await definirDataHoraMesa(audData, audHora, true);      // confere se o app não voltou a data/hora padrão durante a análise
+    let avisoAta = "";
+    if (comAta) { try { await gerarAta(); } catch (e) { avisoAta = String(e.message || e); } }      // o briefing já está pronto: a falha da ata não trava a fila
+    return { ok: true, mensagem: "enviado à Mesa de Audiência (nova audiência com o PDF analisado" + (comAta && !avisoAta ? " e ata preliminar" : "") + ")" + (avisoAta ? ". A ata preliminar NÃO foi gerada: " + avisoAta + " (abra a audiência na Mesa e use “Ata preliminar”)" : ""), minuta: "" };
+  }
+  const mesaOcupada = () => /Preparando a ata\.\.\.|Analisando\.\.\.|Lendo Arquivos\.\.\.|Extraindo autos|mapeando partes/i.test(corpoMesa());
+  // A audiência nova nasce com a data de hoje e 13:30: usa a data e a hora da pauta (a audiência real).
+  async function definirDataHoraMesa(data, hora, salvar) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data || "") && !/^\d{2}:\d{2}$/.test(hora || "")) return;
+    const campo = (tipo) => [...document.querySelectorAll("input[type=" + tipo + "]")].find((i) => visivel(i));
+    const d = await esperar(() => campo("date"), 8000);
+    let mudou = false;
+    if (d && /^\d{4}-\d{2}-\d{2}$/.test(data || "") && d.value !== data) { definirValor(d, data); mudou = true; }
+    const h = campo("time");
+    if (h && /^\d{2}:\d{2}$/.test(hora || "") && h.value !== hora) { definirValor(h, hora); mudou = true; }
+    if (mudou) { await dorme(400); if (salvar) { const sv = botao(/Salvar Ficha/i); if (sv) sv.click(); await dorme(600); } }
   }
   const visualizadorAta = () => document.querySelector("[data-testid=ata-preliminar-viewer]");
   async function gerarAta() {      // botão “Ata preliminar”/“Abrir ata preliminar” da aba Briefing; o app gera e abre o visualizador
     const bt = document.querySelector("[data-testid=btn-ata-preliminar]");
     if (!bt) throw falhar("não achei o botão da ata preliminar");
     bt.click();
-    const t0 = Date.now();
+    const t0 = Date.now(); let ocioso = 0, reabriu = 0;
     for (;;) {
       if (visualizadorAta()) return;
       const e = erroDaMesa(); if (e) throw falhar(e);
-      if (Date.now() - t0 > 10 * 60000) throw falhar("a ata preliminar não terminou em 10 minutos");
+      const b2 = document.querySelector("[data-testid=btn-ata-preliminar]");
+      if (mesaOcupada()) ocioso = 0;
+      else if (Date.now() - t0 > 8000) {      // terminou de carregar e a ata não abriu
+        ocioso++;
+        if (ocioso >= 3) {
+          if (b2 && /Abrir ata preliminar/i.test(texto(b2)) && reabriu < 2) { reabriu++; ocioso = 0; b2.click(); }      // a ata foi gerada: só abre
+          else throw falhar("a ata preliminar não foi gerada (a IA não respondeu)");
+        }
+      }
+      if (Date.now() - t0 > 12 * 60000) throw falhar("a ata preliminar não terminou em 12 minutos");
       await dorme(1500);
     }
   }

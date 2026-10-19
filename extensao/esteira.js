@@ -44,7 +44,7 @@ async function analisar(it) {
     const texto = comTexto ? await textoDoPdf(bytes) : "";
     if (comTexto && texto.replace(/\[Página \d+\]|\s/g, "").length < 200) throw new Error("não consegui extrair texto do PDF (o OCR pode não ter funcionado)");
     const comAta = it.modo === "mesa" ? !!(await chrome.storage.local.get("pauta_mesa_ata")).pauta_mesa_ata : false;
-    const r = await analisarNoStudio(bytes, { retomar: !!it.cotaVezes, comAta, nome: it.pdfNome, prompt: it.prompt, modo: it.modo, tipo: "", processo: it.processo, minuta: it.minutaAssessor, motivoMinuta: it.motivoMinuta, dicas: it.serventia || "", texto, ate1: it.modo === "analise" });
+    const r = await analisarNoStudio(bytes, { retomar: !!it.cotaVezes, comAta, nome: it.pdfNome, prompt: it.prompt, modo: it.modo, tipo: "", processo: it.processo, minuta: it.minutaAssessor, motivoMinuta: it.motivoMinuta, dicas: it.serventia || "", audData: it.audData || "", audHora: it.audHora || "", texto, ate1: it.modo === "analise" });
     if (!(await valida())) return;
     if (r.gigante) { await atualizar(it.id, { estado: "gigante", erro: "", jobId: r.jobId, aviso: "Processo gigante: o Studio lê os autos em lotes, em segundo plano (pode levar de minutos a horas). A fila segue; a minuta será pega no Histórico quando ficar pronta." }); return; }
     intervaloTurbo();

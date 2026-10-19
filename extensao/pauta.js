@@ -135,7 +135,7 @@ $("mesa").onclick = async () => {
   const marcados = pauta.filter((l) => l.marcado && l.url);
   if (!marcados.length) { $("msg").textContent = "Marque ao menos um processo (com link na lista)."; return; }
   const id = "pautamesa" + Date.now();
-  const itens = marcados.map((l) => ({ processo: l.processo, url: l.url, classificador: "pauta", serventia: l.serventiaNome || "", serventiaUrl: l.serventiaUrl || "", situacao: "" }));
+  const itens = marcados.map((l) => ({ processo: l.processo, url: l.url, classificador: "pauta", serventia: l.serventiaNome || "", serventiaUrl: l.serventiaUrl || "", situacao: "", audData: l.data || "", audHora: l.hora || "" }));
   await chrome.storage.local.set({ pauta_mesa_ata: $("comAta").checked });
   await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/Pauta", opcoes: { studio: { ativo: true, modo: "mesa", docs: false } } } });
   chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + id), active: false });
