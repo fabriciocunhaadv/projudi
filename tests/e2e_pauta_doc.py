@@ -61,6 +61,14 @@ with sync_playwright() as p:
     assert t.index("13h30") < t.index("14h00"), "ordem por hora"
     assert "não achei a audiência na Mesa" in t
     assert "longos argumentos" not in t and len(t) < 1500, len(t)
+    # Google Docs: copia a pauta formatada e abre um documento em branco
+    pg.evaluate("""() => { window.__copiado = null; window.__abriu = null; window.chrome.tabs.create = (o) => { window.__abriu = o; };
+      Object.defineProperty(navigator, 'clipboard', { value: { write: async (itens) => { window.__copiado = await itens[0].getType('text/html').then((b) => b.text()); } }, configurable: true }); }""")
+    pg.locator("#docs").click(); pg.wait_for_timeout(800)
+    abriu = pg.evaluate("window.__abriu"); html = pg.evaluate("window.__copiado") or ""
+    assert abriu and abriu["url"].startswith("https://docs.google.com/document/create?title="), abriu
+    assert "<table" in html and "border:1px solid #000" in html and "PAUTA DIA 13 DE JULHO DE 2026" in html and "background:#ffff00" in html and "contenteditable" not in html and "[sem o texto bruto" not in html, html[:400]
+    print("docs OK:", abriu["url"][:70])
     pg.screenshot(path="/tmp/claude-0/work/mob/pauta_doc.png", full_page=True)
     assert not erros, erros
     print("OK"); b.close()

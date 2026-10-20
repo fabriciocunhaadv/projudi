@@ -1,6 +1,7 @@
 // Dados da pauta do dia, lidos das ABAS da Mesa de Audiência do Studio: 1. Briefing, 2. Roteiro, 3. Deliberações, 4. Sentença, 5. Ata.
 // A pauta é só de EVENTOS ESPECÍFICOS (intimações, advogados, testemunhas, datas, denúncia, requerimentos). Nada é inventado: cada linha é um trecho
 // que já está escrito no Studio (encurtado, com a movimentação); o que não for achado fica em branco. Não usa a ata preliminar.
+import { marcosDosAutos } from "./pauta-autos.js";
 const sa = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 const MAX_EVENTOS = 8, MAX_CHARS = 200;
 
@@ -100,6 +101,21 @@ export function dadosPautaMesa(lido, extra = {}) {
     if (ev.length >= MAX_EVENTOS) break;
   }
   out.eventos = ev;
-  out.vazio = !ev.length && !out.testemunhas.length && !out.advogados.length && !Object.keys(out.fatos).length;
+  // TEXTO BRUTO DOS AUTOS (a Mesa o guarda): citação/intimação das partes, audiência, mandado, contestação, advogados… com movimentação e data
+  out.autos = false; out.advAutor = ""; out.advReu = ""; out.situacaoAutor = ""; out.situacaoReu = ""; out.alertaAutor = false; out.alertaReu = false;
+  if (lido?.bruto) {
+    const num7 = ((String(lido?.cabecalho?.processo || "") + " " + String(extra.processo || "")).match(/\d{7}/) || [])[0];
+    if (!num7 || String(lido.bruto).replace(/\D/g, "").includes(num7)) {
+      const r = marcosDosAutos(lido.bruto, { autor: extra.autor || lido?.cabecalho?.autor, reu: extra.reu || lido?.cabecalho?.reu, testemunhas: out.testemunhas.map((p) => p.nome) });
+      out.autos = true; out.situacaoAutor = r.autor.situacao; out.alertaAutor = r.autor.alerta; out.situacaoReu = r.reu.situacao; out.alertaReu = r.reu.alerta;
+      out.advAutor = r.advogados.find((a) => a.lado === "autor")?.texto || ""; out.advReu = r.advogados.find((a) => a.lado === "reu")?.texto || "";
+      out.testemunhas.forEach((p) => { const s = r.testemunhas[sa(p.nome)]; if (s && !p.situacao) { p.situacao = s.texto; p.alerta = s.alerta; } });
+      const vistos2 = new Set(); const merged = [];
+      const temRedes = r.marcos.some((m) => /redesign/i.test(m.texto));
+      for (const e of [...r.marcos, ...ev.filter((x) => !(temRedes && /redesign/i.test(x.texto)))]) { const k = sa(e.texto).slice(0, 50); if (vistos2.has(k)) continue; vistos2.add(k); merged.push(e); }
+      out.eventos = merged.slice(0, MAX_EVENTOS + 2);
+    } else out.autosOutro = true;      // o texto bruto aberto na Mesa é de outro processo: não usar
+  }
+  out.vazio = !out.eventos.length && !out.testemunhas.length && !out.advogados.length && !Object.keys(out.fatos).length;
   return out;
 }

@@ -681,7 +681,7 @@
   const fecharAta = async () => { if (!visualizadorAta()) return; window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); await esperar(() => !visualizadorAta(), 5000); };
 
   // Lê da Mesa os dados de uma audiência já cadastrada: cabeçalho, abas 1 a 5 (texto das caixas) e a ata preliminar (HTML do documento).
-  async function mesaLer({ processo }) {
+  async function mesaLer({ processo, ata }) {
     await abrirMesa();
     const busca = [...document.querySelectorAll("input")].find((i) => /Buscar processo ou parte/i.test(i.placeholder || ""));
     if (busca) { definirValor(busca, ""); await dorme(300); }
@@ -710,13 +710,22 @@
       b.click(); await dorme(900); abas[k] = textoDaAba().slice(0, 30000);
     }
     botao(/^\s*1\.\s*Briefing/i)?.click(); await dorme(500);
+    // texto bruto dos autos (botão "Ver / Editar Texto Bruto dos Autos" do Briefing): fonte das citações, intimações, audiências e datas da pauta
+    let bruto = "";
+    const bBruto = botao(/Ver \/ Editar Texto Bruto/i);
+    if (bBruto) {
+      bBruto.click();
+      const ta = await esperar(() => [...document.querySelectorAll("textarea")].find((x) => /Texto das pe[çc]as processuais/i.test(x.placeholder || "")), 6000);
+      if (ta) bruto = ta.value || "";
+      botao(/Ocultar Texto Bruto/i)?.click(); await dorme(300);
+    }
     let ataHtml = "";
     const bta = document.querySelector("[data-testid=btn-ata-preliminar]");
-    if (bta && /Abrir ata preliminar/i.test(texto(bta))) {      // só abre se a ata já existe (não gasta IA)
+    if (ata && bta && /Abrir ata preliminar/i.test(texto(bta))) {      // só abre se a ata já existe (não gasta IA) e se foi pedida
       bta.click();
       if (await esperar(visualizadorAta, 15000)) { await dorme(500); ataHtml = document.querySelector("[data-testid=ata-documento]")?.innerHTML || ""; await fecharAta(); }
     }
-    return { ok: true, cabecalho, abas, ataHtml };
+    return { ok: true, cabecalho, abas, ataHtml, bruto };
   }
 
   // avisa o app de que é a esteira (e não uma pessoa) que está operando: ele não abre a pergunta de OCR e escolhe o OCR sozinho
