@@ -16,7 +16,9 @@
     [/criminal|penal/, "Criminal", "Criminal"],
     [/civel|civil/, "Cível", "Cível"],
   ];
-  const area = (serv) => { const t = sem(serv); return AREAS.find((a) => a[0].test(t)); };
+  // Só a parte do NOME DA UNIDADE conta: o nome da cidade confundia ("Fazenda Nova - Juizado Especial Cível" virava Fazenda Pública; "Itumbiara - Cível e Criminal" virava Criminal)
+  const unidade = (serv) => { const partes = String(serv || "").split(/\s+-\s+/).map((x) => x.trim()).filter((x) => x && !/^[A-Z]{2}$/.test(x)); return partes.length > 1 ? partes.slice(1).join(" ") : partes[0] || ""; };
+  const area = (serv) => { const t = sem(unidade(serv)); if (/juizado/.test(t) && /civel/.test(t) && /criminal/.test(t)) return AREAS.find((a) => a[1] === "Juizado Especial Cível"); return AREAS.find((a) => a[0].test(t)); };
   globalThis.Sugestoes = {
     prompt: (serv) => { const a = area(serv); return a ? "Outros Área Judicial - " + a[1] : ""; },
     arquivo: (serv) => { const a = area(serv); return a ? a[2] + " - Decisões, Despachos e Sentenças" : ""; },

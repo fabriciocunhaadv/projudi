@@ -51,14 +51,9 @@ let entradaStudio = "pdf";
 let automacao = {};   // { serventia: { ativa, prompt } } — guardado na conta do Chrome (sincroniza entre computadores)
 const salvarAuto = () => chrome.storage.sync.set({ automacao });
 // Preenche sozinho (sem sobrescrever o que o usuário escreveu) o prompt e o arquivo de modelos de cada serventia.
-function completarAuto(servs) {
-  let mudou = false;
-  for (const { serventia: s } of servs) {
-    const a = automacao[s] || {}, prompt = a.prompt || Sugestoes.prompt(s), arq = a.arquivoModelos || Sugestoes.arquivo(s);
-    if (prompt !== a.prompt || arq !== a.arquivoModelos) { automacao[s] = { ...a, prompt, arquivoModelos: arq }; mudou = true; }
-  }
-  if (mudou) salvarAuto();
-}
+// Não grava mais palpite de prompt/arquivo: esses nomes são de cada usuário (um usuário novo não tem os do gabinete de quem programou a sugestão).
+// A sugestão (Sugestoes) aparece só como dica no campo e vale como padrão na hora de rodar; o que o usuário digitar é o que vale.
+function completarAuto() {}
 const nomeCls = (p) => p.classificador || "(sem classificador)";
 
 const todos = (s) => ["naoAnalisadas", "preAnalisadas"].flatMap((tipo) =>
@@ -116,8 +111,8 @@ function desenhar() {
     h += `<h2>Baixar PDFs para análise</h2><div class="baixar"><div><b>1) Serventias em que você trabalha</b> <small>(a extensão só mexe nas marcadas)</small></div>` +
       `<table class="tp"><thead><tr><th>Automatizar</th><th>Serventia</th><th>Processos</th><th>Prompt no Studio <small>(igual ao da lista “Prompt Ativo”)</small></th><th>Arquivo de modelos na base <small>(PDF único)</small></th><th>Prompt no ExecAgaia <small>(opcional; vazio = igual ao do Studio)</small></th></tr></thead><tbody>` +
       estado.serventias.map((s) => `<tr class="tp-linha"><td class="n"><input type="checkbox" data-serv="${esc(s.serventia)}" ${automacao[s.serventia]?.ativa ? "checked" : ""}></td><td>${esc(s.serventia)}</td><td class="n">${todos(s).length}</td>` +
-        `<td><input type="text" data-promptia="${esc(s.serventia)}" value="${esc(automacao[s.serventia]?.prompt || "")}" placeholder="ex.: Outros Área Judicial - Família e Sucessões" size="40"></td>` +
-        `<td><input type="text" data-prompt="${esc(s.serventia)}" value="${esc(automacao[s.serventia]?.arquivoModelos || "")}" placeholder="ex.: Família - Decisões, Despachos e Sentenças" size="40"></td>` +
+        `<td><input type="text" data-promptia="${esc(s.serventia)}" value="${esc(automacao[s.serventia]?.prompt || "")}" placeholder="${esc(Sugestoes.prompt(s.serventia) ? "sugestão: " + Sugestoes.prompt(s.serventia) : "ex.: Outros Área Judicial - Família e Sucessões")}" size="40"></td>` +
+        `<td><input type="text" data-prompt="${esc(s.serventia)}" value="${esc(automacao[s.serventia]?.arquivoModelos || "")}" placeholder="${esc(Sugestoes.arquivo(s.serventia) ? "sugestão: " + Sugestoes.arquivo(s.serventia) : "ex.: Família - Decisões, Despachos e Sentenças")}" size="40"></td>` +
         `<td><input type="text" data-promptagaia="${esc(s.serventia)}" value="${esc(automacao[s.serventia]?.promptAgaia || "")}" placeholder="ex.: Fabrício Família e Sucessões" size="34"></td></tr>`).join("") + `</tbody></table>`;
     if (clsLista.length) h += `<div><b>2) Só estes classificadores</b> <small>(opcional — sem marcar nenhum, baixa todos)</small><br>` +
       clsLista.map((c) => `<label class="chip"><input type="checkbox" data-cls="${esc(c)}" ${selCls.has(c) ? "checked" : ""}> ${esc(c)} <small>(${todosP.filter((p) => nomeCls(p) === c && automacao[p.serventia]?.ativa).length})</small></label>`).join(" ") + `</div>`;
@@ -208,6 +203,12 @@ function csv() {
   $("busca").oninput = desenhar;
   RenderProjudi.ligarCopiar($("conteudo"));
   automacao = (await chrome.storage.sync.get("automacao")).automacao || {};
+  // limpeza única: versões antigas gravaram palpites (e alguns errados, pelo nome da cidade) como se o usuário os tivesse escolhido
+  if (!(await chrome.storage.sync.get("palpitesLimpos")).palpitesLimpos) {
+    const antigo = (serv) => { const t = String(serv || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); const r = [[/juizado.*fazenda|fazenda.*juizado/, "Juizado Faz.Pub.", "Juizado da Fazenda Pública"], [/juizado.*criminal|criminal.*juizado/, "Juizado Especial Criminal", "Juizado Especial Criminal"], [/juizado.*civel|civel.*juizado/, "Juizado Especial Cível", "Juizado Especial Cível"], [/infracional/, "Infância e Juventude Infracional", "Infância e Juventude Infracional"], [/inf[aâ]ncia|infancia|juventude|inf\.? e juv/, "Infância e Juventude Cível", "Infância e Juventude Cível"], [/familia|sucess/, "Família e Sucessões", "Família"], [/execucao fiscal.*estadual|estadual.*execucao fiscal/, "Execução Fiscal Estadual", "Execução Fiscal"], [/execucao fiscal|exec\.? fiscal/, "Execução Fiscal Municipal", "Execução Fiscal"], [/fazenda/, "Fazenda Pública Comum", "Fazenda Pública"], [/eleitoral/, "Eleitoral", "Eleitoral"], [/criminal|penal/, "Criminal", "Criminal"], [/civel|civil/, "Cível", "Cível"]].find((x) => x[0].test(t)); return r ? { p: "Outros Área Judicial - " + r[1], a: r[2] + " - Decisões, Despachos e Sentenças" } : null; };
+    for (const [serv, v] of Object.entries(automacao)) { if (!v || typeof v !== "object") continue; const o = antigo(serv); if (!o) continue; if (v.prompt === o.p) v.prompt = ""; if (v.arquivoModelos === o.a) v.arquivoModelos = ""; }
+    salvarAuto(); await chrome.storage.sync.set({ palpitesLimpos: true });
+  }
   entradaStudio = ((await chrome.storage.sync.get("esteiraConfig")).esteiraConfig || {}).entrada || "pdf";
   opcoes = { ...opcoes, ...((await chrome.storage.sync.get("opcoesLote")).opcoesLote || {}) };
   if (opcoes.modo === "mesa") opcoes.modo = "analise";      // a Mesa de Audiência fica só na tela da Pauta de audiências
