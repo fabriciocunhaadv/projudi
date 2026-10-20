@@ -144,8 +144,14 @@
     if (!bytes && !textoAutos) throw new Error("arquivo não recebido");
     fecharJanelas();
     botao(/^Nova An[aá]lise$/i)?.click(); await dorme(600);
-    const painel = await esperar(() => document.getElementById("tour-input-panel"), 20000);
-    if (!painel) throw new Error("não achei a área de entrada dos autos do app");
+    let painel = await esperar(() => document.getElementById("tour-input-panel"), 8000);
+    // Sem a área de entrada o app está em outra tela (minuta em tela cheia, janela aberta, erro na tela): tenta voltar ao painel “Autos & Prompts” antes de desistir
+    for (let t = 0; !painel && t < 3; t++) {
+      fecharJanelas(); try { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); } catch (e) { /* sem teclado */ }
+      (botao(/^\s*Autos\s*&\s*Prompts\s*$/i) || botao(/^\s*Dividir Tela\s*$/i) || botao(/^Nova An[aá]lise$/i))?.click();
+      painel = await esperar(() => document.getElementById("tour-input-panel"), 6000);
+    }
+    if (!painel) throw new Error("não achei a área de entrada dos autos do app (botões na tela: " + [...document.querySelectorAll("button")].filter(visivel).map((x) => texto(x).slice(0, 26)).filter(Boolean).slice(0, 12).join(" | ") + ")");
     const sel = prompt ? await esperar(() => seletorDePrompt(document, prompt), 30000) : seletorDePrompt(document, prompt);      // a lista de prompts do app carrega depois da página
     if (prompt && (!sel || !escolherPrompt(sel, prompt))) throw erroSemPrompt(prompt, document, "na lista do app");
     await dorme(400);
@@ -395,16 +401,24 @@
     // Quantos registros havia (e se este processo já estava) antes da auditoria: serve para detectar sobrescrita.
     const digA = String(processo || "").replace(/\D/g, "").slice(0, 9);
     const rxA = digA ? new RegExp(digA.slice(0, 7) + "[.\\-]?" + digA.slice(7, 9)) : null;
-    let antes = null, jaTinha = false, perdeu = null;
+    let antes = null, jaTinha = false, avisoPerda = "";
     try {
       botao(/^\s*Processos Auditados/i, modal)?.click(); await dorme(1200);
-      const l = (modal.innerText || "").replace(/\s+/g, " "), n = (l.match(/Processos Auditados\s*(\d+)/i) || [])[1];
+      const lerQtd = () => { const l = (modal.innerText || "").replace(/\s+/g, " "); return { l, n: (l.match(/Processos Auditados\s*(\d+)/i) || [])[1] }; };
+      let { l, n } = lerQtd();
       if (n != null) antes = Number(n);
-      if (antes != null && window.__lupaQtd && antes < window.__lupaQtd && !(window.__lupaRx && temNaFoto(fotoAuditorias(), window.__lupaRx))) perdeu = new Error(`os Processos Auditados tinham ${window.__lupaQtd} registro(s) e agora têm ${antes}: o registro anterior foi apagado (provavelmente pelo “Limpar Tudo”). Parei antes de auditar o próximo`);
+      // A contagem pode cair por motivos que não são “Limpar Tudo” (lista ainda carregando da nuvem, navegador sem espaço que encurta o que guarda). Reconta algumas vezes antes de concluir que algo sumiu.
+      for (let v = 0; v < 3 && antes != null && window.__lupaQtd && antes < window.__lupaQtd && !(window.__lupaRx && temNaFoto(fotoAuditorias(), window.__lupaRx)); v++) {
+        await dorme(4000); ({ l, n } = lerQtd()); if (n != null) antes = Number(n);
+      }
+      if (antes != null && window.__lupaQtd && antes < window.__lupaQtd && !(window.__lupaRx && temNaFoto(fotoAuditorias(), window.__lupaRx))) {
+        // não trava a fila: o processo anterior já foi confirmado na hora em que foi auditado; segue com a nova contagem como referência e avisa
+        avisoPerda = `atenção: a lista de Processos Auditados tinha ${window.__lupaQtd} registro(s) e agora tem ${antes} (o app pode ter encurtado o que guarda no navegador ou alguém limpou); a contagem de referência foi ajustada`;
+        window.__lupaQtd = antes;
+      }
       jaTinha = !!(rxA && rxA.test(l));
       botao(/^\s*Nova Auditoria\s*$/i, modal)?.click(); await esperar(noForm, 4000);
     } catch (e) { /* segue sem a contagem */ }
-    if (perdeu) throw perdeu;
     for (const i of modal.querySelectorAll("input[type=text]")) if (i.value && !/^\s*$/.test(i.value)) definirValor(i, "");
     await dorme(300);
     const sel = seletorDePrompt(modal, prompt);
@@ -499,7 +513,7 @@
     if (rxProc && temNaFoto(foto1, rxProc) && !temNaFoto(foto2, rxProc)) throw new Error(`o botão “Limpar Tudo” apagou ${processo} dos Processos Auditados. Parei para não perder mais registros. ${trilha}`);
     if (antes != null && !jaTinha && qtd != null && Number(qtd) <= antes) throw new Error(`a auditoria de ${processo} substituiu outra em vez de entrar na lista (eram ${antes}, ficaram ${qtd}). Não passei para o próximo`);
     window.__lupaQtd = Number(qtd) || window.__lupaQtd; window.__lupaRx = rxProc;
-    return { ok: true, mensagem: `auditoria gravada em Processos Auditados (${qtd ?? "?"} registro(s); ${processo} ✔) — ${trilha}` + (window.__promptAproximado ? " — " + window.__promptAproximado : "") + (resumo ? " — " + resumo : ""), minuta: "", injecao: injecaoLupa };
+    return { ok: true, mensagem: `auditoria gravada em Processos Auditados (${qtd ?? "?"} registro(s); ${processo} ✔) — ${trilha}` + (window.__promptAproximado ? " — " + window.__promptAproximado : "") + (resumo ? " — " + resumo : "") + (avisoPerda ? " — " + avisoPerda : ""), minuta: "", injecao: injecaoLupa };
   }
 
 
