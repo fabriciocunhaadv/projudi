@@ -96,8 +96,9 @@ $("docs").onclick = async () => {
   const html = htmlParaDocs(), titulo = document.querySelector("h2.dia")?.textContent || "Pauta de audiências";
   let copiou = false;
   try { await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([html], { type: "text/html" }), "text/plain": new Blob([document.querySelector(".folha")?.innerText || ""], { type: "text/plain" }) })]); copiou = true; } catch (e) { /* sem permissão: o usuário usa Copiar texto */ }
+  await chrome.storage.local.set({ pauta_docs_pend: { titulo, html, texto: document.querySelector(".folha")?.innerText || "", ts: Date.now() } });      // a extensão cola sozinha no Docs que vai abrir
   chrome.tabs.create({ url: "https://docs.google.com/document/create?title=" + encodeURIComponent(titulo), active: true });
-  $("msg").textContent = copiou ? "Pauta copiada com a formatação. No Google Docs que abriu, aperte Ctrl+V para colar e depois edite." : "Não consegui copiar automaticamente: use “Copiar texto” e cole no Google Docs.";
+  $("msg").textContent = "Abrindo o Google Docs: a pauta é inserida sozinha em alguns segundos." + (copiou ? " Se o documento ficar em branco, aperte Ctrl+V (a pauta já está copiada)." : " Se ficar em branco, use “Copiar texto” e cole.");
 };
 $("reler").onclick = () => montar(true);
 $("copiar").onclick = async () => {

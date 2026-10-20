@@ -50,6 +50,23 @@
     try { const ass = barra.dataset.assin.split("|"); sessionStorage.setItem("esteiraOculta:" + ass[0] + ":" + ass[1], "1"); } catch (x) { /* sem sessionStorage */ }
     barra.style.display = "none"; barra.dataset.assin = "";
   });
+  // PAUTA DE AUDIÊNCIAS: a página da pauta deixa o HTML guardado e abre um Docs em branco; aqui ele é colado sozinho (se o título do documento for o da pauta)
+  const sem = (x) => String(x || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  async function colarPautaPendente() {
+    if (!noDocs) return;
+    for (let i = 0; i < 45; i++) {      // espera o editor do Docs e o título do documento
+      const { pauta_docs_pend: p } = await chrome.storage.local.get("pauta_docs_pend");
+      if (!p || Date.now() - p.ts > 4 * 60000) return;
+      if (sem(document.title).includes(sem(p.titulo)) && colar({ htmlColar: p.html, minuta: p.texto })) {
+        await chrome.storage.local.remove("pauta_docs_pend");
+        barra.dataset.assin = "pauta"; barra.innerHTML = '<span class="m"><b>Pauta de audiências</b><br><small>Pauta inserida no documento. Confira e edite à vontade.</small></span>'; barra.style.display = "flex";
+        setTimeout(() => { if (barra.dataset.assin === "pauta") { barra.style.display = "none"; barra.dataset.assin = ""; } }, 9000);
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
+  colarPautaPendente();
   async function desenhar() {
     const it = await atual();
     if (!it || oculta(it)) { barra.style.display = "none"; barra.dataset.assin = ""; return; }
