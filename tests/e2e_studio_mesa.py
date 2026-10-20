@@ -62,5 +62,13 @@ with sync_playwright() as p:
     r = pg.evaluate("window.__st.studio_res_m7"); print(r)
     assert r["ok"] and "ata preliminar" in r["mensagem"] and "NÃO" not in r["mensagem"], r
     print("OK")
+    # 8) audiência do processo já existe e tem briefing: reaproveita (não cria outra, não gasta IA)
+    antes = pg.evaluate("window.cliques")
+    pg.evaluate("window.resumo = 'Resumo fático já extraído pela IA ' + 'x'.repeat(80); document.getElementById('res').innerHTML = '<span>Resumo Fático da Lide</span><textarea>' + window.resumo + '</textarea>'")
+    envia("m8", '{"nome":"x-OCR.pdf","processo":"5305719.52","audData":"2026-11-02","audHora":"09:15"}'); pg.wait_for_function("window.__st.studio_res_m8", timeout=60000)
+    r = pg.evaluate("window.__st.studio_res_m8"); print(r)
+    assert r["ok"] and r.get("reaproveitada") and pg.evaluate("window.cliques") == antes, r
+    assert pg.evaluate("document.querySelector('input[type=date]').value") == "2026-11-02"
+    print("OK")
     b.close()
 print("OK")

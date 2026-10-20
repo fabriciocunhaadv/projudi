@@ -621,21 +621,39 @@
 
   // Cria uma audiência NOVA na Mesa e entrega o PDF (o app extrai e analisa sozinho). Em nova tentativa (retomar), reanalisa a audiência que ficou aberta, sem duplicar.
   // Com comAta, gera também a ata preliminar (intimações e movimentações) e a fecha.
-  async function mesa({ arquivoId, nome, retomar, comAta, audData, audHora }) {
+  async function mesa({ arquivoId, nome, retomar, comAta, audData, audHora, processo }) {
     const bytes = arquivos.get(arquivoId);
     if (!bytes) throw new Error("arquivo não recebido");
     await abrirMesa();
     const rean = botao(/Reanalisar com IA/i);
-    let t0 = Date.now();
+    let t0 = Date.now(), reaproveita = false;
+    // Já existe uma audiência deste processo na Mesa? Se já foi analisada, usa a mesma (sem duplicar nem gastar IA); se está vazia, envia o PDF nela.
+    // Sem audiência do processo, reaproveita uma "Processo sem número" vazia (sobra de tentativa anterior) antes de criar outra.
+    const cartoes = () => [...document.querySelectorAll("div")].filter((d) => /rounded-xl/.test(d.className) && /cursor-pointer/.test(d.className) && visivel(d));
+    const alvoDig = dig(processo).slice(0, 9);
+    if (!retomar) {
+      const doProc = alvoDig.length >= 7 ? cartoes().find((d) => dig(texto(d)).startsWith(alvoDig)) : null;
+      if (doProc) {
+        doProc.click(); await dorme(1300);
+        if (resumoDaMesa().length > 40) { await definirDataHoraMesa(audData, audHora, true); return { ok: true, mensagem: "a audiência já estava na Mesa e já tinha o briefing: usei a mesma, sem analisar de novo", minuta: "", reaproveitada: true }; }
+        reaproveita = true;
+      } else {
+        const vazio = cartoes().find((d) => /Processo sem n[úu]mero/i.test(texto(d)) && !/\d{7}/.test(texto(d)));
+        if (vazio) { vazio.click(); await dorme(1000); if (document.querySelector("input[type=file]")) reaproveita = true; }
+      }
+    }
     if (retomar && rean && corpoMesa().includes(String(nome).replace(/\.pdf$/i, "").slice(0, 14))) { rean.click(); await dorme(2500); }
     else {
-      botaoNova().click();
+      if (!reaproveita) botaoNova().click();
       await definirDataHoraMesa(audData, audHora);
       const input = await esperar(() => [...document.querySelectorAll("input[type=file]")].find((i) => /pdf/i.test(i.accept || "") && /txt/i.test(i.accept || "")), 15000);
       if (!input) throw new Error("não achei o campo “Selecionar PDF(s) dos Autos” na Mesa");
       const dt = new DataTransfer(); dt.items.add(new File([bytes], nome, { type: "application/pdf" }));
       input.files = dt.files; input.dispatchEvent(new Event("change", { bubbles: true }));
-      if (!(await esperar(() => /Extraindo autos|mapeando partes/i.test(corpoMesa()), 30000))) { const e = erroDaMesa(); if (e) throw falhar(e); }
+      if (!(await esperar(() => /Extraindo autos|mapeando partes/i.test(corpoMesa()), 30000))) {
+        const e = erroDaMesa(); if (e) throw falhar(e);
+        if (!mesaOcupada() && resumoDaMesa().length <= 40 && !/Pe[çc]as analisadas/i.test(corpoMesa())) throw falhar("o Studio não começou a ler o PDF (o envio do arquivo para a Mesa não foi aceito). Tente de novo; se repetir, atualize a aba do Studio");
+      }
       t0 = Date.now();
     }
     await aguardarBriefing(t0);
