@@ -304,9 +304,11 @@
   }
 
   // Abre "Histórico Local", procura o número do processo e carrega a minuta dele na tela do app.
-  async function carregarDoHistorico(processo) {
+  // `desde` (ms): só vale minuta gravada DEPOIS disso (a da esteira). Um processo costuma ter várias minutas em datas diferentes (a evolução do processo):
+  // escolhe sempre a mais recente e confere a data; nunca usa a que por acaso já estava aberta na tela.
+  const dataDoCartao = (t) => { const m = String(t).match(/(\d{2})\/(\d{2})\/(\d{4})[ ,]+(\d{2}):(\d{2})/); return m ? new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]).getTime() : 0; };
+  async function carregarDoHistorico(processo, desde = 0) {
     const meta = () => (document.getElementById("tour-meta-parties-box")?.innerText || "");
-    if (meta().includes(processo) && minutaDoPainel().length > 200) return true;      // já é a que está aberta
     fecharJanelas();
     const abrir = [...document.querySelectorAll("button")].find((b) => /^Histórico Local$/i.test((b.title || "").trim()) || /^Histórico Local$/i.test(texto(b)));
     if (!abrir) throw new Error("não achei o botão “Histórico Local” do app");
@@ -314,13 +316,17 @@
     const caixa = await esperar(() => [...document.querySelectorAll("input")].find((i) => visivel(i) && /Buscar processo/i.test(i.placeholder || "")), 15000);
     if (!caixa) throw new Error("a janela do Histórico não abriu");
     definirValor(caixa, processo);
-    const carregar = await esperar(() => {
-      const card = [...document.querySelectorAll("div")].filter((d) => d.innerText && d.innerText.includes(processo) && d.querySelector("button") && d.innerText.length < 3000).pop();
-      return card && [...card.querySelectorAll("button")].find((b) => /Carregar Minuta/i.test(texto(b)));
-    }, 15000);
-    if (!carregar) throw new Error(`não achei o processo ${processo} no Histórico do app (ou ele ainda não tem minuta lá)`);
+    await esperar(() => false, 1500);      // deixa a lista filtrar
+    const cartoes = () => [...document.querySelectorAll("div")].filter((d) => d.innerText && d.innerText.includes(processo) && d.innerText.length < 3000 && [...d.querySelectorAll("button")].some((b) => /Carregar Minuta/i.test(texto(b)))).filter((d, i, todos) => !todos.some((o) => o !== d && d.contains(o)));      // só o cartão mais interno de cada processo
+    const lista = await esperar(() => { const c = cartoes(); return c.length ? c : null; }, 15000);
+    if (!lista) throw new Error(`não achei o processo ${processo} no Histórico do app (ou ele ainda não tem minuta lá)`);
+    const ordenados = lista.map((d) => ({ d, t: dataDoCartao(d.innerText) })).sort((x, y) => y.t - x.t);
+    const melhor = ordenados[0], quando = melhor.t ? new Date(melhor.t).toLocaleString("pt-BR") : "data não lida";
+    if (desde && melhor.t && melhor.t < desde) throw new Error(`só achei minutas ANTIGAS de ${processo} no Histórico (a mais recente é de ${quando}), anteriores a este pedido da esteira; nada foi usado`);
+    const carregar = [...melhor.d.querySelectorAll("button")].find((b) => /Carregar Minuta/i.test(texto(b)));
     carregar.click();
     if (!(await esperar(() => meta().includes(processo) && minutaDoPainel().length > 200, 30000))) throw new Error("a minuta do histórico não carregou na tela");
+    window.__minutaCarregadaEm = quando;
     return true;
   }
 
@@ -786,10 +792,10 @@
       responder({ ok: true }); return false;
     }
     if (m?.acao === "studio-enviar-base") { enviar(m.nome, m.arquivoId, m.b64, !!m.substituir).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
-    if (m?.acao === "studio-ler-minuta" && resultadoTurbo()) {      // o resultado do Módulo Turbo está na tela: usa-o, sem procurar no histórico
+    if (m?.acao === "studio-ler-minuta" && resultadoTurbo() && (!m.processo || (resultadoTurbo().innerText || "").includes(m.processo))) {      // o resultado do Módulo Turbo está na tela: usa-o, sem procurar no histórico
       const r = lerResultadoTurbo(); responder({ ok: !!r.texto, minuta: r.texto, minutaHtml: r.html, erro: r.texto ? "" : "não consegui ler a minuta do Turbo" }); return false;
     }
-    if (m?.acao === "studio-ler-minuta") { (m.processo ? carregarDoHistorico(m.processo) : Promise.resolve()).then(() => lerMinuta()).then((t) => responder({ ok: !!t, minuta: t, minutaHtml: minutaHtmlDoPainel(), erro: t ? "" : "não há minuta pronta na tela do app" })).catch((e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
+    if (m?.acao === "studio-ler-minuta") { (m.processo ? carregarDoHistorico(m.processo, m.desde || 0) : Promise.resolve()).then(() => lerMinuta()).then((t) => responder({ ok: !!t, minuta: t, minutaHtml: minutaHtmlDoPainel(), erro: t ? "" : "não há minuta pronta na tela do app" })).catch((e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
     if (m?.acao === "studio-analisar") { window.__dicasPrompt = m.dicas || ""; window.__promptAproximado = ""; }
     if (m?.acao === "studio-analisar" && (m.modo === "turbo" || m.modo === "mesa" || m.modo === "mesa-ler") && m.reqId) {      // análise longa: responde já e entrega o resultado pelo storage (o canal de mensagem pode cair no meio)
       const k = "studio_res_" + m.reqId;

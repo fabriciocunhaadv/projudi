@@ -70,7 +70,7 @@ async function analisar(it) {
 // A análise já tinha terminado no Studio (a extensão foi recarregada ou a tela travou): usa a minuta que está lá, sem analisar de novo.
 async function usarMinutaDoStudio(it) {
   await atualizar(it.id, { estado: "analisando", erro: "", rodada: Date.now() + Math.random() });
-  try { const m = await lerMinutaAtual(it.processo); await entregar(it, await lerPdf(it.id), m.texto, "", m.html); }
+  try { const m = await lerMinutaAtual(it.processo, (it.criadoEm || 0) - 60000); await entregar(it, await lerPdf(it.id), m.texto, "", m.html); }      // só vale minuta gravada depois deste pedido
   catch (e) { await atualizar(it.id, { estado: "erro", erro: e.message }); }
 }
 
@@ -83,6 +83,13 @@ async function cadastrar(it) {         // conferência terminada: pega o texto f
   } catch (e) { aviso = "Não consegui ler o Google Docs (" + e.message + "): será usada a minuta original do Studio."; }
   const aba = await abrirNoProjudi(it, absoluta(it.urlPre || it.url), true);
   await atualizar(it.id, { estado: "cadastrando", textoFinal: texto, htmlFinal: html, aviso, projudiTab: aba.id, inserido: false });
+}
+
+// Gigante concluído no Studio: a minuta foi gerada AGORA, a pedido desta fila, e o app já a salvou no Histórico. A esteira não procura nem lê nada no Histórico:
+// só marca como concluído, com a data e a hora, para o assessor abrir a minuta no app e seguir para a 2ª etapa.
+async function concluirGigante(it) {
+  const quando = new Date().toLocaleString("pt-BR");
+  await atualizar(it.id, { estado: "concluido", erro: "", minuta: "", minutaHtml: "", aviso: `Processo gigante concluído no Studio em ${quando}: a minuta nova foi salva no Histórico do app (a esteira não procura minutas no Histórico). Abra-a lá para a 2ª etapa.` });
 }
 
 // Processos gigantes lidos em lotes pelo Studio: confere o andamento (no máximo a cada 45 s) e, quando a minuta fica pronta no Histórico, segue o fluxo normal.
@@ -98,7 +105,7 @@ async function verificarGigantes(lista) {
     if (j.uniao) {      // processo muito grande: lido em partes; a minuta única só sai depois que o Studio une as partes
       const unida = jobs.find((x) => x.serie === it.jobId);
       if (unida) {
-        if (unida.status === "concluido") await usarMinutaDoStudio(it);
+        if (unida.status === "concluido") await concluirGigante(it);
         else if (unida.status === "erro" || unida.status === "cancelado") await atualizar(it.id, { estado: "erro", erro: "A união das partes parou no Studio: " + (unida.erro || "veja o painel “Gigantes” do app e clique em Retomar.") });
         else await atualizar(it.id, { aviso: "Processo muito grande: as partes já foram lidas e o Studio está redigindo a minuta única (" + unida.status + ")." });
         continue;
@@ -107,7 +114,7 @@ async function verificarGigantes(lista) {
       else await atualizar(it.id, { aviso: "Processo muito grande: o Studio lê as partes uma de cada vez (primeira: " + j.status + ") e depois une tudo numa só minuta." });
       continue;
     }
-    if (j.status === "concluido") await usarMinutaDoStudio(it);
+    if (j.status === "concluido") await concluirGigante(it);
     else if (j.status === "erro" || j.status === "cancelado") await atualizar(it.id, { estado: "erro", erro: j.status === "cancelado" ? "O processo gigante foi cancelado no Studio." : "O processo gigante parou no Studio: " + (j.erro || "veja o painel “Gigantes” do app e clique em Retomar.") });
   }
 }

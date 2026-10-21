@@ -58,9 +58,9 @@ export async function consultarGigantes() {
   return r.jobs || [];
 }
 
-export async function lerMinutaAtual(processo = "") {
+export async function lerMinutaAtual(processo = "", desde = 0) {
   const aba = await acharStudio();
-  const r = await chrome.tabs.sendMessage(aba.id, { acao: "studio-ler-minuta", processo });
+  const r = await chrome.tabs.sendMessage(aba.id, { acao: "studio-ler-minuta", processo, desde });
   if (!r?.ok) throw new Error(r?.erro || "não consegui ler a minuta do app");
   return { texto: r.minuta, html: r.minutaHtml || "" };
 }
