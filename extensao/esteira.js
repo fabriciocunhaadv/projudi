@@ -152,6 +152,7 @@ async function desenhar() {
     if (it.estado === "erro" && it.promptOpcoes?.length) b.push(`<br><select data-a-sel="${it.id}" title="Prompts que existem no seu Studio"><option value="">— escolha o prompt —</option>${it.promptOpcoes.map((o) => `<option value="${esc(o)}"${o === it.promptEscolhido ? " selected" : ""}>${esc(o)}</option>`).join("")}</select> <button data-a="usarprompt" data-id="${it.id}">Usar este prompt e analisar</button>`);
     if (it.estado === "erro" && it.grande) b.push(`<button data-a="normal" data-id="${it.id}" title="Refaz este processo na análise normal do Studio (PDF/texto completo, sem o Módulo Turbo)">Usar a análise normal</button>`);
     if (it.modo === "mesa" && it.estado === "concluido") b.push(`<label title="Inclui esta audiência na pauta (formato do modelo do gabinete)"><input type="checkbox" data-pauta="${it.id}" ${it.pautaSel ? "checked" : ""}> incluir na pauta</label>`);
+    if (it.estado === "concluido" && (it.minuta || "").length > 200) b.push(`<button data-a="copiar" data-id="${it.id}" title="Copia a minuta que a extensão recebeu do Studio (garantia caso ela não apareça no Histórico do app)">📋 Copiar minuta</button>`);
     b.push(`<button data-a="excluir" data-id="${it.id}" title="Tira este processo da fila e apaga o PDF guardado (não mexe no Projudi nem nos arquivos já baixados)">🗑 Excluir</button>`);
     return `<tr><td>${n + 1}</td><td>${esc(it.processo)}<br><small>${esc(it.tipo || "")}</small></td><td class="e-${it.estado}">${esc(ROTULO[it.estado] || it.estado)}${it.erro ? "<br>" + esc(it.erro) : ""}${it.aviso ? `<br><small>${esc(it.aviso)}</small>` : ""}${it.injecao ? (it.injecao.estado === "vermelha" ? `<br><small class="inj-v">🚨 Prompt injection nos autos: ${esc(it.injecao.texto || "confira a tarja vermelha no app")}</small>` : `<br><small class="inj-ok">✅ Prompt injection: nada encontrado</small>`) : ""}</td><td>${b.join(" ")}</td></tr>`;
   }).join("") : '<tr><td colspan="4">Fila vazia.</td></tr>';
@@ -164,6 +165,11 @@ $("linhas").addEventListener("change", async (ev) => { const pc = ev.target.clos
 $("linhas").addEventListener("click", async (ev) => {
   const b = ev.target.closest("button[data-a]"); if (!b) return;
   const id = b.dataset.id, a = b.dataset.a;
+  if (a === "copiar") {      // a minuta fica guardada aqui mesmo que o Histórico do app não a tenha gravado
+    const it = (await todos()).find((x) => x.id === id); const txt = (it && it.minuta) || "";
+    try { await navigator.clipboard.writeText(txt); b.textContent = "✔ Copiada"; } catch (e) { const ta = document.createElement("textarea"); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); b.textContent = "✔ Copiada"; }
+    setTimeout(() => { b.textContent = "📋 Copiar minuta"; }, 2500); return;
+  }
   if (a === "excluir") {
     if (!confirm("Excluir este processo da esteira? O PDF guardado pela extensão será apagado (o arquivo baixado no computador e o Projudi não são afetados).")) return;
     await fecharAbas((await todos()).find((x) => x.id === id));
