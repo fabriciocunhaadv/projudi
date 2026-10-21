@@ -237,7 +237,12 @@ function csv() {
     if (!fila.length) return;
     const hoje = new Date().toISOString().slice(0, 10), id = String(Date.now());
     const vistosLote = new Set();      // o mesmo processo nunca entra duas vezes no lote (ex.: dois perfis/juízes na mesma unidade)
-    const itens = fila.filter((p) => { const k = String(p.processo).replace(/\D/g, "").slice(0, 13) || p.processo; if (vistosLote.has(k)) return false; vistosLote.add(k); return true; }).map((p) => ({ processo: p.processo, url: p.url, classificador: nomeCls(p), serventia: p.serventia, situacao: p.tipo, urlPre: p.urlPre || "", serventiaUrl: p.serventiaUrl || "", arquivoModelos: automacao[p.serventia]?.arquivoModelos || "", prompt: automacao[p.serventia]?.prompt || "", pasta: `Projudi/${hoje}/${[p.serventia, nomeCls(p)].map((x) => String(x).replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60).replace(/[\s.]+$/g, "")).join("/")}` }));
+    const itens = fila.filter((p) => { const k = String(p.processo).replace(/\D/g, "").slice(0, 13) || p.processo; if (vistosLote.has(k)) return false; vistosLote.add(k); return true; }).map((p) => ({ processo: p.processo, url: p.url, classificador: nomeCls(p), serventia: p.serventia, situacao: p.tipo, urlPre: p.urlPre || "", serventiaUrl: p.serventiaUrl || "", arquivoModelos: automacao[p.serventia]?.arquivoModelos || "", prompt: automacao[p.serventia]?.prompt || (globalThis.Sugestoes ? Sugestoes.prompt(p.serventia) : "") || "", pasta: `Projudi/${hoje}/${[p.serventia, nomeCls(p)].map((x) => String(x).replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60).replace(/[\s.]+$/g, "")).join("/")}` }));
+    // sem prompt da matéria a análise rodaria com o prompt que estiver ATIVO no Studio (ex.: Criminal num processo de Família): não deixa seguir
+    if (opcoes.studio && opcoes.modo !== "turbo") {
+      const sem = [...new Set(itens.filter((i) => !i.prompt).map((i) => i.serventia))];
+      if (sem.length) { alert("Defina o prompt destas serventias antes de enviar ao Studio (campo “Prompt no Studio” na tabela de serventias):\n\n" + sem.join("\n")); return; }
+    }
     await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/" + hoje, opcoes: { atualizarBase: opcoes.atualizarBase, studio: { ativo: opcoes.studio, modo: opcoes.modo, docs: false } } } });
     chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + id) });
   });
