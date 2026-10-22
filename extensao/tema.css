@@ -101,3 +101,12 @@ body:has(#diagnostico) h1 { font-size: 16px !important; } body:has(#diagnostico)
 #linhas td:nth-child(2) { white-space: nowrap; } #linhas td[class^="e-"] { font-weight: 650; }
 #linhas td button { padding: 4px 10px !important; font-size: 12px; margin: 2px 4px 2px 0; }
 td.e-concluido { color: var(--ok) !important; } td.e-erro { color: var(--erro) !important; } td.e-analisando { color: var(--brand) !important; }
+
+/* janelinha (popup): atalhos + situação da última atualização */
+.menu { display: grid; gap: 8px; margin-bottom: 14px; } .menu button { width: 100%; text-align: left; padding: 10px 14px !important; }
+.situacao { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--radius); background: var(--card); border: 1px solid var(--line); box-shadow: var(--sombra); }
+.situacao .bolinha { width: 12px; height: 12px; border-radius: 50%; background: var(--muted); flex: none; box-shadow: 0 0 0 4px color-mix(in srgb, var(--muted) 18%, transparent); }
+.situacao.ok .bolinha { background: var(--ok); box-shadow: 0 0 0 4px var(--ok-suave); } .situacao.erro .bolinha { background: var(--erro); box-shadow: 0 0 0 4px var(--erro-suave); }
+.situacao.aviso .bolinha, .situacao.andamento .bolinha { background: var(--aviso); box-shadow: 0 0 0 4px var(--aviso-suave); }
+.situacao .titulo { font-weight: 700; }
+body:has(.menu) { min-width: 320px; padding: 14px !important; } body:has(.menu) h1 { font-size: 16px !important; margin-bottom: 12px; }

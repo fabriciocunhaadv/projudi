@@ -75,19 +75,27 @@ def main():
         assert {"amostra inicio", "amostra naoAnalisadas", "amostra preAnalisadas"} <= set(dbg), list(dbg)
 
         ext_id = sw.url.split("/")[2]
+        # janelinha: só os 4 atalhos e a situação da última atualização (sem serventias, comarcas nem listas de processos)
         pg = ctx.new_page(); pg.goto(f"chrome-extension://{ext_id}/popup.html"); pg.wait_for_timeout(500)
-        txt = pg.inner_text("body"); print(txt[:700])
-        assert "Fulano - minutando - (Prioridade: 10)" in txt and "1000002-22.2026.8.09.0166" in txt and "Gicrana - lote - (Prioridade: 3)" in txt
-        assert "Concluso - Genérico" in txt and "Data/Hora" in txt and "Tipo da Ação" in txt        # colunas e faixas como no Projudi
-        assert pg.locator("table.tp .dot.u1").count() >= 1 and pg.locator("table.tp .dot.u2").count() >= 1   # bolinhas de urgência
-        assert pg.locator("table.tp .tp-titulo").count() == 2 and pg.locator("table.tp button.copiar").count() >= 9
-
-        if os.environ.get("CAPTURAS"):   # python: CAPTURAS=/pasta python tests/e2e_extensao.py
-            pg.set_viewport_size({"width": 720, "height": 900}); pg.screenshot(path=os.environ["CAPTURAS"] + "/popup.png", full_page=True)
+        txt = pg.inner_text("body"); print(txt[:300])
+        botoes = [b.inner_text().strip() for b in pg.locator("button").all()]
+        assert botoes == ["Abrir painel completo", "Ferramentas", "PDF com OCR", "Pauta de audiências"], botoes
+        assert "Última atualização concluída" in txt and "Montes Claros" not in txt and "Fulano" not in txt and "1000002-22" not in txt, txt
         pn = ctx.new_page(); pn.goto(f"chrome-extension://{ext_id}/painel.html"); pn.wait_for_timeout(500)
+        # tabelas do painel (como no Projudi): classificador, colunas, bolinhas de urgência e botões de copiar
+        pn.click("#abrir"); pn.wait_for_timeout(300)
+        txt = pn.inner_text("body")
+        assert "Fulano - minutando - (Prioridade: 10)" in txt and "1000002-22.2026.8.09.0166" in txt and "Gicrana - lote - (Prioridade: 3)" in txt
+        assert "Concluso - Genérico" in txt and "Data/Hora" in txt and "Tipo da Ação" in txt
+        assert pn.locator("table.tp .dot.u1").count() >= 1 and pn.locator("table.tp .dot.u2").count() >= 1
+        assert pn.locator("table.tp .tp-titulo").count() == 2 and pn.locator("table.tp button.copiar").count() >= 9
+        # a tabela "Por classificador" começa recolhida e abre ao clicar
         if os.environ.get("CAPTURAS"):
-            pn.set_viewport_size({"width": 1300, "height": 900}); pn.click("#abrir"); pn.wait_for_timeout(300)
-            pn.screenshot(path=os.environ["CAPTURAS"] + "/painel.png", full_page=True); pn.click("#abrir")
+            pn.set_viewport_size({"width": 1300, "height": 900}); pn.screenshot(path=os.environ["CAPTURAS"] + "/painel.png", full_page=True)
+        pn.click("#abrir"); pn.wait_for_timeout(300)
+        assert pn.evaluate("() => document.getElementById('det-cls').open") is False, "a tabela Por classificador deveria voltar recolhida"
+        pn.locator("#det-cls > summary").click(); pn.wait_for_timeout(200); assert pn.evaluate("() => document.getElementById('det-cls').open") is True
+        pn.locator("#det-cls > summary").click(); pn.wait_for_timeout(200)
         # seleção das serventias para baixar PDFs: nada marcado = nada na fila; marcar a serventia traz os processos dela; o prompt fica gravado
         assert pn.locator("input[data-serv]").count() >= 1 and pn.locator("input[data-proc]").count() == 0
         assert "Marque ao menos uma serventia" in pn.inner_text("body")

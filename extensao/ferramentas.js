@@ -13,3 +13,17 @@ async function ocrConfig() {
   $("abrirDetalhes").onclick = () => chrome.tabs.create({ url: "chrome://extensions/?id=" + chrome.runtime.id });
 }
 ocrConfig();
+
+// ajustes que antes ficavam na janelinha da extensão
+(async () => {
+  const PADRAO = { filtro: "Montes Claros", notificar: true };
+  const cfg = { ...PADRAO, ...(await chrome.storage.sync.get(PADRAO)) };
+  $("filtro").value = cfg.filtro; $("notificar").checked = cfg.notificar;
+  const salvar = () => chrome.storage.sync.set({ filtro: $("filtro").value, notificar: $("notificar").checked });
+  ["filtro", "notificar"].forEach((i) => $(i).addEventListener("change", salvar));
+  $("diagnostico").onclick = async () => {
+    const { debug = {}, estado } = await chrome.storage.local.get(["debug", "estado"]);
+    const txt = JSON.stringify({ debug, resumo: estado?.serventias?.map((s) => ({ s: s.serventia, erro: s.erro, linhas: s.linhas, n: s.processos && [s.processos.naoAnalisadas.length, s.processos.preAnalisadas.length] })) }, null, 1);
+    await navigator.clipboard.writeText(txt); $("diagnostico").textContent = "Copiado! Cole no chat";
+  };
+})();

@@ -24,5 +24,13 @@ faz o OCR só nas páginas que são imagem e salva ao lado o arquivo <b>nome-OCR
 </div>
 <p id="acessoArquivos" class="dica"></p>
 <p><button id="salvarOcr">Salvar</button> <button id="abrirDetalhes">Abrir detalhes da extensão</button> <span id="okOcr" style="color:#1a7a1a"></span></p>
+<h2>Verificação do painel</h2>
+<div class="linha">
+  <label style="font-size:13px">Serventias (parte do nome; separe por ; — vazio = todas)<input type="text" id="filtro" style="display:block;width:100%"></label>
+  <label style="font-size:13px"><input type="checkbox" id="notificar" style="display:inline;width:auto"> Avisar quando chegar conclusão nova</label>
+  <p class="dica">A verificação é manual: abra o painel e clique em <b>Verificar agora</b> quando quiser atualizar a lista (nada roda sozinho no Projudi).</p>
+</div>
+<h2>Suporte</h2>
+<p><button id="diagnostico">Copiar diagnóstico</button> <span class="dica">Copia um resumo técnico para colar no chat. Para copiar o HTML de uma tela, use o atalho <b>Alt+Shift+C</b> na tela desejada.</span></p>
 <script src="tabs-retry.js"></script>
 <script src="ferramentas.js"></script>
