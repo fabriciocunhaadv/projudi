@@ -57,7 +57,7 @@ def main():
         time.sleep(3)
         assert sw.evaluate("chrome.storage.local.get('estado')").get("estado") is None      # nada roda sozinho ao instalar
         assert sw.evaluate("chrome.storage.sync.get({ filtro: 'x' })")["filtro"] == "x"                  # padrão: nenhum filtro de serventia (vale para todas)
-        sw.evaluate("chrome.storage.sync.set({ filtro: 'Montes Claros' })")                  # neste teste o usuário filtra por "Montes Claros"
+        sw.evaluate("chrome.storage.sync.set({ filtro: 'Montes Claros', filtroPadraoLimpo: true })")                  # neste teste o usuário filtra por "Montes Claros"
         sw.evaluate("verificar()")                                                         # só roda quando o usuário manda
         for _ in range(40):
             estado = sw.evaluate("chrome.storage.local.get('estado')").get("estado")
