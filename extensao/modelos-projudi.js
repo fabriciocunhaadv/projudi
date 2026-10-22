@@ -101,7 +101,10 @@
   function relatar(msg) { try { chrome.runtime.sendMessage({ acao: "modelos-progresso", ...msg }); } catch (e) { /* página fechada */ } }
 
   const chaveServ = (x) => sem(x).replace(/\s*-\s*go\s*$/, "").replace(/\s+/g, " ").trim();
-  async function capturar() {
+  const tipoOk = (x) => /decis|despach|sentenc/.test(sem(x.tipo));      // só decisão, despacho e sentença (ignora citação, ofício, certidão etc.)
+
+  // ETAPA 1 — só LISTA os modelos (nome, serventia, tipo), sem ler o texto: o usuário escolhe quais quer cadastrar na extensão.
+  async function listar() {
     cancelar = false;
     relatar({ txt: "Abrindo Cadastros → Modelo…" });
     if (!(await navegar("Modelo"))) throw new Error("a tela Modelo não carregou");
@@ -116,39 +119,49 @@
       relatar({ txt: `Lendo a lista de modelos (página ${pagina} de ${total ? paginas : "?"}; ${lista.length} até agora)…` });
       if (!novas.length) break;
     }
-    // só as serventias em que o usuário trabalha (se nenhuma estiver marcada no painel, todas as que têm serventia)
     const { automacao = {} } = await chrome.storage.sync.get("automacao");
     const minhas = Object.entries(automacao).filter(([, a]) => a.ativa).map(([n]) => chaveServ(n));
-    const tipoOk = (x) => /decis|despach|sentenc/.test(sem(x.tipo));   // só decisão, despacho e sentença (ignora citação, ofício, certidão etc.)
-    const unica = lista.filter((x) => x.serventia && tipoOk(x) && (!minhas.length || minhas.some((k) => chaveServ(x.serventia) === k || chaveServ(x.serventia).includes(k) || k.includes(chaveServ(x.serventia)))));
-    const aviso = (total && lista.length !== total ? `A lista informa ${total} modelos, mas li ${lista.length}. ` : "") + `${unica.length} modelo(s) de decisão/despacho/sentença das suas serventias${minhas.length ? "" : " (nenhuma marcada no painel: li todas)"}.`;
+    const doTipo = lista.filter((x) => x.serventia && tipoOk(x));
+    const daMinha = (x) => !minhas.length || minhas.some((k) => chaveServ(x.serventia) === k || chaveServ(x.serventia).includes(k) || k.includes(chaveServ(x.serventia)));
+    return { ok: true, total: lista.length, totalInformado: total, modelos: doTipo.map((x) => ({ id: x.id, nome: x.nome, serventia: x.serventia, tipo: x.tipo, minha: daMinha(x) })) };
+  }
+
+  // ETAPA 2 — lê o texto SÓ dos modelos escolhidos e guarda na extensão (chrome.storage.local). Nada é enviado ao Studio.
+  async function capturar(itens) {
+    cancelar = false;
+    if (!Array.isArray(itens) || !itens.length) throw new Error("nenhum modelo foi escolhido");
     const modelos = []; let anterior = "";
-    for (let i = 0; i < unica.length; i++) {
+    for (let i = 0; i < itens.length; i++) {
       if (cancelar) throw new Error("cancelado");
-      const m = unica[i];
-      relatar({ txt: `Lendo o texto do modelo ${i + 1} de ${unica.length}: ${m.nome}`, feitos: i, total: unica.length });
+      const m = itens[i];
+      relatar({ txt: `Lendo o texto do modelo ${i + 1} de ${itens.length}: ${m.nome}`, feitos: i, total: itens.length });
       let html;
       try { html = await carregarTexto(m, anterior); anterior = html; } catch (e) { relatar({ txt: "⚠ " + e.message }); modelos.push({ ...m, texto: "", erro: e.message }); continue; }
       const texto = htmlParaTexto(html);
-      modelos.push({ ...m, texto, hash: hash(texto) });
+      modelos.push({ id: m.id, nome: m.nome, serventia: m.serventia, tipo: m.tipo, texto, hash: hash(texto), lidoEm: Date.now() });
     }
-    // agrupa por serventia e compara com a captura anterior
+    // junta ao que já estava cadastrado (o que foi relido substitui o de mesmo id) e compara para dizer o que mudou
     const { modelos: antes } = await chrome.storage.local.get("modelos");
-    const servs = {}; const diff = { novos: [], alterados: [], excluidos: [] };
-    for (const m of modelos) (servs[m.serventia || "(sem serventia)"] ||= { modelos: [] }).modelos.push(m);
-    const velhos = new Map(Object.values(antes?.serventias || {}).flatMap((s) => s.modelos).map((m) => [m.id, m]));
-    for (const m of modelos) { const v = velhos.get(m.id); if (!v) diff.novos.push(m); else if (v.hash !== m.hash && !m.erro) diff.alterados.push(m); velhos.delete(m.id); }
-    diff.excluidos = [...velhos.values()];
-    const novo = { atualizadoEm: Date.now(), serventias: servs, diff: { novos: diff.novos.map((m) => m.id), alterados: diff.alterados.map((m) => m.id), excluidos: diff.excluidos.map((m) => ({ id: m.id, nome: m.nome, serventia: m.serventia })) } };
-    await chrome.storage.local.set({ modelos: novo });
-    return { ok: true, total: modelos.length, falhas: modelos.filter((m) => m.erro).length, aviso, diff: novo.diff };
+    const servs = JSON.parse(JSON.stringify(antes?.serventias || {})); const diff = { novos: [], alterados: [] };
+    const velhos = new Map(Object.values(servs).flatMap((x) => x.modelos).map((m) => [m.id, m]));
+    for (const m of modelos) {
+      if (m.erro) continue;
+      const v = velhos.get(m.id);
+      if (!v) diff.novos.push(m.id); else if (v.hash !== m.hash) diff.alterados.push(m.id);
+      for (const sv of Object.values(servs)) sv.modelos = sv.modelos.filter((x) => x.id !== m.id);
+      (servs[m.serventia || "(sem serventia)"] ||= { modelos: [] }).modelos.push(m);
+    }
+    for (const k of Object.keys(servs)) if (!servs[k].modelos.length) delete servs[k];
+    await chrome.storage.local.set({ modelos: { atualizadoEm: Date.now(), serventias: servs, diff } });
+    return { ok: true, total: modelos.length, falhas: modelos.filter((m) => m.erro).length, diff };
   }
 
   chrome.runtime.onMessage.addListener((m, _s, responder) => {
     if (m?.acao === "modelos-ping") { responder({ ok: true }); return false; }
     if (m?.acao === "modelos-cancelar") { cancelar = true; responder({ ok: true }); return false; }
+    if (m?.acao === "modelos-listar") { listar().then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
     if (m?.acao !== "modelos-capturar") return false;
-    capturar().then(responder, (e) => responder({ ok: false, erro: String(e.message || e) }));
+    capturar(m.itens).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) }));
     return true;
   });
 })();

@@ -4,7 +4,7 @@ const sa = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLow
 const BASE = "https://projudi.tjgo.jus.br/";
 const link = (p) => (p.url ? new URL(p.url, BASE).href : "");
 const ROTULO = { naoAnalisadas: "Não analisadas", preAnalisadas: "Pré-analisadas" };
-let estado = null, aberto = false;
+let estado = null, aberto = false, clsAberto = false;      // clsAberto: a tabela “Por classificador” começa recolhida e o usuário a expande
 // Dois perfis (dois juízes) na MESMA unidade listam os mesmos processos: cada processo aparece uma só vez (o do primeiro perfil lido) e o perfil repetido não soma de novo.
 function deduplicar(e) {
   if (!e?.serventias) return e;
@@ -94,10 +94,10 @@ function desenhar() {
     o[p.tipo]++; porCls.set(k, o);
   }
   if (porCls.size) {
-    h += "<h2>Por classificador (todas as serventias)</h2><table><tr><th>Classificador</th><th>Não analisadas</th><th>Pré-analisadas</th></tr>";
+    h += `<details id="det-cls" class="bloco" ${clsAberto ? "open" : ""}><summary>Por classificador (todas as serventias) <span class="qtd">— ${porCls.size} classificador(es); clique para ${clsAberto ? "recolher" : "expandir"}</span></summary><table><tr><th>Classificador</th><th>Não analisadas</th><th>Pré-analisadas</th></tr>`;
     [...porCls].sort((a, b) => (b[1].naoAnalisadas + b[1].preAnalisadas) - (a[1].naoAnalisadas + a[1].preAnalisadas))
       .forEach(([k, o]) => (h += `<tr><td class="cls">${esc(k)}</td><td class="n">${o.naoAnalisadas}</td><td class="n">${o.preAnalisadas}</td></tr>`));
-    h += "</table>";
+    h += "</table></details>";
   }
 
   // 3a) Baixar PDFs para análise: o assessor marca as serventias (varas) em que trabalha; a extensão baixa os processos delas
@@ -133,7 +133,6 @@ function desenhar() {
     const jaFeitos = cand.filter((p) => sitProc[p.processo]?.feito).length;
     h += `<div class="opcoes"><label><input type="checkbox" data-op="refazer" ${opcoes.refazer ? "checked" : ""}> Baixar de novo também os já baixados <small>(${jaFeitos} já baixado(s)/na esteira — por padrão ficam desmarcados)</small></label> <a href="esteira.html" target="_blank">Abrir a esteira de minutas</a></div>` +
       `<div class="opcoes"><b>3) Depois de baixar:</b><br>` +
-      `<label><input type="checkbox" data-op="atualizarBase" ${opcoes.atualizarBase ? "checked" : ""}> Cadastrar/atualizar a <b>base de conhecimento</b> do Studio com os modelos das varas selecionadas (PDF único por vara, substitui o antigo)</label><br>` +
       `<label><input type="checkbox" data-op="studio" ${opcoes.studio ? "checked" : ""}> <b>Iniciar a análise</b> de cada PDF no Studio, uma de cada vez, com o prompt da vara:</label>` +
       `<label class="radio"><input type="radio" name="modoStudio" data-modo="analise" ${opcoes.modo === "analise" ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> Análise dos processos (Gerar Minuta Judicial)</label>` +
       `<label class="radio"><input type="radio" name="modoStudio" data-modo="lupa" ${opcoes.modo === "lupa" ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> Lupa do Magistrado <small>(pega a minuta do assessor em “Visualizar” das pré-analisadas, sobe os autos na Lupa e clica em Auditar)</small></label>` +
@@ -243,10 +242,11 @@ function csv() {
       const sem = [...new Set(itens.filter((i) => !i.prompt).map((i) => i.serventia))];
       if (sem.length) { alert("Defina o prompt destas serventias antes de enviar ao Studio (campo “Prompt no Studio” na tabela de serventias):\n\n" + sem.join("\n")); return; }
     }
-    await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/" + hoje, opcoes: { atualizarBase: opcoes.atualizarBase, studio: { ativo: opcoes.studio, modo: opcoes.modo, docs: false } } } });
+    await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/" + hoje, opcoes: { atualizarBase: false, studio: { ativo: opcoes.studio, modo: opcoes.modo, docs: false } } } });
     chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + id) });
   });
   $("csv").onclick = csv;
+  document.addEventListener("toggle", (e) => { if (e.target && e.target.id === "det-cls") clsAberto = e.target.open; }, true);
   $("abrir").onclick = () => { aberto = !aberto; $("abrir").textContent = aberto ? "Recolher tudo" : "Expandir tudo"; desenhar(); };
   $("atualizar").onclick = () => chrome.runtime.sendMessage({ acao: "verificar" });
   desenhar();

@@ -1,23 +1,43 @@
 <!doctype html>
+<html lang="pt-BR">
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Modelos do Projudi — Conclusões Projudi</title>
 <style>
-  body { font: 14px system-ui, sans-serif; margin: 0; padding: 16px 24px; max-width: 980px; color: #222; }
+  body { font: 14px system-ui, sans-serif; margin: 0; padding: 16px 24px; max-width: 1080px; color: #222; }
   h1 { font-size: 18px; margin: 0 0 4px; } .dica { color: #666; font-size: 12px; }
   .serv { border: 1px solid #c3cfdf; border-radius: 8px; padding: 10px 14px; margin: 12px 0; }
-  .serv h2 { font-size: 15px; margin: 0 0 4px; } input[type=text] { width: 100%; padding: 5px 8px; box-sizing: border-box; }
   button { padding: 6px 12px; cursor: pointer; margin: 6px 6px 0 0; } .ok { color: #1a7a1a; } .erro { color: #b00020; } .msg { margin-top: 6px; font-weight: 600; }
-  @media (prefers-color-scheme: dark) { body { background: #1c1d21; color: #e6e6e6; } .dica { color: #aaa; } .serv { border-color: #3d4a5e; } }
 </style>
-<h1>Modelos do Projudi (decisões, despachos e sentenças)</h1>
-<p class="dica">Um PDF por serventia, com todos os modelos, para a <b>Base de Conhecimento</b> do app de IA (que só aceita PDF). Ao enviar, o documento de mesmo nome é
-<b>substituído</b> (o antigo é excluído e o novo enviado), então nunca duplica. Os modelos ficam só neste computador.</p>
-<div class="serv"><b>Atualizar do Projudi</b>
-  <div class="dica">Com o Projudi aberto e logado (em qualquer tela), a extensão abre Cadastros → Modelo, percorre a lista e lê só o texto dos modelos de decisão, despacho e sentença das suas serventias (novos, alterados e excluídos são considerados a cada vez). Não use o Projudi enquanto ela trabalha.</div>
-  <button id="atualizar">Atualizar modelos do Projudi</button><button id="cancelarCap" hidden>Cancelar</button>
-  <div class="msg" id="progresso"></div><div id="mudancas" class="dica"></div></div>
-<p id="vazio" class="dica" hidden>Ainda não há modelos capturados. Clique em “Atualizar modelos do Projudi”.</p>
-<div id="lista"></div>
+<header class="topo"><div><h1>Modelos do Projudi</h1>
+  <p class="dica">Escolha quais modelos de decisão, despacho e sentença você quer usar. Eles ficam <b>cadastrados nesta extensão</b>, neste computador — nada é enviado ao Studio.</p></div></header>
+
+<section class="card" id="passo1">
+  <h2><span class="passo">1</span> Listar os modelos do Projudi</h2>
+  <p class="dica">Com o Projudi aberto e logado (em qualquer tela), a extensão abre Cadastros → Modelo e só <b>lê os nomes</b>. Depois você escolhe quais capturar. Não use o Projudi enquanto ela trabalha.</p>
+  <button id="listar" class="primary">Listar modelos do Projudi</button><button id="cancelarCap" hidden>Cancelar</button>
+  <div class="msg" id="progresso"></div>
+</section>
+
+<section class="card" id="passo2" hidden>
+  <h2><span class="passo">2</span> Escolher o que capturar</h2>
+  <div class="barra-filtros">
+    <input type="search" id="filtro" placeholder="Filtrar por nome, serventia ou tipo…">
+    <label class="chk"><input type="checkbox" id="soMinhas" checked> só das serventias que eu marquei no painel</label>
+    <button id="marcarTodos">Marcar todos os visíveis</button><button id="limparSel">Limpar seleção</button>
+  </div>
+  <div id="escolha"></div>
+  <div class="rodape-acao"><span id="contagem" class="dica"></span><button id="capturar" class="primary" disabled>Capturar os modelos escolhidos</button></div>
+  <div id="mudancas" class="dica"></div>
+</section>
+
+<section class="card">
+  <h2>Modelos cadastrados na extensão</h2>
+  <p id="vazio" class="dica" hidden>Ainda não há modelos cadastrados. Use o passo 1 e o passo 2 acima.</p>
+  <div id="lista"></div>
+</section>
 <script src="sugestoes.js"></script>
 <script src="vendor/pdf-lib.min.js"></script>
 <script type="module" src="modelos.js"></script>
+<link rel="stylesheet" href="tema.css">
+</html>

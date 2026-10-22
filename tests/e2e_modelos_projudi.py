@@ -65,27 +65,47 @@ def main():
         sw.evaluate("(n) => chrome.storage.sync.set({automacao: {[n]: {ativa: true}}})", SERV)
         proj = ctx.new_page(); proj.goto("http://localhost:8776/"); proj.wait_for_timeout(2500)
         pg = ctx.new_page(); pg.goto(f"chrome-extension://{ext_id}/modelos.html"); pg.wait_for_selector("body[data-pronto='1']")
+        assert pg.locator("#passo2").is_hidden()
 
-        def capturar():
-            pg.evaluate("() => { delete document.body.dataset.capturado; delete document.body.dataset.erro; }")
-            pg.click("#atualizar")
+        def esperar_dado(chave):
             for _ in range(400):
-                if pg.evaluate("() => !!(document.body.dataset.capturado || document.body.dataset.erro)"): break
+                if pg.evaluate("(c) => !!(document.body.dataset[c] || document.body.dataset.erro)", chave): break
                 pg.wait_for_timeout(250)
             assert pg.evaluate("() => document.body.dataset.erro") is None, pg.evaluate("() => document.body.dataset.erro")
-            return json.loads(pg.evaluate("() => document.body.dataset.capturado"))
-        r1 = capturar(); print(r1, pg.inner_text("#mudancas"))
-        assert r1["total"] == 20 and r1["falhas"] == 0 and len(r1["diff"]["novos"]) == 20
+            return json.loads(pg.evaluate("(c) => document.body.dataset[c]", chave))
+        def listar():
+            pg.evaluate("() => { delete document.body.dataset.listado; delete document.body.dataset.erro; }")
+            pg.click("#listar"); return esperar_dado("listado")
+        def capturar():
+            pg.evaluate("() => { delete document.body.dataset.capturado; delete document.body.dataset.erro; }")
+            pg.click("#capturar"); return esperar_dado("capturado")
+        # 1) lista primeiro (sem ler o texto): só decisão/despacho/sentença; as das suas serventias vêm marcadas
+        l1 = listar(); print("listados:", len(l1["modelos"]), "das minhas:", sum(1 for m in l1["modelos"] if m["minha"]))
+        assert sum(1 for m in l1["modelos"] if m["minha"]) == 20 and not pg.locator("#passo2").is_hidden()
+        assert pg.evaluate("() => chrome.storage.local.get('modelos')") == {} or not (pg.evaluate("() => chrome.storage.local.get('modelos')") or {}).get("modelos"), "nada deve ser capturado antes da escolha"
+        assert "Capturar 20 modelo(s)" in pg.inner_text("#capturar"), pg.inner_text("#capturar")
+        # 2) escolhe só 3 pela tela e captura: só esses 3 são lidos e guardados na extensão
+        pg.click("#limparSel"); boxes = pg.locator("#escolha input[data-id]")
+        for i in range(3): boxes.nth(i).check()
+        assert "Capturar 3 modelo(s)" in pg.inner_text("#capturar")
+        r0 = capturar(); print("3 escolhidos:", r0["total"], r0["diff"]); assert r0["total"] == 3 and len(r0["diff"]["novos"]) == 3
+        assert pg.locator("button[data-a=enviar]").count() == 0, "não existe mais envio ao Studio"
+        # 3) captura o resto (as das suas serventias que ainda não estão cadastradas)
+        l2 = listar(); assert "Capturar 17 modelo(s)" in pg.inner_text("#capturar"), pg.inner_text("#capturar")
+        r1 = capturar(); print(r1); assert r1["total"] == 17 and r1["falhas"] == 0
         guardado = sw.evaluate("() => chrome.storage.local.get('modelos')")["modelos"]
         ms = guardado["serventias"][SERV]["modelos"]
-        assert len(ms) == 20 and ms[0]["texto"] == "Texto do modelo 1.\nSegundo parágrafo do 1." and {m["tipo"] for m in ms} == {"Decisão", "Despacho", "Sentença"}, ms[0]
-        assert "Modelo 20 teste" in pg.inner_text("#lista") or "20 modelo(s)" in pg.inner_text("#lista")
-        # muda um modelo e exclui outro no "Projudi": a segunda captura aponta alterado e excluído
+        assert len(ms) == 20 and {m["tipo"] for m in ms} == {"Decisão", "Despacho", "Sentença"}, len(ms)
+        assert any(m["texto"] == "Texto do modelo 1.\nSegundo parágrafo do 1." for m in ms), [m["texto"][:30] for m in ms[:3]]
+        assert "20 modelo(s)" in pg.inner_text("#lista")
+        # 4) muda um modelo e exclui outro no "Projudi": relê e vê o que mudou; o que já estava cadastrado continua guardado
         DADOS["modelos"][2]["texto"] = "<p>Texto NOVO do modelo 3.</p>"
         excluido = DADOS["modelos"].pop(5)
-        r2 = capturar(); print(r2["diff"], pg.inner_text("#mudancas"))
-        assert r2["total"] == 19 and r2["diff"]["alterados"] == ["504003"] and [e["id"] for e in r2["diff"]["excluidos"]] == [str(excluido["id"])] and r2["diff"]["novos"] == []
-        assert "1</b> alterado" in pg.inner_html("#mudancas") and "Atualize o PDF" in pg.inner_text("#mudancas")
+        listar(); pg.click("#limparSel"); pg.locator("#escolha input[data-id]").nth(2).check()
+        r2 = capturar(); print(r2["diff"])
+        assert r2["total"] == 1 and len(r2["diff"]["alterados"]) == 1 and r2["diff"]["novos"] == []
+        ms2 = sw.evaluate("() => chrome.storage.local.get('modelos')")["modelos"]["serventias"][SERV]["modelos"]
+        assert len(ms2) == 20 and any(m["texto"] == "Texto NOVO do modelo 3." for m in ms2)
         ctx.close()
     print("OK")
 
