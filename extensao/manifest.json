@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Conclusões Projudi",
-  "version": "1.0.50",
+  "version": "1.0.51",
   "description": "Confere automaticamente as conclusões não analisadas e pré-analisadas de cada serventia no Projudi/TJGO.",
   "permissions": [
     "activeTab",
@@ -64,21 +64,11 @@
         "arquivos-core.js",
         "baixador.js",
         "gerarpdf.js",
-        "copiar-tela.js",
         "modelos-projudi.js"
       ],
       "all_frames": true,
       "match_about_blank": true,
       "match_origin_as_fallback": true,
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "https://assessor-judicial.ai.studio/*"
-      ],
-      "js": [
-        "studio-diag.js"
-      ],
       "run_at": "document_idle"
     },
     {
