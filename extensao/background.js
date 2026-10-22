@@ -1,10 +1,15 @@
 const DOMINIO = "tjgo.jus.br";
 const BASE = "https://projudi.tjgo.jus.br/";
 const LISTA = BASE + "Usuario?PaginaAtual=9";
-const PADRAO = { filtro: "Montes Claros", notificar: true };
+const PADRAO = { filtro: "", notificar: true };      // filtro de serventias vazio = todas (vários juízes, de comarcas diferentes, usam a extensão)
 let rodando = false;
 
-const getCfg = async () => ({ ...PADRAO, ...(await chrome.storage.sync.get(PADRAO)) });
+// o padrão antigo era "Montes Claros": uma única vez, esse valor (que quase sempre era só o padrão gravado) volta a vazio
+async function limparFiltroAntigo() {
+  const c = await chrome.storage.sync.get({ filtro: "", filtroPadraoLimpo: false });
+  if (!c.filtroPadraoLimpo) await chrome.storage.sync.set({ filtroPadraoLimpo: true, ...(c.filtro === "Montes Claros" ? { filtro: "" } : {}) });
+}
+const getCfg = async () => { await limparFiltroAntigo(); return { ...PADRAO, ...(await chrome.storage.sync.get(PADRAO)) }; };
 
 async function garantirOffscreen() {
   const ja = await chrome.runtime.getContexts({ contextTypes: ["OFFSCREEN_DOCUMENT"] });

@@ -56,13 +56,15 @@ def main():
         estado = None
         time.sleep(3)
         assert sw.evaluate("chrome.storage.local.get('estado')").get("estado") is None      # nada roda sozinho ao instalar
+        assert sw.evaluate("chrome.storage.sync.get({ filtro: 'x' })")["filtro"] == "x"                  # padrão: nenhum filtro de serventia (vale para todas)
+        sw.evaluate("chrome.storage.sync.set({ filtro: 'Montes Claros' })")                  # neste teste o usuário filtra por "Montes Claros"
         sw.evaluate("verificar()")                                                         # só roda quando o usuário manda
         for _ in range(40):
             estado = sw.evaluate("chrome.storage.local.get('estado')").get("estado")
             if estado and estado["status"] in ("ok", "erro", "deslogado"): break
             time.sleep(1)
         print(*chamadas, sep="\n")
-        assert estado["status"] == "ok" and len(estado["serventias"]) == 1, estado   # filtro "Montes Claros" tira Anápolis
+        assert estado["status"] == "ok" and len(estado["serventias"]) == 1, estado   # o filtro "Montes Claros" tira Anápolis
         s = estado["serventias"][0]
         assert "mudou de serventia" in (s.get("erro") or ""), s
         assert not s["linhas"], s

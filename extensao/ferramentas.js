@@ -16,7 +16,8 @@ ocrConfig();
 
 // ajustes que antes ficavam na janelinha da extensão
 (async () => {
-  const PADRAO = { filtro: "Montes Claros", notificar: true };
+  const PADRAO = { filtro: "", notificar: true };
+  { const c = await chrome.storage.sync.get({ filtro: "", filtroPadraoLimpo: false }); if (!c.filtroPadraoLimpo) await chrome.storage.sync.set({ filtroPadraoLimpo: true, ...(c.filtro === "Montes Claros" ? { filtro: "" } : {}) }); }      // o padrão antigo era "Montes Claros"
   const cfg = { ...PADRAO, ...(await chrome.storage.sync.get(PADRAO)) };
   $("filtro").value = cfg.filtro; $("notificar").checked = cfg.notificar;
   const salvar = () => chrome.storage.sync.set({ filtro: $("filtro").value, notificar: $("notificar").checked });
