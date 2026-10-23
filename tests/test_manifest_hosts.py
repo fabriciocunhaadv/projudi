@@ -1,11 +1,13 @@
-"""O Studio pode estar no endereço principal (AI Studio) ou no servidor reserva: a extensão tem de agir nos dois (permissão + os dois grupos de scripts do Studio)."""
+"""A extensão só age no servidor oficial (judicial.assessor.net.br); a ligação com assessor-judicial.ai.studio foi removida."""
 import json, pathlib
 m = json.loads((pathlib.Path(__file__).parent.parent / "extensao" / "manifest.json").read_text())
-HOSTS = ["https://assessor-judicial.ai.studio/*", "https://judicial.assessor.net.br/*"]
-for h in HOSTS:
-    assert h in m["host_permissions"], f"falta em host_permissions: {h}"
+NOVO, ANTIGO = "https://judicial.assessor.net.br/*", "https://assessor-judicial.ai.studio/*"
+assert NOVO in m["host_permissions"], "falta em host_permissions"
+assert ANTIGO not in m["host_permissions"], "o endereço antigo ainda está nas permissões"
 grupos = [c for c in m["content_scripts"] if "studio-base.js" in c["js"] or "studio-main.js" in c["js"]]
 assert len(grupos) == 2, grupos
 for c in grupos:
-    for h in HOSTS: assert h in c["matches"], f"falta em {c['js']}: {h}"
+    assert NOVO in c["matches"], f"falta em {c['js']}"
+    assert ANTIGO not in c["matches"], f"endereço antigo em {c['js']}"
+assert "assessor-judicial.ai.studio" not in (pathlib.Path(__file__).parent.parent / "extensao" / "studio-cliente.js").read_text()
 print("OK", m["version"])

@@ -12,7 +12,7 @@ Esta extensão do Google Chrome auxilia assessores e magistrados do TJGO no trab
 ## Quais dados a extensão acessa
 1. **Páginas do Projudi (`*.tjgo.jus.br`)**: lista de conclusões, dados e PDFs dos processos que você manda baixar, modelos de decisão/despacho/sentença do seu cadastro e o texto do editor de minutas. Esse conteúdo é lido apenas para executar a função que você pediu.
 2. **PDFs e OCR**: os PDFs gerados pelo Projudi são baixados e o OCR é feito **localmente**, no navegador. Os arquivos ficam na pasta de downloads do seu computador.
-3. **App Assessor Judicial / AI Studio (`*.ai.studio`)**: se você ativar a opção, a extensão envia o PDF do processo e o PDF de modelos **para o app que você já usa, com a sua conta**, e lê de volta a minuta gerada. O tratamento nesse app segue os termos e a política do próprio app e do Google.
+3. **App Assessor Judicial (`judicial.assessor.net.br`)**: se você ativar a opção, a extensão envia o PDF do processo e o PDF de modelos **para o app que você já usa, com a sua conta**, e lê de volta a minuta gerada. O tratamento nesse app segue os termos e a política do próprio app e do Google.
 4. **Google Docs**: se você ativar a opção, a extensão usa a sua autorização Google (escopo `documents`) para **criar um documento na sua conta** com a minuta e, depois, ler o texto que você conferiu. O acesso é feito com o seu token, diretamente entre o seu navegador e o Google; nenhum outro destinatário recebe esses dados.
 
 ## O que fica guardado no navegador
@@ -20,7 +20,7 @@ Esta extensão do Google Chrome auxilia assessores e magistrados do TJGO no trab
 - **Dados temporários de trabalho** (lista de processos da fila, modelos capturados, PDFs aguardando análise na esteira, texto das minutas): ficam no armazenamento local do navegador, no seu computador, e podem ser limpos pelos botões da própria extensão ou removendo a extensão.
 
 ## Permissões e para que servem
-- **Sites do TJGO, ai.studio, Google Docs/APIs**: ler e operar as telas e criar o documento, como descrito acima.
+- **Sites do TJGO, judicial.assessor.net.br, Google Docs/APIs**: ler e operar as telas e criar o documento, como descrito acima.
 - **downloads**: salvar os PDFs. **storage**: guardar configurações e a fila. **tabs/scripting**: abrir e conduzir as abas necessárias. **notifications**: avisar o fim das tarefas. **identity**: login Google para o Docs. **clipboardWrite**: copiar a minuta quando o login Google não está configurado.
 
 ## Compartilhamento

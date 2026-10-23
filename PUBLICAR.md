@@ -7,7 +7,7 @@
 4. Aba **Listagem da loja**: nome, descrição (o que faz, para assessores/magistrados do TJGO), categoria *Produtividade*, ícone 128×128 (`extensao/icone.png`), ao menos 1 captura de tela (1280×800) e idioma Português (Brasil).
 5. Aba **Privacidade**:
    - Finalidade única: "Auxiliar o trabalho de assessoria no Projudi: baixar PDFs de processos com OCR, formatar minutas e organizar o envio ao Studio/Google Docs."
-   - Justifique cada permissão (downloads, storage, tabs/scripting, identity [login Google para criar o Docs], clipboardWrite, notifications, hosts do TJGO, ai.studio e Google Docs).
+   - Justifique cada permissão (downloads, storage, tabs/scripting, identity [login Google para criar o Docs], clipboardWrite, notifications, hosts do TJGO, judicial.assessor.net.br e Google Docs).
    - Declare que processa **conteúdo de processos** apenas no navegador do usuário, que **não há servidor próprio** nem venda de dados; e informe uma URL de política de privacidade (pode ser uma página simples do GitHub Pages/Google Sites).
 6. Aba **Distribuição**: Visibilidade **Privada** → "Testadores confiáveis" (lista de e-mails Google dos assessores/juízes) **ou** "Não listada" (só quem tem o link). Evite "Pública".
 7. **Enviar para revisão.** A primeira revisão leva de horas a alguns dias (por pedir acesso a vários sites, pode demorar mais).

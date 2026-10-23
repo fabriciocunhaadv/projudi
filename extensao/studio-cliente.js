@@ -1,5 +1,5 @@
-// Fala com a aba do app "Assessor Judicial" (AI Studio) a partir de páginas da extensão.
-export const STUDIO_URL = "https://assessor-judicial.ai.studio/";
+// Fala com a aba do app "Assessor Judicial" (judicial.assessor.net.br) a partir de páginas da extensão.
+export const STUDIO_URL = "https://judicial.assessor.net.br/";
 const dorme = (ms) => new Promise((ok) => setTimeout(ok, ms));
 
 export async function acharStudio() {
