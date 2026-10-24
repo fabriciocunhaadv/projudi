@@ -1,13 +1,19 @@
-// Fala com a aba do app "Assessor Judicial" (judicial.assessor.net.br) a partir de páginas da extensão.
+// Fala com a aba do app "Assessor Judicial" a partir de páginas da extensão. Há dois endereços do app: o PRINCIPAL (judicial.assessor.net.br) e o que usa MySQL (judicial-mysql.assessor.net.br).
+// Se os dois estiverem abertos, vale o principal; se só o do MySQL estiver aberto, a extensão trabalha nele; se nenhum estiver aberto, abre o principal.
 export const STUDIO_URL = "https://judicial.assessor.net.br/";
+export const DOMINIOS_STUDIO = [STUDIO_URL, "https://judicial-mysql.assessor.net.br/"];      // ordem de prioridade
 const dorme = (ms) => new Promise((ok) => setTimeout(ok, ms));
 
-export async function acharStudio() {
-  const padroes = chrome.runtime.getManifest().content_scripts.find((c) => c.js.includes("studio-base.js")).matches;
-  let [aba] = await chrome.tabs.query({ url: padroes });
-  if (!aba) aba = await chrome.tabs.create({ url: STUDIO_URL, active: false });
-  for (let i = 0; i < 60; i++) {     // espera a página carregar e o script da extensão responder
-    try { if ((await chrome.tabs.sendMessage(aba.id, { acao: "studio-ping" }))?.ok) return aba; } catch (e) { /* ainda carregando */ }
+/** Abas do app em ordem de prioridade: todas as do endereço principal, depois as do MySQL (a ordem entre abas do mesmo endereço é mantida). */
+export function abasDoStudioEmOrdem(abas) {
+  const lista = [];
+  for (const dominio of DOMINIOS_STUDIO) for (const a of abas || []) if (String(a?.url || "").startsWith(dominio)) lista.push(a);
+  return lista;
+}
+
+async function responde(aba, tentativas) {
+  for (let i = 0; i < tentativas; i++) {      // espera a página carregar e o script da extensão responder
+    try { if ((await chrome.tabs.sendMessage(aba.id, { acao: "studio-ping" }))?.ok) return true; } catch (e) { /* ainda carregando */ }
     if (i === 3) {      // aba aberta antes de a extensão ser (re)carregada: o script antigo morreu; injeta o novo sem precisar atualizar a página
       try {
         await chrome.scripting.executeScript({ target: { tabId: aba.id, allFrames: true }, func: () => { delete window.__projudiStudioBase; } });
@@ -16,6 +22,16 @@ export async function acharStudio() {
     }
     await dorme(1000);
   }
+  return false;
+}
+
+export async function acharStudio() {
+  const padroes = chrome.runtime.getManifest().content_scripts.find((c) => c.js.includes("studio-base.js")).matches;
+  const abertas = abasDoStudioEmOrdem(await chrome.tabs.query({ url: padroes }));
+  // tenta as abas já abertas na ordem de prioridade (principal primeiro); uma aba que não responde (sem a extensão, por exemplo) não impede de usar a seguinte
+  for (const aba of abertas) if (await responde(aba, abertas.length > 1 ? 8 : 60)) return aba;
+  const nova = abertas.length ? null : await chrome.tabs.create({ url: STUDIO_URL, active: false });      // nenhuma aberta: abre o principal
+  if (nova && (await responde(nova, 60))) return nova;
   throw new Error("abra o app Assessor Judicial (e entre com a sua conta) e tente de novo");
 }
 

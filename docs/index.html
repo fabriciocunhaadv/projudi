@@ -11,7 +11,7 @@
 <h2>Quais dados a extensão acessa</h2>
 <p>1. <strong>Páginas do Projudi (<code>*.tjgo.jus.br</code>)</strong>: lista de conclusões, dados e PDFs dos processos que você manda baixar, modelos de decisão/despacho/sentença do seu cadastro e o texto do editor de minutas. Esse conteúdo é lido apenas para executar a função que você pediu.</p>
 <p>2. <strong>PDFs e OCR</strong>: os PDFs gerados pelo Projudi são baixados e o OCR é feito <strong>localmente</strong>, no navegador. Os arquivos ficam na pasta de downloads do seu computador.</p>
-<p>3. <strong>App Assessor Judicial (<code>judicial.assessor.net.br</code>)</strong>: se você ativar a opção, a extensão envia o PDF do processo e o PDF de modelos <strong>para o app que você já usa, com a sua conta</strong>, e lê de volta a minuta gerada. O tratamento nesse app segue os termos e a política do próprio app e do Google.</p>
+<p>3. <strong>App Assessor Judicial (<code>judicial.assessor.net.br</code> e, na versão com banco MySQL, <code>judicial-mysql.assessor.net.br</code>)</strong>: se você ativar a opção, a extensão envia o PDF do processo e o PDF de modelos <strong>para o app que você já usa, com a sua conta</strong>, e lê de volta a minuta gerada. O tratamento nesse app segue os termos e a política do próprio app e do Google.</p>
 <p>4. <strong>Google Docs</strong>: se você ativar a opção, a extensão usa a sua autorização Google (escopo <code>documents</code>) para <strong>criar um documento na sua conta</strong> com a minuta e, depois, ler o texto que você conferiu. O acesso é feito com o seu token, diretamente entre o seu navegador e o Google; nenhum outro destinatário recebe esses dados.</p>
 <h2>O que fica guardado no navegador</h2>
 <ul>
@@ -20,7 +20,7 @@
 </ul>
 <h2>Permissões e para que servem</h2>
 <ul>
-<li><strong>Sites do TJGO, judicial.assessor.net.br, Google Docs/APIs</strong>: ler e operar as telas e criar o documento, como descrito acima.</li>
+<li><strong>Sites do TJGO, judicial.assessor.net.br e judicial-mysql.assessor.net.br, Google Docs/APIs</strong>: ler e operar as telas e criar o documento, como descrito acima.</li>
 <li><strong>downloads</strong>: salvar os PDFs. <strong>storage</strong>: guardar configurações e a fila. <strong>tabs/scripting</strong>: abrir e conduzir as abas necessárias. <strong>notifications</strong>: avisar o fim das tarefas. <strong>identity</strong>: login Google para o Docs. <strong>clipboardWrite</strong>: copiar a minuta quando o login Google não está configurado.</li>
 </ul>
 <h2>Compartilhamento</h2>

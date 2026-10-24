@@ -20,7 +20,7 @@ m["name"] = "Conclusões Projudi (TESTE)"
 m["action"]["default_title"] = "Conclusões Projudi (TESTE)"
 if "COLE_AQUI" in json.dumps(m.get("oauth2", {})):
     m.pop("oauth2", None); m["permissions"] = [x for x in m.get("permissions", []) if x != "identity"]
-m["host_permissions"] = [h for h in m["host_permissions"] if h != "https://judicial.assessor.net.br/*"] + ["https://ai.studio/*", "https://*.run.app/*", "https://aistudio.google.com/*"]
+m["host_permissions"] = [h for h in m["host_permissions"] if h not in ("https://judicial.assessor.net.br/*", "https://judicial-mysql.assessor.net.br/*")] + ["https://ai.studio/*", "https://*.run.app/*", "https://aistudio.google.com/*"]
 for cs in m["content_scripts"]:
     if "https://judicial.assessor.net.br/*" in cs["matches"]:
         cs["matches"] = PAGINAS_TESTE + ["https://*.run.app/*"]      # a página do AI Studio com o app de teste (o app roda num quadro *.run.app dentro dela)
