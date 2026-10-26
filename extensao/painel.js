@@ -4,6 +4,15 @@ const sa = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLow
 const BASE = "https://projudi.tjgo.jus.br/";
 const link = (p) => (p.url ? new URL(p.url, BASE).href : "");
 const ROTULO = { naoAnalisadas: "Não analisadas", preAnalisadas: "Pré-analisadas" };
+// Serventias e cargos (perfis) que o usuário escondeu: não aparecem nem entram nos totais, e a verificação nem os lê. Guardado na conta do Chrome (leve, sem banco).
+let ocultas = { servs: [], cargos: [] }, falhasLeitura = {};
+const salvarOcultas = () => chrome.storage.sync.set({ ocultas });
+function aplicarOcultas(e) {
+  if (!e?.serventias) return e;
+  return { ...e, serventias: e.serventias.filter((s) => !ocultas.servs.includes(s.serventia) && !ocultas.cargos.includes(s.perfil)) };
+}
+let estadoCheio = null;
+const guardarEstado = (e) => { estadoCheio = e; estado = aplicarOcultas(e); };
 let estado = null, aberto = false, clsAberto = false;      // clsAberto: a tabela “Por classificador” começa recolhida e o usuário a expande
 // Dois perfis (dois juízes) na MESMA unidade listam os mesmos processos: cada processo aparece uma só vez (o do primeiro perfil lido) e o perfil repetido não soma de novo.
 function deduplicar(e) {
@@ -74,7 +83,7 @@ function desenhar() {
   if (estado.status === "erro") return (el.innerHTML = `<div class="msg erro">Erro: ${esc(estado.mensagem)}</div>`);
 
   // 1) Resumo: uma linha por serventia
-  let h = "<h2>Resumo por serventia</h2><table><tr><th>Serventia</th><th>Perfil</th><th>Não analisadas</th><th>Pré-analisadas</th><th>Urgentes</th></tr>";
+  let h = "<h2>Resumo por serventia</h2><table><tr><th>Serventia</th><th>Perfil</th><th>Não analisadas</th><th>Pré-analisadas</th><th>Urgentes</th><th></th></tr>";
   let tNa = 0, tPre = 0, tUrg = 0;
   for (const s of estado.serventias) {
     const na = s.linhas.reduce((n, l) => n + l.naoAnalisadas, 0), pre = s.linhas.reduce((n, l) => n + l.preAnalisadas, 0);
@@ -82,9 +91,14 @@ function desenhar() {
     tNa += na; tPre += pre; tUrg += urg;
     const lis = (k) => (s.processos?.[k] || []).length;
     const c = (n, k) => `<td class="n ${n ? "alerta" : "zero"}">${n}${n !== lis(k) && (n || lis(k)) ? `<br><small>(lista: ${lis(k)})</small>` : ""}</td>`;
-    h += `<tr><td><a href="${esc(s.url)}" target="_blank">${esc(s.serventia)}</a>${s.repetida ? "<br><small>(mesma unidade de outro perfil: processos já contados acima)</small>" : ""}${s.erro ? `<br><span class="erro">${esc(s.erro)}</span>` : ""}${(s.avisos || []).map((a) => `<br><span class="aviso">⚠ ${a.tipo === "naoAnalisadas" ? "não analisadas" : "pré-analisadas"}: a tela inicial conta ${a.esperado}, mas só ${a.lido} vieram na lista</span>`).join("")}</td><td>${esc(s.perfil)}</td>${c(na, "naoAnalisadas")}${c(pre, "preAnalisadas")}<td class="n ${urg ? "alerta" : "zero"}">${urg}</td></tr>`;
+    h += `<tr><td><a href="${esc(s.url)}" target="_blank">${esc(s.serventia)}</a>${s.repetida ? "<br><small>(mesma unidade de outro perfil: processos já contados acima)</small>" : ""}${s.erro ? `<br><span class="erro">${esc(s.erro)}</span>${(falhasLeitura[s.serventia + "|" + s.perfil] || 0) >= 2 ? ' <b class="aviso">falhou em ' + falhasLeitura[s.serventia + "|" + s.perfil] + ' verificações seguidas — ocultar?</b>' : ""}` : ""}${(s.avisos || []).map((a) => `<br><span class="aviso">⚠ ${a.tipo === "naoAnalisadas" ? "não analisadas" : "pré-analisadas"}: a tela inicial conta ${a.esperado}, mas só ${a.lido} vieram na lista</span>`).join("")}</td><td>${esc(s.perfil)}</td>${c(na, "naoAnalisadas")}${c(pre, "preAnalisadas")}<td class="n ${urg ? "alerta" : "zero"}">${urg}</td><td class="ocultar"><button data-ocultar-serv="${esc(s.serventia)}" title="Não mostrar nem ler mais esta serventia">ocultar serventia</button> <button data-ocultar-cargo="${esc(s.perfil)}" title="Não mostrar nem ler mais este cargo (ex.: juiz que saiu)">ocultar cargo</button></td></tr>`;
   }
-  h += `<tr><th colspan="2">Total</th><th class="n">${tNa}</th><th class="n">${tPre}</th><th class="n">${tUrg}</th></tr></table>`;
+  h += `<tr><th colspan="2">Total</th><th class="n">${tNa}</th><th class="n">${tPre}</th><th class="n">${tUrg}</th><th></th></tr></table>`;
+  const nOc = ocultas.servs.length + ocultas.cargos.length;
+  if (nOc) h += `<details class="bloco"><summary>Ocultas (${nOc}) <span class="qtd">— não aparecem nem são lidas; clique para reativar</span></summary>` +
+    ocultas.servs.map((n) => `<div>Serventia: <b>${esc(n)}</b> <button data-reativar-serv="${esc(n)}">reativar</button></div>`).join("") +
+    ocultas.cargos.map((n) => `<div>Cargo: <b>${esc(n)}</b> <button data-reativar-cargo="${esc(n)}">reativar</button></div>`).join("") +
+    `<small>Depois de reativar, clique em “Verificar agora” para ler de novo.</small></details>`;
 
   // 2) Por classificador (todas as serventias juntas)
   const porCls = new Map();
@@ -189,9 +203,11 @@ function csv() {
 }
 
 (async () => {
-  estado = deduplicar((await chrome.storage.local.get("estado")).estado);
+  ocultas = { servs: [], cargos: [], ...((await chrome.storage.sync.get({ ocultas: {} })).ocultas) };
+  falhasLeitura = (await chrome.storage.local.get({ falhas: {} })).falhas;
+  guardarEstado(deduplicar((await chrome.storage.local.get("estado")).estado));
   await carregarSituacao();
-  chrome.storage.onChanged.addListener((c, area) => { if (area === "local" && c.estado) { estado = deduplicar(c.estado.newValue); desenhar(); } });
+  chrome.storage.onChanged.addListener((c, area) => { if (area === "local" && c.estado) { guardarEstado(deduplicar(c.estado.newValue)); desenhar(); } });
   chrome.storage.onChanged.addListener(async (c, area) => {      // andamento da fila/esteira: atualiza a coluna "Situação na automação"
     if (area === "local" && Object.keys(c).some((k) => k === "baixados" || k.startsWith("esteira_"))) { await carregarSituacao(); desenhar(); }
   });
@@ -231,6 +247,12 @@ function csv() {
     desenhar();
   });
   $("conteudo").addEventListener("click", async (e) => {
+    const d = e.target.dataset || {};
+    const mexer = (lista, v, add) => { const i = ocultas[lista].indexOf(v); if (add && i < 0) ocultas[lista].push(v); if (!add && i >= 0) ocultas[lista].splice(i, 1); salvarOcultas(); estado = aplicarOcultas(estadoCheio); desenhar(); };
+    if (d.ocultarServ !== undefined) return mexer("servs", d.ocultarServ, true);
+    if (d.ocultarCargo !== undefined) return mexer("cargos", d.ocultarCargo, true);
+    if (d.reativarServ !== undefined) return mexer("servs", d.reativarServ, false);
+    if (d.reativarCargo !== undefined) return mexer("cargos", d.reativarCargo, false);
     if (!e.target.closest || !e.target.closest("#baixarLote")) return;
     const fila = window.__candidatos || [];   // já na ordem de trabalho
     if (!fila.length) return;

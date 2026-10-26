@@ -3,6 +3,7 @@ const BASE = "https://projudi.tjgo.jus.br/";
 const LISTA = BASE + "Usuario?PaginaAtual=9";
 const PADRAO = { filtro: "", notificar: true };      // filtro de serventias vazio = todas (vários juízes, de comarcas diferentes, usam a extensão)
 let rodando = false;
+const getOcultas = async () => { const o = (await chrome.storage.sync.get({ ocultas: {} })).ocultas || {}; return { servs: o.servs || [], cargos: o.cargos || [] }; };
 
 // o padrão antigo era "Montes Claros": uma única vez, esse valor (que quase sempre era só o padrão gravado) volta a vazio
 async function limparFiltroAntigo() {
@@ -89,8 +90,10 @@ async function verificar() {
     if (!lista.logado) return await terminar({ status: "deslogado" }, cfg);
 
     const filtros = cfg.filtro.split(";").map((f) => semAcento(f)).filter(Boolean);
+    const oc = await getOcultas();      // serventias/cargos que o usuário escondeu no painel: nem são lidos
     const alvos = lista.itens.filter((i) =>
-      !filtros.length || filtros.some((f) => semAcento(i.serventia).includes(f)));
+      (!filtros.length || filtros.some((f) => semAcento(i.serventia).includes(f))) && !oc.servs.includes(i.serventia) && !oc.cargos.includes(i.perfil));
+    const falhas = (await chrome.storage.local.get({ falhas: {} })).falhas;
 
     await chrome.storage.local.set({ debug: {} });
     const serventias = [];
@@ -135,9 +138,11 @@ async function verificar() {
       } catch (e) {
         s.erro = String(e.message || e);
       }
+      const kf = s.serventia + "|" + s.perfil; if (s.erro) falhas[kf] = (falhas[kf] || 0) + 1; else delete falhas[kf];      // erro repetido: o painel sugere ocultar
       serventias.push(s);
       await ocioso(1500); // ritmo humano
     }
+    await chrome.storage.local.set({ falhas });
     await terminar({ status: "ok", quando: Date.now(), serventias }, cfg);
   } catch (e) {
     await chrome.storage.local.set({ estado: { status: "erro", mensagem: String(e.message || e) } });
