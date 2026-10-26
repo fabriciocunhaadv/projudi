@@ -1,10 +1,10 @@
-// Fala com a aba do app "Assessor Judicial" a partir de páginas da extensão. Há dois endereços do app: o PRINCIPAL (judicial.assessor.net.br) e o que usa MySQL (judicial-mysql.assessor.net.br).
-// Se os dois estiverem abertos, vale o principal; se só o do MySQL estiver aberto, a extensão trabalha nele; se nenhum estiver aberto, abre o principal.
-export const STUDIO_URL = "https://judicial.assessor.net.br/";
-export const DOMINIOS_STUDIO = [STUDIO_URL, "https://judicial-mysql.assessor.net.br/"];      // ordem de prioridade
+// Fala com a aba do app "Assessor Judicial" a partir de páginas da extensão. A extensão trabalha SOMENTE no app com MySQL (judicial-mysql.assessor.net.br).
+// Se não houver aba aberta dele, a extensão abre uma.
+export const STUDIO_URL = "https://judicial-mysql.assessor.net.br/";
+export const DOMINIOS_STUDIO = [STUDIO_URL];
 const dorme = (ms) => new Promise((ok) => setTimeout(ok, ms));
 
-/** Abas do app em ordem de prioridade: todas as do endereço principal, depois as do MySQL (a ordem entre abas do mesmo endereço é mantida). */
+/** Abas do app (a ordem entre elas é mantida). */
 export function abasDoStudioEmOrdem(abas) {
   const lista = [];
   for (const dominio of DOMINIOS_STUDIO) for (const a of abas || []) if (String(a?.url || "").startsWith(dominio)) lista.push(a);
@@ -28,9 +28,9 @@ async function responde(aba, tentativas) {
 export async function acharStudio() {
   const padroes = chrome.runtime.getManifest().content_scripts.find((c) => c.js.includes("studio-base.js")).matches;
   const abertas = abasDoStudioEmOrdem(await chrome.tabs.query({ url: padroes }));
-  // tenta as abas já abertas na ordem de prioridade (principal primeiro); uma aba que não responde (sem a extensão, por exemplo) não impede de usar a seguinte
+  // tenta as abas já abertas na ordem de prioridade ; uma aba que não responde (sem a extensão, por exemplo) não impede de usar a seguinte
   for (const aba of abertas) if (await responde(aba, abertas.length > 1 ? 8 : 60)) return aba;
-  const nova = abertas.length ? null : await chrome.tabs.create({ url: STUDIO_URL, active: false });      // nenhuma aberta: abre o principal
+  const nova = abertas.length ? null : await chrome.tabs.create({ url: STUDIO_URL, active: false });      // nenhuma aberta: abre o app
   if (nova && (await responde(nova, 60))) return nova;
   throw new Error("abra o app Assessor Judicial (e entre com a sua conta) e tente de novo");
 }

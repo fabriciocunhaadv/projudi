@@ -1,4 +1,4 @@
-"""Dois apps abertos: a extensão usa o principal; só o MySQL aberto: usa o MySQL; nenhum: abre o principal."""
+"""A extensão só enxerga abas do app MySQL; abas do endereço principal e de outros sites são ignoradas."""
 import json, pathlib, shutil, subprocess, tempfile
 raiz = pathlib.Path(__file__).parent.parent / "extensao"
 tmp = pathlib.Path(tempfile.mkdtemp()); shutil.copy(raiz / "studio-cliente.js", tmp / "studio-cliente.mjs")
@@ -19,9 +19,9 @@ const r = {
 console.log(JSON.stringify(r));
 """ % tmp
 saida = json.loads(subprocess.run(["node", "--input-type=module", "-e", js], capture_output=True, text=True, check=True).stdout)
-assert saida["dois_mysql_na_frente"] == "2,1", saida      # principal primeiro, mesmo que a aba do MySQL seja a primeira da lista
-assert saida["so_mysql"] == "5" and saida["so_principal"] == "7", saida
-assert saida["varias"] == "4,6,3", saida                  # as do principal (na ordem) e depois a do MySQL
+assert saida["dois_mysql_na_frente"] == "1", saida      # a aba do endereço principal é ignorada
+assert saida["so_mysql"] == "5" and saida["so_principal"] == "", saida
+assert saida["varias"] == "3", saida
 assert saida["nenhuma"] == "" and saida["vazio"] == "" and saida["semlista"] == "", saida
-assert saida["padrao"] == "https://judicial.assessor.net.br/" and saida["ordem"][0] == saida["padrao"], saida
+assert saida["padrao"] == "https://judicial-mysql.assessor.net.br/" and saida["ordem"] == [saida["padrao"]], saida
 print("OK", saida)

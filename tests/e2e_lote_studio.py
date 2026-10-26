@@ -85,10 +85,10 @@ class HS(http.server.BaseHTTPRequestHandler):
 def main():
     tmp = Path(tempfile.mkdtemp()); ext = tmp / "ext"
     shutil.copytree(RAIZ, ext)
-    m = ext / "manifest.json"; m.write_text(m.read_text().replace("https://*.tjgo.jus.br/*", "http://localhost/*").replace("https://judicial.assessor.net.br/*", "http://127.0.0.1/*").replace("https://docs.google.com/document/*", "http://127.0.0.1/*"))
+    m = ext / "manifest.json"; m.write_text(m.read_text().replace("https://*.tjgo.jus.br/*", "http://localhost/*").replace("https://judicial-mysql.assessor.net.br/*", "http://127.0.0.1/*").replace("https://docs.google.com/document/*", "http://127.0.0.1/*"))
     d = ext / "docs-api.js"; d.write_text(d.read_text().replace("https://docs.googleapis.com/v1/documents", "http://127.0.0.1:8777/v1/documents").replace("https://docs.google.com/document/d/", "http://127.0.0.1:8777/d/").replace("const token = () =>", "const token = async () => 'tok-teste'; const _t = () =>"))
     m.write_text(m.read_text().replace("COLE_AQUI_O_CLIENT_ID", "teste"))
-    c = ext / "studio-cliente.js"; c.write_text(c.read_text().replace("https://judicial.assessor.net.br/", "http://127.0.0.1:8774/"))
+    c = ext / "studio-cliente.js"; c.write_text(c.read_text().replace("https://judicial-mysql.assessor.net.br/", "http://127.0.0.1:8774/"))
     (ext / "background.js").write_text((ext / "background.js").read_text().replace('const DOMINIO = "tjgo.jus.br";', 'const DOMINIO = "localhost";'))
     srv = http.server.HTTPServer(("localhost", 8770), H)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
