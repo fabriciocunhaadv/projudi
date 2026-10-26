@@ -117,7 +117,15 @@ async function paginaInvalida(tabId) {
 }
 // Pega um link NOVO do processo na lista da serventia (a lista é da serventia ativa na sessão: escolhe a do processo antes).
 async function urlFresca(item) {
-  const dig = chaveProc(item.processo), lista = BASE + (item.situacao === "preAnalisadas" ? "PreAnalisarConclusao?PaginaAtual=6&tipo=todas" : "PreAnalisarConclusao?PaginaAtual=2");
+  const dig = chaveProc(item.processo);
+  const listas = item.situacao === "preAnalisadas" ? ["PreAnalisarConclusao?PaginaAtual=6&tipo=todas", "PreAnalisarConclusao?PaginaAtual=2"] : ["PreAnalisarConclusao?PaginaAtual=2", "PreAnalisarConclusao?PaginaAtual=6&tipo=todas"];
+  // tenta a lista do processo e, se ele não estiver nela (mudou de situação), a outra; refaz tudo uma vez (o Projudi às vezes responde vazio logo após abrir outra janela)
+  for (let rodada = 0; rodada < 2; rodada++) for (const l of listas) {
+    const h = await urlFrescaNaLista(item, dig, BASE + l); if (h) return h;
+  }
+  return "";
+}
+async function urlFrescaNaLista(item, dig, lista) {
   const tab = await chrome.tabs.create({ url: lista, active: false });
   try {
     if (item.serventiaUrl) {
@@ -126,13 +134,14 @@ async function urlFresca(item) {
       await chrome.tabs.update(tab.id, { url: lista }); await dorme(600);
     }
     await carregou(tab.id); await dorme(1500);
-    for (let k = 0; k < 10; k++) {
+    for (let k = 0; k < 14; k++) {
       const r = await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, args: [dig], func: (d) => {
         const chave = (s) => { const t = String(s || ""), m = t.match(/(\d{1,7})[.\-](\d{1,2})(?!\d)/); return m ? m[1].padStart(7, "0") + m[2].padStart(2, "0") : t.replace(/\D/g, "").slice(0, 9); };
         const a = [...document.querySelectorAll("a[href*='Id_Processo']")].find((x) => chave(x.textContent) === d);
         return a ? a.href : "";
       } }).catch(() => []);
       const h = r.map((x) => x.result).find(Boolean); if (h) return h;
+      if (k === 5) await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, func: () => document.getElementById("formLocalizarBotao")?.click() }).catch(() => {});      // a lista pode vir vazia até apertar “Consultar”
       await dorme(1000);
     }
     return "";

@@ -712,7 +712,7 @@
           else throw falhar("a ata preliminar não foi gerada (a IA não respondeu)");
         }
       }
-      if (Date.now() - t0 > 12 * 60000) throw falhar("a ata preliminar não terminou em 12 minutos");
+      if (Date.now() - t0 > 20 * 60000) { const e = falhar("a ata preliminar não terminou em 20 minutos"); e.semRetry = false; throw e; }
       await dorme(1500);
     }
   }
