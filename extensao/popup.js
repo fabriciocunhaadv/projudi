@@ -4,6 +4,7 @@ const abrir = (arq) => { chrome.tabs.create({ url: chrome.runtime.getURL(arq) })
 $("painel").onclick = () => abrir("painel.html");
 $("ferramentas").onclick = () => abrir("ferramentas.html");
 $("ocr").onclick = () => abrir("ocr.html");
+$("texto").onclick = () => abrir("texto.html");
 $("pauta").onclick = () => abrir("pauta.html");
 
 function situacao(estado) {
