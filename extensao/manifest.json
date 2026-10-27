@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Conclusões Projudi",
-  "version": "1.0.61",
+  "version": "1.0.62",
   "description": "Confere automaticamente as conclusões não analisadas e pré-analisadas de cada serventia no Projudi/TJGO.",
   "permissions": [
     "activeTab",
@@ -11,7 +11,6 @@
     "power",
     "scripting",
     "storage",
-    "identity",
     "clipboardWrite",
     "tabGroups",
     "unlimitedStorage"
@@ -19,7 +18,6 @@
   "host_permissions": [
     "https://*.tjgo.jus.br/*",
     "https://judicial-mysql.assessor.net.br/*",
-    "https://docs.googleapis.com/*",
     "https://docs.google.com/*"
   ],
   "background": {
@@ -117,11 +115,5 @@
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
   },
-  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAswTqPViaQlMpnbKhl/ZrxElS0qeGWcJqgLMH4SIbsJ3C68paygEzAqBqnnXOghnj3K+/baRsyYCtezDbSMX2hAaiZ6Fr2M9+W/TOrKG5vPJhi08+vC+fEs3mPBbOmyjNO3Oen+ll9bt2D5lWvgSXcFhFJDbtKwv/Ta7GjQo/qSZZBygvfb4UblD+Wt70Xqh1lINcRyDRq1qXIJ5gR3ef4ImpywBAnxPmSqZgBs9+wXaXXtHnlIRURFf1S4qSWN8MQlhvWNnVgOaYb8gvZx2s03VPoPBUNchfAv96Km1y0/onl2E1O01LadJ7gizYzNhz7+F4OaqYSfbKhV7yuPHK1wIDAQAB",
-  "oauth2": {
-    "client_id": "COLE_AQUI_O_CLIENT_ID.apps.googleusercontent.com",
-    "scopes": [
-      "https://www.googleapis.com/auth/documents"
-    ]
-  }
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAswTqPViaQlMpnbKhl/ZrxElS0qeGWcJqgLMH4SIbsJ3C68paygEzAqBqnnXOghnj3K+/baRsyYCtezDbSMX2hAaiZ6Fr2M9+W/TOrKG5vPJhi08+vC+fEs3mPBbOmyjNO3Oen+ll9bt2D5lWvgSXcFhFJDbtKwv/Ta7GjQo/qSZZBygvfb4UblD+Wt70Xqh1lINcRyDRq1qXIJ5gR3ef4ImpywBAnxPmSqZgBs9+wXaXXtHnlIRURFf1S4qSWN8MQlhvWNnVgOaYb8gvZx2s03VPoPBUNchfAv96Km1y0/onl2E1O01LadJ7gizYzNhz7+F4OaqYSfbKhV7yuPHK1wIDAQAB"
 }

@@ -41,9 +41,8 @@ Todas usam dados fictícios (comarca "Exemplo", processos inventados).
 - **storage / unlimitedStorage:** guardar configurações, a fila de processos e as minutas no computador do usuário.
 - **clipboardWrite:** copiar para a área de transferência a minuta e o diagnóstico, a pedido do usuário.
 - **power:** impedir que o computador entre em suspensão enquanto a extensão processa em segundo plano um lote de processos (download dos PDFs e OCR, que levam vários minutos). Só mantém o computador acordado durante o processamento e libera assim que termina; nenhum dado é coletado por essa permissão.
-- **identity:** (opcional) entrar com a conta Google do próprio usuário para ler e abrir, no Google Docs dele, a minuta que ele mesmo está revisando. Não é usada para nenhuma outra finalidade.
 - **tabGroups:** agrupar, numa só janela, as abas do Google Docs e do PDF do processo.
-- **Acesso a sites:** *.tjgo.jus.br (Projudi: ler conclusões, gerar PDF, editor de minutas); *.ai.studio (app Assessor Judicial: enviar o PDF e ler a minuta); docs.google.com e docs.googleapis.com (abrir o documento da minuta).
+- **Acesso a sites:** *.tjgo.jus.br (Projudi: ler conclusões, gerar PDF, editor de minutas); judicial-mysql.assessor.net.br (app Assessor Judicial: enviar o PDF e ler a minuta); docs.google.com (abrir o documento da minuta ao lado do PDF; a minuta é copiada para o usuário colar, sem acesso à conta Google).
 
 **Uso de código remoto:** Não. Todo o código (incluindo pdf.js, tesseract.js e pdf-lib) está dentro do pacote.
 
@@ -53,3 +52,6 @@ Todas usam dados fictícios (comarca "Exemplo", processos inventados).
 
 ## Aba "Distribuição"
 Visibilidade: **Privada** (testadores confiáveis, com os e-mails Google dos assessores) ou **Não listada**. Regiões: Brasil.
+
+
+**Versão 1.0.62:** sem a permissão `identity`, sem o bloco `oauth2` e sem o host `docs.googleapis.com`. A extensão não acessa a conta Google do usuário; o documento do Google Docs é aberto em branco, com o título, e a minuta já fica copiada e formatada para colar.

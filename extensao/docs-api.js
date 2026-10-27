@@ -3,7 +3,9 @@ import { requisicoes, htmlMonografia, tipoDaMinuta, nomeDoc } from "./docs-core.
 export { tipoDaMinuta, nomeDoc };
 
 export const DOCS_API = "https://docs.googleapis.com/v1/documents";
-const configurado = () => { const id = chrome.runtime.getManifest().oauth2?.client_id || ""; return id && !/^COLE_AQUI/.test(id); };
+// A criação direta pela API do Google Docs fica DESLIGADA: o manifesto não pede mais "identity" nem o host da API (e não tem oauth2). Vale o Plano B abaixo (documento novo + minuta copiada para colar).
+// Para religar no futuro: pedir "identity" e "https://docs.googleapis.com/*" no manifesto e configurar oauth2.client_id.
+const configurado = () => { const id = chrome.runtime.getManifest().oauth2?.client_id || ""; return !!chrome.identity && !!id && !/^COLE_AQUI/.test(id); };
 const token = () => new Promise((ok, erro) => chrome.identity.getAuthToken({ interactive: true }, (t) => (chrome.runtime.lastError || !t ? erro(new Error(chrome.runtime.lastError?.message || "sem autorização do Google")) : ok(typeof t === "string" ? t : t.token))));
 
 async function chamar(url, t, corpo) {
