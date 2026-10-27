@@ -797,9 +797,9 @@
     }
     if (m?.acao === "studio-ler-minuta") { (m.processo ? carregarDoHistorico(m.processo, m.desde || 0) : Promise.resolve()).then(() => lerMinuta()).then((t) => responder({ ok: !!t, minuta: t, minutaHtml: minutaHtmlDoPainel(), erro: t ? "" : "não há minuta pronta na tela do app" })).catch((e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
     if (m?.acao === "studio-analisar") { window.__dicasPrompt = m.dicas || ""; window.__promptAproximado = ""; }
-    if (m?.acao === "studio-analisar" && (m.modo === "turbo" || m.modo === "mesa" || m.modo === "mesa-ler") && m.reqId) {      // análise longa: responde já e entrega o resultado pelo storage (o canal de mensagem pode cair no meio)
+    if (m?.acao === "studio-analisar" && m.reqId) {      // análise longa (qualquer modo): responde já e entrega o resultado pelo storage (o canal de mensagem pode cair no meio e a análise não se perde)
       const k = "studio_res_" + m.reqId;
-      automatico(m.modo === "mesa" ? mesa(m) : m.modo === "mesa-ler" ? mesaLer(m) : turbo(m)).catch((e) => ({ ok: false, erro: String(e.message || e), opcoes: e.opcoes, semRetry: !!e.semRetry, grande: !!e.grande })).then((r) => chrome.storage.local.set({ [k]: r }));
+      automatico(m.modo === "mesa" ? mesa(m) : m.modo === "mesa-ler" ? mesaLer(m) : m.modo === "lupa" ? lupa(m) : m.modo === "turbo" ? turbo(m) : analisar(m)).catch((e) => ({ ok: false, erro: String(e.message || e), opcoes: e.opcoes, semRetry: !!e.semRetry, grande: !!e.grande })).then((r) => chrome.storage.local.set({ [k]: r }));
       responder({ ok: true, assincrono: true }); return false;
     }
     if (m?.acao === "studio-analisar") { automatico(m.modo === "lupa" ? lupa(m) : m.modo === "turbo" ? turbo(m) : analisar(m)).then(responder, (e) => responder({ ok: false, erro: String(e.message || e), opcoes: e.opcoes })); return true; }

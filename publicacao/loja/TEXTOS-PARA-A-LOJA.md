@@ -55,3 +55,5 @@ Visibilidade: **Privada** (testadores confiáveis, com os e-mails Google dos ass
 
 
 **Versão 1.0.62:** sem a permissão `identity`, sem o bloco `oauth2` e sem o host `docs.googleapis.com`. A extensão não acessa a conta Google do usuário; o documento do Google Docs é aberto em branco, com o título, e a minuta já fica copiada e formatada para colar.
+
+**Versão 1.0.63:** inclui tudo da 1.0.62 e torna a análise mais robusta: o resultado passa a chegar pelo armazenamento local da extensão (não depende de um canal de mensagem aberto), e, se a conexão com a aba do assistente cair, a fila procura a minuta já pronta no histórico antes de tentar de novo. Nenhuma permissão nova.

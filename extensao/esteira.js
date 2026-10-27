@@ -31,6 +31,22 @@ async function entregar(it, bytes, minuta, mensagem, html = "", injecao = null, 
   return atualizar(it.id, { estado: "concluido", minuta: minuta || "", minutaHtml: html, tipo: tipoDaMinuta(minuta), aviso, injecao });
 }
 
+// Queda do canal com a aba do Studio (aba recarregada ou fechada, extensão recarregada, análise longa): a análise pode ter terminado lá. Antes de gastar cota de novo, procura a minuta pronta no
+// Histórico do app; só vale a minuta gravada DEPOIS do início desta tentativa. Tenta agora e mais uma vez depois de 1 minuto (se o app ainda estiver terminando).
+const CANAL_PERDIDO = /message channel closed|channel closed|asynchronous response|Receiving end does not exist|Extension context invalidated|foi fechada durante|recarregou durante|não terminou em \d+ minutos|não recebeu o pedido/i;
+async function recuperarDoStudio(it, rodada, valida) {
+  const desde = Math.floor(rodada) - 2000;
+  for (let t = 0; t < 2; t++) {
+    if (t) await new Promise((ok) => setTimeout(ok, 60000));
+    if (!(await valida())) return true;      // o usuário escolheu outro caminho: não mexe mais
+    try {
+      const m = await lerMinutaAtual(it.processo, desde);
+      if (m?.texto) { await entregar(it, await lerPdf(it.id), m.texto, "", m.html || ""); return true; }
+    } catch (e) { /* ainda não há minuta pronta (ou a aba do Studio não está aberta) */ }
+  }
+  return false;
+}
+
 async function analisar(it) {
   const intervaloTurbo = () => { if (it.modo === "turbo") pausaTurboAte = Date.now() + 60000; };      // janela de 1 minuto da cota gratuita: o próximo Turbo espera 60 s
   const rodada = Date.now() + Math.random();
@@ -52,6 +68,10 @@ async function analisar(it) {
     await entregar(it, bytes, r.minuta, r.mensagem, r.minutaHtml || "", r.injecao || null, r.aproximado || "");
   } catch (e) {
     intervaloTurbo();
+    if ((it.modo === "analise" || it.modo === "turbo") && it.processo && CANAL_PERDIDO.test(e.message || "") && await valida()) {
+      await atualizar(it.id, { aviso: "A conexão com a aba do Studio caiu; procurando a minuta pronta no Histórico do app antes de tentar de novo…" });
+      if (await recuperarDoStudio(it, rodada, valida)) return;
+    }
     if (await valida()) {      // esteira automática: uma nova tentativa sozinha antes de dar erro (o app pode ter estado ocupado)
       const cur = (await todos()).find((x) => x.id === it.id) || it;
       const cota = /cota|quota|429|rate limit|\b503\b|alta demanda|pico tempor|resposta do servidor incompleta|formato inv[áa]lido|reiniciando/i.test(e.message || "");

@@ -59,10 +59,7 @@ export async function enviarBase(nome, bytes, substituir = false) {          // 
 export async function analisarNoStudio(bytes, opcoes) {
   const aba = await acharStudio();
   const arquivoId = opcoes.texto ? "" : await enviarArquivo(aba.id, bytes);
-  if (opcoes.modo === "turbo" || opcoes.modo === "mesa" || opcoes.modo === "mesa-ler") return analisarTurbo(aba, arquivoId, opcoes);
-  const r = await chrome.tabs.sendMessage(aba.id, { acao: "studio-analisar", arquivoId, ...opcoes });
-  if (!r?.ok) throw Object.assign(new Error(r?.erro || "o app não confirmou a análise"), { opcoes: r?.opcoes });
-  return r;
+  return analisarTurbo(aba, arquivoId, opcoes);      // todos os modos: o app responde logo e entrega o resultado pelo storage (queda do canal de mensagem não perde a análise)
 }
 
 // Lê a minuta que já está pronta na tela do app (sem analisar de novo).
@@ -81,7 +78,7 @@ export async function lerMinutaAtual(processo = "", desde = 0) {
   return { texto: r.minuta, html: r.minutaHtml || "" };
 }
 
-// Módulo Turbo: o app responde logo e grava o resultado no storage; assim uma queda do canal de mensagem não perde a análise.
+// Análise (qualquer modo): o app responde logo e grava o resultado no storage; assim uma queda do canal de mensagem não perde a análise.
 async function analisarTurbo(aba, arquivoId, opcoes) {
   const reqId = "t" + Date.now() + Math.random().toString(36).slice(2, 6), chave = "studio_res_" + reqId;
   let r;
@@ -89,14 +86,15 @@ async function analisarTurbo(aba, arquivoId, opcoes) {
   catch (e) { throw new Error("o app do Studio não recebeu o pedido (" + e.message + "). Atualize a aba do assessor-judicial e tente de novo"); }
   if (!r?.ok) throw Object.assign(new Error(r?.erro || "o app não confirmou a análise"), { opcoes: r?.opcoes });
   const t0 = Date.now(); let carregando = 0;
+  const limiteMin = opcoes.modo === "turbo" || opcoes.modo === "mesa" || opcoes.modo === "mesa-ler" ? 18 : 45;      // análise normal e Lupa podem esperar a cota da IA renovar
   for (;;) {
     const res = (await chrome.storage.local.get(chave))[chave];
-    if (res) { await chrome.storage.local.remove(chave); if (!res.ok) throw Object.assign(new Error(res.erro || "o Módulo Turbo falhou"), { opcoes: res.opcoes, semRetry: !!res.semRetry, grande: !!res.grande }); return res; }
+    if (res) { await chrome.storage.local.remove(chave); if (!res.ok) throw Object.assign(new Error(res.erro || "a análise falhou no app"), { opcoes: res.opcoes, semRetry: !!res.semRetry, grande: !!res.grande }); return res; }
     const aba2 = await chrome.tabs.get(aba.id).catch(() => null);
     if (!aba2) throw new Error("a aba do assessor-judicial foi fechada durante a análise");
     carregando = aba2.status === "loading" ? carregando + 1 : 0;
     if (carregando > 90) throw new Error("a aba do assessor-judicial recarregou durante a análise (ficou mais de 3 minutos carregando; confira se o Studio terminou de atualizar e tente de novo)");      // o Studio pode demorar a reabrir depois de uma atualização
-    if (Date.now() - t0 > 18 * 60000) throw new Error("o Módulo Turbo/Mesa não terminou em 18 minutos");
+    if (Date.now() - t0 > limiteMin * 60000) throw new Error(`a análise não terminou em ${limiteMin} minutos`);
     await dorme(2000);
   }
 }
