@@ -17,14 +17,12 @@ function escolher(lista) {
   $("status").textContent = arquivos.length ? `${arquivos.length} arquivo(s): ${arquivos.map((f) => f.name).join(", ")}` : "";
 }
 
-function salvarBlob(nome, blob) {
+function baixar(nome, texto) {
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
+  a.href = URL.createObjectURL(new Blob(["﻿" + texto], { type: "text/plain;charset=utf-8" }));      // BOM: o Bloco de Notas abre com os acentos certos
   a.download = nome; document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 30000);
 }
-const baixar = (nome, texto) => salvarBlob(nome, new Blob(["\ufeff" + texto], { type: "text/plain;charset=utf-8" }));      // BOM: o Bloco de Notas abre com os acentos certos
-const baixarPdf = (nome, bytes) => salvarBlob(nome, new Blob([bytes], { type: "application/pdf" }));
 
 async function copiar(texto, botao) {
   try { await navigator.clipboard.writeText(texto); botao.textContent = "Copiado ✓"; }
@@ -43,11 +41,7 @@ function mostrar(r) {
   const barra = document.createElement("div");
   const bx = document.createElement("button"); bx.textContent = "Baixar .txt"; bx.onclick = () => baixar(r.nome + ".txt", r.texto);
   const bc = document.createElement("button"); bc.textContent = "Copiar texto"; bc.onclick = () => copiar(r.texto, bc);
-  barra.append(bx, bc);
-  if (r.pdf) {
-    const bp = document.createElement("button"); bp.textContent = "Baixar PDF com OCR"; bp.onclick = () => baixarPdf(r.nome + "-OCR.pdf", r.pdf); barra.append(bp);
-  } else if (r.ocr === 0 && r.temPdf) { const n = document.createElement("span"); n.className = "dica"; n.textContent = " (todas as páginas já tinham texto: o PDF original já é pesquisável)"; barra.append(n); }
-  div.append(barra);
+  barra.append(bx, bc); div.append(barra);
   $("resultados").append(div);
 }
 
@@ -62,14 +56,13 @@ async function converter(arquivo, opcoes) {
   });
   let texto = await textoDoPdf(r.bytes);
   if (!opcoes.marcadores) texto = texto.replace(/^\[Página \d+(?: de \d+)?\]\n/gm, "");
-  const comOcr = opcoes.gerarPdf && r.ocr > 0;      // sem páginas-imagem o PDF volta igual ao original: não há o que baixar
-  return { texto, paginas: r.total, ocr: r.ocr, pdf: comOcr ? r.bytes : null, temPdf: !!opcoes.gerarPdf };
+  return { texto, paginas: r.total, ocr: r.ocr };
 }
 
 async function iniciar() {
   rodando = true; cancelado = false; resultados.length = 0;
   $("iniciar").disabled = true; $("cancelar").disabled = false; $("resultados").textContent = ""; $("unir").hidden = true;
-  const opcoes = { escala: +$("escala").value, paralelo: +$("paralelo").value, forcar: $("forcar").checked, marcadores: $("marcadores").checked, gerarPdf: $("gerarPdf").checked };
+  const opcoes = { escala: +$("escala").value, paralelo: +$("paralelo").value, forcar: $("forcar").checked, marcadores: $("marcadores").checked };
   const usados = new Set();
   for (const f of arquivos) {
     if (cancelado) break;
@@ -87,7 +80,6 @@ async function iniciar() {
   rodando = false; $("cancelar").disabled = true; $("iniciar").disabled = !arquivos.length;
   $("status").textContent = cancelado ? "Cancelado." : `Pronto: ${resultados.length} de ${arquivos.length} arquivo(s) convertido(s).`; $("barra").hidden = true;
   $("unir").hidden = resultados.length < 2;
-  $("baixarPdfs").hidden = !resultados.some((x) => x.pdf);
   document.body.dataset.pronto = "1";
 }
 
@@ -101,6 +93,5 @@ async function iniciar() {
   z.ondrop = (e) => { e.preventDefault(); z.classList.remove("sobre"); escolher(e.dataTransfer.files); };
   $("iniciar").onclick = iniciar;
   $("cancelar").onclick = () => { cancelado = true; $("status").textContent = "Cancelando…"; };
-  $("baixarPdfs").onclick = async () => { for (const r of resultados) if (r.pdf) { baixarPdf(r.nome + "-OCR.pdf", r.pdf); await new Promise((ok) => setTimeout(ok, 700)); } };
   $("baixarTudo").onclick = () => baixar("textos-dos-pdfs.txt", resultados.map((r) => `===== ${r.nome}.pdf =====\n${r.texto}`).join("\n\n"));
 })();
