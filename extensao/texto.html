@@ -21,12 +21,13 @@ as que são imagem (escaneadas) passam por OCR. Tudo roda no seu computador: nen
   <label>Qualidade do OCR <select id="escala"><option value="1.6">Rápida</option><option value="2.2">Normal</option><option value="3" selected>Alta (recomendada)</option></select></label>
   <label>PDFs em paralelo <select id="paralelo"></select></label><br>
   <label><input type="checkbox" id="forcar"> Refazer OCR mesmo nas páginas que já têm texto</label><br>
-  <label><input type="checkbox" id="marcadores" checked> Marcar o início de cada página no texto (“[Página 3 de 120]”)</label>
+  <label><input type="checkbox" id="marcadores" checked> Marcar o início de cada página no texto (“[Página 3 de 120]”)</label><br>
+  <label><input type="checkbox" id="gerarPdf" checked> Gerar também o <b>PDF com OCR</b> (pesquisável), além do .txt</label>
 </p>
 <p><button id="iniciar" disabled>Converter em texto</button> <button id="cancelar" disabled>Cancelar</button> <span id="status"></span></p>
 <progress id="barra" value="0" max="1" hidden></progress>
 <div id="resultados"></div>
-<div id="unir" hidden><button id="baixarTudo">Baixar tudo em um único .txt</button> <span class="dica">cada arquivo separado por uma linha com o nome do PDF</span></div>
+<div id="unir" hidden><button id="baixarTudo">Baixar tudo em um único .txt</button> <span class="dica">cada arquivo separado por uma linha com o nome do PDF</span> <button id="baixarPdfs" hidden>Baixar todos os PDFs com OCR</button></div>
 <div id="log"></div>
 <script src="tabs-retry.js"></script>
 <script src="vendor/pdf-lib.min.js"></script>

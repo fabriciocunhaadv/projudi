@@ -40,6 +40,13 @@ with sync_playwright() as p:
         pg.click("#baixarTudo")
     junto = Path(dl2.value.path()).read_text(encoding="utf-8-sig")
     assert "===== misto.pdf =====" in junto and "===== projudi.pdf =====" in junto
+    # PDF com OCR: o PDF misto (2 páginas escaneadas) devolve o pesquisável; o do Projudi também precisou de OCR (1 página imagem)
+    assert r[0]["pdf"] and len(r[0]["pdf"]) > 1000, "faltou o PDF com OCR"
+    assert pg.locator("button:has-text('Baixar PDF com OCR')").count() == 2 and pg.is_visible("#baixarPdfs")
+    with pg.expect_download() as dl3:
+        pg.locator("button:has-text('Baixar PDF com OCR')").first.click()
+    assert dl3.value.suggested_filename == "misto-OCR.pdf", dl3.value.suggested_filename
+    assert Path(dl3.value.path()).read_bytes()[:4] == b"%PDF"
     # sem marcadores de página
     pg.reload(); pg.set_input_files("#arquivo", [str(tmp / "projudi.pdf")]); pg.uncheck("#marcadores"); pg.click("#iniciar")
     pg.wait_for_selector("body[data-pronto='1']", timeout=300000)
