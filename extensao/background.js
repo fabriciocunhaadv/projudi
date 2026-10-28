@@ -273,7 +273,7 @@ chrome.runtime.onMessage.addListener((m, s, responder) => {
 
 
 // ---------- OCR automático dos PDFs baixados do Projudi ----------
-// Quando um PDF de *.tjgo.jus.br termina de baixar, abre a página de OCR em segundo plano.
+// Só se a pessoa ligar a opção em Ferramentas (padrão: desligada). Quando um PDF de *.tjgo.jus.br termina de baixar, abre a página de OCR em segundo plano.
 // Ela lê o arquivo, faz OCR só nas páginas-imagem e salva "<nome>-OCR.pdf" em Downloads.
 const tratados = new Set();
 const hostProjudi = (u) => { try { return new URL(u).hostname.endsWith(DOMINIO); } catch { return false; } };
@@ -286,7 +286,7 @@ chrome.downloads.onChanged.addListener(async (delta) => {
     if (!it || tratados.has(it.id) || it.byExtensionId === chrome.runtime.id) return; // não refaz o que a própria extensão baixou
     if (!hostProjudi(it.finalUrl || it.url) || !parecePdf(it)) return;
     const { ocr } = await chrome.storage.sync.get("ocr");
-    if ({ ocrAutomatico: true, ...ocr }.ocrAutomatico === false) return;
+    if (ocr?.ocrAuto !== true) return;      // desligado por padrão: o PDF baixado pelo botão do próprio Projudi não aciona a extensão; só liga se a pessoa marcar em Ferramentas
     tratados.add(it.id);
     await chrome.storage.local.set({ ["ocr_" + it.id]: { id: it.id, url: it.finalUrl || it.url, filename: it.filename } });
     await chrome.tabs.create({ url: chrome.runtime.getURL("ocr.html?auto=" + it.id), active: false });
