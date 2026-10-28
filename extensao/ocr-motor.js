@@ -7,6 +7,16 @@ const { PDFDocument, StandardFonts, TextRenderingMode, setTextRenderingMode, pus
 
 export { pdfjs };
 export const MIN_CHARS = 25; // página com menos texto que isto é tratada como imagem
+// Texto legível de qualquer erro (o Tesseract/worker às vezes rejeita com texto simples ou objeto, sem .message: antes aparecia "undefined").
+export function descreverErro(e) {
+  if (e instanceof Error) return e.message || e.name || "erro sem descrição";
+  if (typeof e === "string") return e || "erro sem descrição";
+  try {
+    const t = e && (e.message || e.error || e.reason || e.type || (e.data && (e.data.message || e.data.error)));
+    if (t) return String(t).slice(0, 200);
+    const j = JSON.stringify(e); return j && j !== "{}" ? j.slice(0, 200) : "erro sem descrição (falha no leitor de OCR)";
+  } catch { return "erro sem descrição (falha no leitor de OCR)"; }
+}
 export const fmt = (s) => (s < 90 ? `${Math.round(s)} s` : `${Math.round(s / 60)} min`);
 
 // Total de caracteres de texto da página (o carimbo do Projudi é tratado em precisaOcr, pela posição em relação à imagem).
@@ -143,18 +153,19 @@ export async function fazerOcr(bytes, opcoes, ganchos = {}) {
 
   // 2) OCR das páginas-imagem
   const ws = await criarWorkers(Math.min(opcoes.paralelo || 2, alvo.length));
-  const resultados = new Map();
+  const resultados = new Map(), puladas = [];
   let proximo = 0, feitas = 0;
   const t0 = performance.now();
   progresso(0, alvo.length);
-  try {
-    await Promise.all(ws.map(async (w) => {
-      while (!cancelado() && proximo < alvo.length) {
-        const i = alvo[proximo++];
-        const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: opcoes.escala || 3 });
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
+
+  // uma página, numa escala: desenha, melhora o contraste e reconhece
+  const lerPagina = async (w, i, escala) => {
+    const page = await pdf.getPage(i);
+    try {
+      const viewport = page.getViewport({ scale: escala });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
+      try {
         const ctx = canvas.getContext("2d", { willReadFrequently: true });
         ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
         await page.render({ canvasContext: ctx, canvas, viewport, intent: "print" }).promise;      // "print" não usa requestAnimationFrame: em aba escondida o rAF para e o OCR travava
@@ -165,8 +176,30 @@ export async function fazerOcr(bytes, opcoes, ganchos = {}) {
           const cx = (p.bbox.x0 + p.bbox.x1) / 2, cy = (p.bbox.y0 + p.bbox.y1) / 2;
           return !ja.some((r) => cx >= r.x0 && cx <= r.x1 && cy >= r.y0 && cy <= r.y1);   // já existe como texto: não duplica
         });
-        resultados.set(i, { palavras: novas, viewport });
-        canvas.width = canvas.height = 0; page.cleanup();
+        return { palavras: novas, viewport, escala };
+      } finally { canvas.width = canvas.height = 0; }
+    } finally { page.cleanup(); }
+  };
+
+  try {
+    await Promise.all(ws.map(async (_, k) => {
+      while (!cancelado() && proximo < alvo.length) {
+        const i = alvo[proximo++];
+        const escalaBase = opcoes.escala || 3;
+        const escalas = [escalaBase, 2, 1.5].filter((e, j, a) => e <= escalaBase && a.indexOf(e) === j);
+        let lida = null, motivo = "";
+        for (const esc of escalas) {
+          try { lida = await lerPagina(ws[k], i, esc); break; }
+          catch (e) {
+            if (cancelado()) throw new Error("cancelado");
+            motivo = descreverErro(e);
+            log(`  ⚠ página ${i}: falhou no OCR (escala ${esc}): ${motivo}${esc !== escalas[escalas.length - 1] ? " — tentando de novo em escala menor" : ""}`);
+            try { await ws[k].terminate(); } catch { /* já caiu */ }      // o leitor pode ter ficado inutilizável (memória do WASM): troca por um novo
+            try { ws[k] = (await criarWorkers(1))[0]; } catch (e2) { throw new Error("o leitor de OCR não reiniciou: " + descreverErro(e2)); }
+          }
+        }
+        if (lida) resultados.set(i, lida);
+        else { puladas.push({ pagina: i, motivo }); log(`  ✖ página ${i} ficou SEM OCR (${motivo}); as demais seguem normalmente.`); }
         feitas++;
         progresso(feitas, alvo.length);
         const decorrido = (performance.now() - t0) / 1000;
@@ -174,7 +207,7 @@ export async function fazerOcr(bytes, opcoes, ganchos = {}) {
       }
     }));
   } finally {
-    await Promise.all(ws.map((w) => w.terminate()));
+    await Promise.all(ws.map((w) => w.terminate().catch(() => {})));
   }
   if (cancelado()) throw new Error("cancelado");
 
@@ -183,8 +216,7 @@ export async function fazerOcr(bytes, opcoes, ganchos = {}) {
   const doc = await PDFDocument.load(bytes);
   const font = await doc.embedFont(StandardFonts.Helvetica);
   let palavras = 0;
-  const s = opcoes.escala || 3;
-  for (const [i, { palavras: ps, viewport }] of resultados) {
+  for (const [i, { palavras: ps, viewport, escala: s }] of resultados) {
     const page = doc.getPage(i - 1);
     page.pushOperators(pushGraphicsState(), setTextRenderingMode(TextRenderingMode.Invisible));
     for (const w of ps) {
@@ -199,12 +231,12 @@ export async function fazerOcr(bytes, opcoes, ganchos = {}) {
     page.pushOperators(popGraphicsState());
   }
   const saida = await doc.save();
-  log(`  ${palavras} palavras reconhecidas em ${alvo.length} página(s).`);
+  log(`  ${palavras} palavras reconhecidas em ${resultados.size} página(s)${puladas.length ? `; ${puladas.length} sem OCR (${puladas.map((x) => x.pagina).join(", ")})` : ""}.`);
 
   // 4) conferência: o texto agora é extraível?
   const novo = await pdfjs.getDocument({ data: saida.slice() }).promise;
   let ok = 0;
   for (const i of alvo.slice(0, 5)) { const p = await novo.getPage(i); if ((await textoDaPagina(p)) >= MIN_CHARS) ok++; }
   log(`  Conferência: ${ok}/${Math.min(5, alvo.length)} páginas testadas já têm texto selecionável.`);
-  return { bytes: saida, ocr: alvo.length, total: n, palavras, paginasOcr: alvo };
+  return { bytes: saida, ocr: resultados.size, total: n, palavras, paginasOcr: [...resultados.keys()], puladas };
 }

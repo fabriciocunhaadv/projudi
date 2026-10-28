@@ -39,6 +39,16 @@ def main():
         PDF["bytes"] = entrada.read_bytes()
 
         pg = ctx.new_page(); pg.goto("http://localhost:8767/")
+        # padrão (1.0.64): o botão de baixar do próprio Projudi NÃO aciona a extensão
+        with pg.expect_download() as dl0:
+            pg.click("#a")
+        dl0.value.path()
+        pg.wait_for_timeout(6000)
+        assert not [q for q in ctx.pages if "ocr.html?auto=" in q.url], "OCR automático não deve abrir por padrão"
+        print("padrão desligado: ok")
+
+        # só quando a opção é ligada em Ferramentas
+        sw.evaluate("chrome.storage.sync.set({ ocr: { ocrAuto: true } })")
         with pg.expect_download() as dl:       # o assessor clica em "baixar" no Projudi
             pg.click("#a")
         dl.value.path()                          # espera terminar

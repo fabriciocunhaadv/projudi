@@ -1,5 +1,5 @@
 // Página de OCR: tela, arrastar/soltar e OCR automático dos PDFs baixados do Projudi. O trabalho pesado está em ocr-motor.js.
-import { fazerOcr, fmt } from "./ocr-motor.js";
+import { fazerOcr, fmt, descreverErro } from "./ocr-motor.js";
 import { textoDoPdf } from "./pdf-texto.js";
 import { extrairPauta } from "./pauta-extrator.js";
 import { chaveProc } from "./proc-chave.js";
@@ -43,14 +43,14 @@ async function obterBytes(job) {
       if (r.ok && ehPdf(b)) return { bytes: b, origem: "arquivo baixado" };
       falhas.push("arquivo local ilegível");
     } else falhas.push("acesso a arquivos locais desligado");
-  } catch (e) { falhas.push("arquivo local: " + e.message); }
+  } catch (e) { falhas.push("arquivo local: " + descreverErro(e)); }
   // 2) baixar de novo pelo mesmo endereço, com a sua sessão do Projudi
   try {
     const r = await fetch(job.url, { credentials: "include", cache: "no-store" });
     const b = new Uint8Array(await r.arrayBuffer());
     if (r.ok && ehPdf(b)) return { bytes: b, origem: "novo download" };
     falhas.push(`o endereço não devolveu PDF (HTTP ${r.status})`);
-  } catch (e) { falhas.push("novo download: " + e.message); }
+  } catch (e) { falhas.push("novo download: " + descreverErro(e)); }
   throw new Error(falhas.join("; "));
 }
 
@@ -103,10 +103,10 @@ async function automatico(idDownload) {
     setTimeout(() => window.close(), 4000);
   } catch (e) {
     rodando = false; $("cancelar").disabled = true;
-    log("✖ " + e.message);
+    log("✖ " + descreverErro(e));
     $("status").innerHTML = '<span class="erro">Não consegui ler o PDF baixado.</span> Solte o arquivo aqui em cima, ou ative “Permitir acesso a URLs de arquivo” nos detalhes da extensão (chrome://extensions).';
     avisar("OCR do PDF do Projudi", "Não consegui ler o PDF baixado. Abra a página de OCR e solte o arquivo, ou ative “Permitir acesso a URLs de arquivo” na extensão.");
-    document.body.dataset.erro = e.message;
+    document.body.dataset.erro = descreverErro(e);
   }
 }
 
@@ -169,30 +169,30 @@ async function interceptado(idJob) {
         const dados = extrairPauta(await textoDoPdf(res.bytes));
         await chrome.storage.local.set({ ["pauta_res_" + chaveProc(job.nome)]: { dados, ts: Date.now(), pdf: arqPdf } });
       }
-    } catch (e) { log("⚠ pauta: " + e.message); }
-    try { await salvar(new Blob([await textoDoPdf(res.bytes)], { type: "text/plain;charset=utf-8" }), num + "-OCR.txt"); log("Texto do PDF salvo: " + num + "-OCR.txt"); } catch (e) { log("⚠ não consegui salvar o .txt: " + e.message); }      // o texto de cada processo baixado fica ao lado do PDF
+    } catch (e) { log("⚠ pauta: " + descreverErro(e)); }
+    try { await salvar(new Blob([await textoDoPdf(res.bytes)], { type: "text/plain;charset=utf-8" }), num + "-OCR.txt"); log("Texto do PDF salvo: " + num + "-OCR.txt"); } catch (e) { log("⚠ não consegui salvar o .txt: " + descreverErro(e)); }      // o texto de cada processo baixado fica ao lado do PDF
     $("status").textContent = `Pronto: ${arqPdf}`;
     document.body.dataset.salvo = arqPdf;
-    avisar("PDF do processo pronto", `${num}-OCR.pdf salvo (${res.ocr} de ${res.total} páginas com OCR).`);
+    avisar("PDF do processo pronto", `${num}-OCR.pdf salvo (${res.ocr} de ${res.total} páginas com OCR${res.puladas && res.puladas.length ? `; ${res.puladas.length} página(s) sem OCR: ${res.puladas.map((x) => x.pagina).join(", ")}` : ""}).`);
     let studio = null;      // minuta no app de IA: entra na esteira (um processo por vez); o download não espera por ela
     if (job.studio && job.studio.ativo) {
       try {
         await enfileirar({ processo: job.nome, url: job.studio.url || "", urlPre: job.studio.urlPre || "", serventiaUrl: job.studio.serventiaUrl || "", serventia: job.studio.serventia || "", audData: job.studio.audData || "", audHora: job.studio.audHora || "", audPromovente: job.studio.audPromovente || "", audPromovido: job.studio.audPromovido || "", audTipo: job.studio.audTipo || "", prompt: job.studio.prompt, modo: job.studio.modo, docs: !!job.studio.docs, minutaAssessor: job.studio.minuta || "", motivoMinuta: job.studio.motivoMinuta || "", pdfNome: num + "-OCR.pdf", pdf: arqPdf }, res.bytes);
         await chrome.runtime.sendMessage({ acao: "esteira-abrir" });
         studio = { ok: true, fila: true, mensagem: "na esteira de minutas" };
-      } catch (e) { studio = { ok: false, erro: e.message }; log("✖ esteira: " + e.message); }
+      } catch (e) { studio = { ok: false, erro: descreverErro(e) }; log("✖ esteira: " + descreverErro(e)); }
       document.body.dataset.studio = JSON.stringify(studio);
     }
-    if (job.lote) await chrome.storage.local.set({ ["lote_fim_" + job.lote]: { ok: true, semAcesso, pdf: arqPdf, paginas: res.total, ocr: res.ocr, studio } });
+    if (job.lote) await chrome.storage.local.set({ ["lote_fim_" + job.lote]: { ok: true, semAcesso, pdf: arqPdf, paginas: res.total, ocr: res.ocr, puladas: (res.puladas || []).map((x) => x.pagina), studio } });
     await chrome.storage.local.remove(chave);
     document.body.dataset.pronto = "1";
     setTimeout(() => window.close(), 5000);
   } catch (e) {
-    log("✖ " + e.message);
-    $("status").innerHTML = `<span class="erro">${e.message}</span>`;
-    avisar("PDF do processo", e.message);
-    document.body.dataset.erro = e.message;
-    if (job.lote) await chrome.storage.local.set({ ["lote_fim_" + job.lote]: { ok: false, erro: e.message } });
+    log("✖ " + descreverErro(e));
+    $("status").innerHTML = `<span class="erro">${descreverErro(e)}</span>`;
+    avisar("PDF do processo", descreverErro(e));
+    document.body.dataset.erro = descreverErro(e);
+    if (job.lote) await chrome.storage.local.set({ ["lote_fim_" + job.lote]: { ok: false, erro: descreverErro(e) } });
   } finally { manterAtiva(false); rodando = false; $("cancelar").disabled = true; $("barra").hidden = true; }
 }
 
@@ -210,8 +210,8 @@ async function iniciar() {
       const div = document.createElement("div"); div.className = "res"; div.append(a, ` — ${r.ocr} de ${r.total} página(s) com OCR`);
       $("resultados").append(div);
     } catch (e) {
-      log(`  ✖ ${f.name}: ${e.message}`);
-      const div = document.createElement("div"); div.className = "res erro"; div.textContent = `${f.name}: ${e.message}`; $("resultados").append(div);
+      log(`  ✖ ${f.name}: ${descreverErro(e)}`);
+      const div = document.createElement("div"); div.className = "res erro"; div.textContent = `${f.name}: ${descreverErro(e)}`; $("resultados").append(div);
       if (cancelado) break;
     }
   }
