@@ -39,7 +39,6 @@ export async function abrirLadoALado(urlDoc, urlPdf, modo = "abas") {
   if (modo !== "janelas") {
     const doc = await chrome.tabs.create({ url: urlDoc, active: true });
     const pdf = await chrome.tabs.create({ url: urlPdf, active: false, windowId: doc.windowId, index: doc.index + 1 });
-    try { const g = await chrome.tabs.group({ tabIds: [doc.id, pdf.id] }); await chrome.tabGroups.update(g, { title: "Minuta + PDF", color: "blue" }); } catch (e) { /* sem agrupar */ }
     return { doc: doc.id, pdf: pdf.id };
   }
   const W = screen.availWidth || 1366, H = screen.availHeight || 768, L = screen.availLeft || 0, T = screen.availTop || 0, meio = Math.floor(W / 2);
