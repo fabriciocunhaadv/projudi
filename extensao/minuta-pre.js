@@ -1,6 +1,7 @@
 // Leitura da minuta que o assessor escreveu na pré-análise (botão Visualizar da Busca de Pré-Análises). Mesma lógica usada pela fila de download (lote.js),
 // aqui disponível também para a esteira (processos já baixados).
 import { chaveProc } from "./proc-chave.js";
+import { abrirAbaProjudi, soltarAbaProjudi, pegarTravaDaAba } from "./projudi-aba.js";
 const BASE = "https://projudi.tjgo.jus.br/";
 const dorme = (ms) => new Promise((ok) => setTimeout(ok, ms));
 function carregou(tabId, ms = 60000) {
@@ -32,10 +33,22 @@ function htmlParaTexto(html) {
   if (ini > 0 && t.slice(0, ini).split("\n").length < 25) t = t.slice(ini);
   return t;
 }
-export async function lerMinutaPre(item) {
+const ALVO_PRE = BASE + "PreAnalisarConclusao?PaginaAtual=6&tipo=todas";
+/** `opcoes.tabId`: usa essa aba (a do fluxo em andamento); sem ela, usa a aba do Projudi que já está aberta (uma por vez) e a devolve à página em que estava. */
+export async function lerMinutaPre(item, opcoes = {}) {
+  const emprestada = opcoes.tabId != null;
+  const liberar = emprestada ? null : await pegarTravaDaAba();
+  let ref = null;
+  try {
+    ref = emprestada ? { id: opcoes.tabId, criada: false } : await abrirAbaProjudi(ALVO_PRE);
+    if (emprestada) await chrome.tabs.update(ref.id, { url: ALVO_PRE });
+    return await lerNaAba(item, ref.id);
+  } finally { if (!emprestada) await soltarAbaProjudi(ref); liberar?.(); }
+}
+async function lerNaAba(item, tabId) {
   const digitos = chaveProc(item.processo), novas = [];
   const aoCriar = (t) => novas.push(t.id); chrome.tabs.onCreated.addListener(aoCriar);
-  const tab = await chrome.tabs.create({ url: BASE + "PreAnalisarConclusao?PaginaAtual=6&tipo=todas", active: false });
+  const tab = { id: tabId };      // a aba é do Projudi do usuário: a extensão navega nela, não abre outra
   const motivo = { m: "" };
   try {
     // As listas do Projudi são da serventia ativa NA SESSÃO (e a verificação deixa a sessão na última serventia lida): escolhe a do processo antes.
@@ -85,7 +98,7 @@ export async function lerMinutaPre(item) {
     return { texto: "", motivo: "cliquei em Visualizar, mas não achei o editor com a minuta (ou ele está vazio)" };
   } finally {
     chrome.tabs.onCreated.removeListener(aoCriar);
-    for (const id of [tab.id, ...novas]) chrome.tabs.remove(id).catch(() => {});
+    for (const id of novas) chrome.tabs.remove(id).catch(() => {});      // só as janelas que o Projudi abriu por conta própria
   }
 }
 

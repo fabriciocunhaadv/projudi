@@ -2,6 +2,7 @@ import { chaveProc } from "./proc-chave.js";
 import { montarPdf, nomePadrao, semBarra, acharServentia } from "./modelos-pdf.js";
 import { enviarBase } from "./studio-cliente.js";
 import { manterAcordado } from "./acordado.js";
+import { abrirAbaProjudi, soltarAbaProjudi, pegarTravaDaAba } from "./projudi-aba.js";
 // Fila: para cada processo selecionado, abre o processo, pede o PDF completo ao Projudi e deixa a página de OCR salvar PDF + texto.
 const BASE = "https://projudi.tjgo.jus.br/";
 const $ = (id) => document.getElementById(id);
@@ -52,10 +53,22 @@ function htmlParaTexto(html) {
   if (ini > 0 && t.slice(0, ini).split("\n").length < 25) t = t.slice(ini);
   return t;
 }
-async function lerMinutaPre(item) {
+const ALVO_PRE = BASE + "PreAnalisarConclusao?PaginaAtual=6&tipo=todas";
+/** `opcoes.tabId`: usa essa aba (a do fluxo em andamento); sem ela, usa a aba do Projudi que já está aberta (uma por vez) e a devolve à página em que estava. */
+async function lerMinutaPre(item, opcoes = {}) {
+  const emprestada = opcoes.tabId != null;
+  const liberar = emprestada ? null : await pegarTravaDaAba();
+  let ref = null;
+  try {
+    ref = emprestada ? { id: opcoes.tabId, criada: false } : await abrirAbaProjudi(ALVO_PRE);
+    if (emprestada) await chrome.tabs.update(ref.id, { url: ALVO_PRE });
+    return await lerNaAba(item, ref.id);
+  } finally { if (!emprestada) await soltarAbaProjudi(ref); liberar?.(); }
+}
+async function lerNaAba(item, tabId) {
   const digitos = chaveProc(item.processo), novas = [];
   const aoCriar = (t) => novas.push(t.id); chrome.tabs.onCreated.addListener(aoCriar);
-  const tab = await chrome.tabs.create({ url: BASE + "PreAnalisarConclusao?PaginaAtual=6&tipo=todas", active: false });
+  const tab = { id: tabId };      // a aba é do Projudi do usuário: a extensão navega nela, não abre outra
   const motivo = { m: "" };
   try {
     // As listas do Projudi são da serventia ativa NA SESSÃO (e a verificação deixa a sessão na última serventia lida): escolhe a do processo antes.
@@ -105,7 +118,7 @@ async function lerMinutaPre(item) {
     return { texto: "", motivo: "cliquei em Visualizar, mas não achei o editor com a minuta (ou ele está vazio)" };
   } finally {
     chrome.tabs.onCreated.removeListener(aoCriar);
-    for (const id of [tab.id, ...novas]) chrome.tabs.remove(id).catch(() => {});
+    for (const id of novas) chrome.tabs.remove(id).catch(() => {});      // só as janelas que o Projudi abriu por conta própria
   }
 }
 
@@ -116,17 +129,27 @@ async function paginaInvalida(tabId) {
   try { const r = await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, func: () => /C[oó]digo inv[aá]lido|n[aã]o foi poss[ií]vel validar o ID/i.test(document.body?.innerText || "") }); return r.some((x) => x.result); } catch (e) { return false; }
 }
 // Pega um link NOVO do processo na lista da serventia (a lista é da serventia ativa na sessão: escolhe a do processo antes).
-async function urlFresca(item) {
+async function urlFresca(item, tabId = null) {
   const dig = chaveProc(item.processo);
   const listas = item.situacao === "preAnalisadas" ? ["PreAnalisarConclusao?PaginaAtual=6&tipo=todas", "PreAnalisarConclusao?PaginaAtual=2"] : ["PreAnalisarConclusao?PaginaAtual=2", "PreAnalisarConclusao?PaginaAtual=6&tipo=todas"];
   // tenta a lista do processo e, se ele não estiver nela (mudou de situação), a outra; refaz tudo uma vez (o Projudi às vezes responde vazio logo após abrir outra janela)
   for (let rodada = 0; rodada < 2; rodada++) for (const l of listas) {
-    const h = await urlFrescaNaLista(item, dig, BASE + l); if (h) return h;
+    const h = await urlFrescaNaLista(item, dig, BASE + l, tabId); if (h) return h;
   }
   return "";
 }
-async function urlFrescaNaLista(item, dig, lista) {
-  const tab = await chrome.tabs.create({ url: lista, active: false });
+/** Usa a aba do Projudi que já está aberta (ou a `tabId` do fluxo em andamento); nunca abre uma aba nova só para olhar a lista. */
+async function urlFrescaNaLista(item, dig, lista, tabId = null) {
+  const emprestada = tabId != null;
+  const liberar = emprestada ? null : await pegarTravaDaAba();
+  let ref = null;
+  try {
+    ref = emprestada ? { id: tabId, criada: false } : await abrirAbaProjudi(lista);
+    if (emprestada) await chrome.tabs.update(ref.id, { url: lista });
+    return await procurarNaLista(item, dig, lista, { id: ref.id });
+  } finally { if (!emprestada) await soltarAbaProjudi(ref); liberar?.(); }
+}
+async function procurarNaLista(item, dig, lista, tab) {
   try {
     if (item.serventiaUrl) {
       await chrome.tabs.update(tab.id, { url: new URL(item.serventiaUrl, BASE).href }); await dorme(600);
@@ -145,17 +168,18 @@ async function urlFrescaNaLista(item, dig, lista) {
       await dorme(1000);
     }
     return "";
-  } finally { chrome.tabs.remove(tab.id).catch(() => {}); }
+  } finally { /* a aba é do Projudi do usuário: não se fecha */ }
 }
 window.__urlFresca = urlFresca;      // usado nos testes
 
-let abaLoteId = null;
+let abaLoteId = null, abaLoteRef = null;
 const irPara = async (tabId, url) => { await chrome.tabs.update(tabId, { url }); await dorme(600); await carregou(tabId); };
 async function abaDoLote() {
   if (abaLoteId != null) { const t = await chrome.tabs.get(abaLoteId).catch(() => null); if (t) return t; }
-  const t = await chrome.tabs.create({ url: BASE, active: false }); abaLoteId = t.id; await carregou(t.id); return t;
+  // navega na aba do Projudi que o usuário já deixou aberta (abas novas derrubam a sessão do Projudi); só cria uma se não houver nenhuma
+  abaLoteRef = await abrirAbaProjudi(BASE); abaLoteId = abaLoteRef.id; await carregou(abaLoteId); return await chrome.tabs.get(abaLoteId);
 }
-const fecharAbaDoLote = () => { if (abaLoteId != null) chrome.tabs.remove(abaLoteId).catch(() => {}); abaLoteId = null; };
+const fecharAbaDoLote = () => { if (abaLoteRef) void soltarAbaProjudi(abaLoteRef); abaLoteId = null; abaLoteRef = null; };
 
 async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
   const passo = (t) => { registro.push(new Date().toLocaleTimeString("pt-BR") + " " + item.processo + " — " + t); etapa(t); };
@@ -168,12 +192,13 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
   let popup = null;
   try {
     if (item.serventiaUrl) { passo("entrando na serventia " + (item.serventia || "")); await irPara(tab.id, new URL(item.serventiaUrl, BASE).href); await dorme(1200); }
+    let urlAtual = url;
     await irPara(tab.id, url); await dorme(1500);
     if (await paginaInvalida(tab.id)) {
       passo("o link guardado do processo expirou (“Código inválido”); pegando um novo na lista");
-      const nova = await urlFresca(item);
+      const nova = await urlFresca(item, tab.id);
       if (!nova) throw new Error("o link do processo expirou e não achei o processo na lista da serventia (clique em “Verificar agora” no painel e tente de novo)");
-      await irPara(tab.id, nova); await dorme(1500);
+      urlAtual = nova; await irPara(tab.id, nova); await dorme(1500);
       if (await paginaInvalida(tab.id)) throw new Error("o Projudi recusou o link do processo (“Código inválido”)");
     }
     passo("procurando o botão Gerar PDF");
@@ -181,7 +206,7 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
     let minuta = "", motivoMinuta = "";      // Lupa do Magistrado: usa a minuta que o assessor já escreveu na pré-análise
     if (opcoes.studio?.ativo && opcoes.studio.modo === "lupa") {
       if (item.situacao !== "preAnalisadas") motivoMinuta = "processo não está pré-analisado (sem minuta do assessor)";
-      else { passo("lendo a minuta do assessor (Visualizar)"); const r = await limite(lerMinutaPre(item), 120000, "a minuta da pré-análise não carregou").catch((e) => ({ texto: "", motivo: e.message })); minuta = r.texto; motivoMinuta = r.motivo; if (minuta) passo("minuta do assessor lida (" + minuta.length + " caracteres)"); else passo("⚠ " + motivoMinuta); }
+      else { passo("lendo a minuta do assessor (Visualizar)"); const r = await limite(lerMinutaPre(item, { tabId: tab.id }), 120000, "a minuta da pré-análise não carregou").catch((e) => ({ texto: "", motivo: e.message })); minuta = r.texto; motivoMinuta = r.motivo; if (minuta) passo("minuta do assessor lida (" + minuta.length + " caracteres)"); else passo("⚠ " + motivoMinuta); await irPara(tab.id, urlAtual); await dorme(1500); }      // a mesma aba foi usada para ler a minuta: volta ao processo
     }
     await chrome.storage.local.set({ gerarpdf_pedido: { todos: true, processo: item.processo, pasta, lote: chave, ts: Date.now(), studio: opcoes.studio?.ativo ? { ativo: true, modo: opcoes.studio.modo, prompt: item.prompt || "", tipo: "", minuta, motivoMinuta, url: item.url, urlPre: item.urlPre || "", serventiaUrl: item.serventiaUrl || "", serventia: item.serventia || "", audData: item.audData || "", audHora: item.audHora || "", audPromovente: item.audPromovente || "", audPromovido: item.audPromovido || "", audTipo: item.audTipo || "", docs: !!opcoes.studio.docs && opcoes.studio.modo !== "lupa" } : null } });
     let r = await limite(GerarUtil.capturarGerar(tab.id), 45000, "a página do processo não respondeu (pode haver um aviso do Projudi aberto nela)");
