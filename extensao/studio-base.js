@@ -137,6 +137,9 @@
   const prosseguirEtapa2 = () => botao(/Prosseguir para (a )?2ª Etapa/i);
 
   // Resumo dos processos gigantes que o app está lendo em lotes (o app o publica no atributo data-gigantes da página)
+  // O app monta o mapa do processo em segundo plano (leva minutos e não é demora da análise): esse tempo não conta nos limites de espera (no máximo 40 min).
+  const mapasAtivos = () => { try { return JSON.parse(document.documentElement.dataset.mapas || "[]").some((m) => ["planejando", "lendo", "consolidando"].includes(m.status)); } catch { return false; } };
+  const novoRelogio = () => { const t0 = Date.now(); let parado = 0, ult = t0; return () => { const n = Date.now(); if (mapasAtivos() && parado < 40 * 60000) parado += n - ult; ult = n; return n - t0 - parado; }; };
   const listaGigantes = () => { try { return JSON.parse(document.documentElement.dataset.gigantes || "[]"); } catch { return []; } };
   async function analisar({ arquivoId, nome, prompt, tipo, texto: textoAutos, ate1, processo }) {
     const inicioAnalise = Date.now();
@@ -193,7 +196,7 @@
       exec.click();
       const novoGigante = () => listaGigantes().filter((g) => !gigantesAntes.has(g.id)).sort((x, y) => (x.parte || 0) - (y.parte || 0))[0];      // processo em partes: acompanha a Parte 1
       if (!(await esperar(() => executando() || resultadoNovo() || erroNaTela() || novoGigante(), 60000))) throw new Error("a análise não começou");
-      const t0 = Date.now(), rep = { vezes: 0, ate: 0 };
+      const decorrido = novoRelogio(), rep = { vezes: 0, ate: 0 };
       for (;;) {
         const gig = novoGigante();      // processo gigante (acima do limite da análise normal): o app lê em lotes, em segundo plano; a fila segue
         if (gig) return { ok: true, gigante: true, jobId: gig.id, mensagem: "processo gigante: o Studio está lendo em lotes, em segundo plano" };
@@ -213,7 +216,7 @@
         }
       if (pro && !pro.disabled && !rep.etapa2) { rep.etapa2 = pro; pro.click(); await dorme(1500); continue; }
       if (!executando() && resultadoNovo() && !prosseguirEtapa2() && !(rep.etapa2 && rep.etapa2.isConnected)) break;      // com a 2ª etapa em curso o botão fica na tela (“Executando…”) até terminar
-        if (Date.now() - t0 > 20 * 60000) throw new Error("a análise demorou mais de 20 minutos");
+        if (decorrido() > 20 * 60000) throw new Error("a análise demorou mais de 20 minutos");
         await dorme(1000);
       }
     } finally {
@@ -589,7 +592,7 @@
     const gigantesAntes = new Set(listaGigantes().map((g) => g.id));
     const rotulo = texto(exec); exec.click();
     // 1) começou (o botão muda ou some) 2) terminou (aparece o resultado: “Abrir no Editor” + aba “Minuta Completa”)
-    const t0 = Date.now(), rep = { vezes: 0, ate: 0 };
+    const decorrido = novoRelogio(), rep = { vezes: 0, ate: 0 };
     const novoGigante = () => listaGigantes().filter((g) => !gigantesAntes.has(g.id)).sort((x, y) => (x.parte || 0) - (y.parte || 0))[0];      // processo em partes: acompanha a Parte 1
     await esperar(() => { const b = botaoExecutarTurbo(raiz); return erroNaTela() || !b || b.disabled || texto(b) !== rotulo || resultadoTurbo() || novoGigante(); }, 20000);
     for (;;) {
@@ -599,7 +602,7 @@
       const e = erroNaTela();
       if (e && repetirSePassageiro(rep, e, () => { const r2 = painelTurbo(), b = r2 && botaoExecutarTurbo(r2); if (b && !b.disabled && /Executar/i.test(texto(b))) b.click(); })) { await dorme(1000); continue; }
       if (e) throw new Error("o app avisou: " + e);
-      if (Date.now() - t0 > 16 * 60000) throw new Error("o Módulo Turbo demorou mais de 16 minutos");
+      if (decorrido() > 16 * 60000) throw new Error("o Módulo Turbo demorou mais de 16 minutos");
       await dorme(1000);
     }
     await dorme(1500);

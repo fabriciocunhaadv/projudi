@@ -86,7 +86,7 @@ async function analisarTurbo(aba, arquivoId, opcoes) {
   catch (e) { throw new Error("o app do Studio não recebeu o pedido (" + e.message + "). Atualize a aba do assessor-judicial e tente de novo"); }
   if (!r?.ok) throw Object.assign(new Error(r?.erro || "o app não confirmou a análise"), { opcoes: r?.opcoes });
   const t0 = Date.now(); let carregando = 0;
-  const limiteMin = opcoes.modo === "turbo" || opcoes.modo === "mesa" || opcoes.modo === "mesa-ler" ? 18 : 45;      // análise normal e Lupa podem esperar a cota da IA renovar
+  const limiteMin = opcoes.modo === "mesa" || opcoes.modo === "mesa-ler" ? 18 : opcoes.modo === "turbo" ? 60 : 75;      // o limite de cada módulo está no app (studio-base) e não conta o tempo do mapa do processo (até 40 min a mais); aqui é só a rede de segurança. Análise normal e Lupa podem esperar a cota da IA renovar
   for (;;) {
     const res = (await chrome.storage.local.get(chave))[chave];
     if (res) { await chrome.storage.local.remove(chave); if (!res.ok) throw Object.assign(new Error(res.erro || "a análise falhou no app"), { opcoes: res.opcoes, semRetry: !!res.semRetry, grande: !!res.grande }); return res; }
