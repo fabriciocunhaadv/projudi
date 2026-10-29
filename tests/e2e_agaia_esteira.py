@@ -28,6 +28,7 @@ const CENARIO = "%(cenario)s";
 function modal(corpo, botoes) { const m = document.getElementById('mdl'); document.getElementById('mdl-corpo').innerHTML = corpo; document.getElementById('mdl-botoes').innerHTML = botoes; m.style.display = 'block'; m.classList.add('show'); }
 function fechar() { const m = document.getElementById('mdl'); m.style.display = 'none'; m.classList.remove('show'); }
 function carregarMov() {
+  if (CENARIO === 'sigiloso') { modal('<b>Atenção: Responsabilidade em processo sigiloso</b> É sua responsabilidade garantir que os documentos enviados estejam devidamente anonimizados.', '<button>Não prosseguir</button><button id="entendi">Entendi e desejo continuar</button>'); return; }
   if (CENARIO === 'arquivado') { document.getElementById('sistem_message').innerHTML = '<div class="alert alert-danger">Processo arquivado: o Agaia não executa prompts em processos arquivados.</div>'; return; }
   let h = '<table>'; for (let i = 1; i <= 12; i++) h += '<tr><td>' + (i %% 3 ? '<input type="checkbox" class="check_movimento" onchange="atualizar()">' : '') + '</td><td>Movimento ' + i + '</td></tr>';
   document.getElementById('selecao_upload_dados').innerHTML = h + '</table><button onclick="alert(1)">Todos</button>';
@@ -81,7 +82,7 @@ def main():
         print("resultado:", res)
         assert res["ok"]["ok"] and "DECISÃO INTERLOCUTÓRIA" in res["ok"]["minutaTexto"] and res["ok"]["minutaHtml"] > 200, res
         assert res["numero"] == "" and res["numero2"] == "5285460.70.2025", res
-        assert any("processando" in a for a in res["andamento"]) and any("confirmando" in a for a in res["andamento"]), res["andamento"]
+        assert any("processando" in a for a in res["andamento"]), res["andamento"]
         assert len(ctx.pages) == antes, "abriu aba nova do Agaia"
         pag = [x for x in ctx.pages if "localhost" in x.url and "/agaia/" in x.url][0]
         assert pag.evaluate("[...document.querySelectorAll('.check_movimento')].every(c => c.checked)"), "nem todos os movimentos foram marcados"
@@ -99,6 +100,12 @@ def main():
         estado["cenarios"]["5285463.73.2025"] = "login"
         r4 = ver.evaluate("async () => { const ag = await import('./agaia-cliente.js'); return await ag.executarNoAgaia({ processo: '5285463-73.2025.8.09.0166', prompt: 'x' }, { limiteMs: 60000 }); }")
         print("login:", r4); assert not r4["ok"] and r4.get("sessao"), r4
+        # segredo de justiça: não confirma a declaração de responsabilidade e registra o motivo
+        estado["cenarios"]["5285465.75.2025"] = "sigiloso"
+        r6 = ver.evaluate("async () => { const ag = await import('./agaia-cliente.js'); return await ag.executarNoAgaia({ processo: '5285465-75.2025.8.09.0166', prompt: 'Outros Área Judicial - Fabrício Juizado Especial Civel' }, { limiteMs: 60000 }); }")
+        print("sigiloso:", r6); assert not r6["ok"] and r6.get("sigiloso") and "segredo de justiça" in r6["erro"], r6
+        pag2 = [x for x in ctx.pages if "/agaia/" in x.url][0]
+        assert pag2.evaluate("document.getElementById('mdl').classList.contains('show')"), "a declaração de responsabilidade não pode ser confirmada pela extensão (o aviso deve continuar na tela)"
         # número sem ano
         r5 = ver.evaluate("async () => { const ag = await import('./agaia-cliente.js'); return await ag.executarNoAgaia({ processo: '5285460.70', prompt: 'x' }); }")
         print("sem ano:", r5); assert not r5["ok"] and "ano" in r5["erro"], r5

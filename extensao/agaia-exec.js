@@ -33,6 +33,10 @@
     return achados;
   }
   const modalAberto = () => [...document.querySelectorAll(".modal.show")].find(visivel) || null;
+  // processo em segredo de justiça: o Agaia pede uma declaração de responsabilidade (“Entendi e desejo continuar”) e depois exige o PDF anonimizado.
+  // A declaração é do usuário e o PDF não faz parte deste modo: a esteira NÃO confirma por ele; registra o motivo e segue.
+  const sigilo = () => { const t = [texto(modalAberto()), ...mensagens()].join(" "); return /sigilos|segredo de justi/i.test(t) ? t.replace(/\s+/g, " ").trim().slice(0, 400) : ""; };
+  const falhaSigilo = (t) => ({ ok: false, sigiloso: true, erro: "Processo em segredo de justiça: o Agaia exige a sua declaração de responsabilidade e o PDF do processo (anexo manual), o que a esteira não faz por você. Faça este processo à mão no Agaia. Texto do Agaia: " + t });
 
   // ---------- preenchimento ----------
   const marcar = (id, valor) => { const c = document.getElementById(id); if (!c || c.disabled) return false; if (c.checked !== valor) c.click(); return c.checked === valor; };
@@ -63,7 +67,9 @@
       const form = await esperar(() => document.getElementById("form_execucao_moderno") || naTelaDeLogin(), 45000);
       if (naTelaDeLogin()) return falha("O Agaia pediu login (sessão expirada). Entre no Agaia e continue a fila.", { sessao: true });
       if (!form) return falha("O Agaia não abriu o formulário de execução" + (mensagens()[0] ? ": " + mensagens()[0] : "."));
-      const m0 = mensagens().find((t) => /n[aã]o (foi )?encontrad|inexistente|sigilo|segredo|arquivad|sem permiss|n[aã]o autorizad/i.test(t));
+      await dorme(1500);      // o aviso de segredo de justiça aparece logo depois de abrir
+      if (sigilo()) return falhaSigilo(sigilo());
+      const m0 = mensagens().find((t) => /n[aã]o (foi )?encontrad|inexistente|arquivad|sem permiss|n[aã]o autorizad/i.test(t));
       if (m0) return falha(m0);
       await esperar(() => selectPrompt(), 20000);
       await dorme(600);
@@ -80,8 +86,8 @@
       const radio = document.getElementById("tipo_movimentos") || [...document.querySelectorAll("input[type=radio][name=tipo]")].find((r) => r.value === "movimentos");
       if (!radio) return falha("não achei a opção “Através da integração ao PROJUDI” no Agaia");
       radio.click();
-      const achouLista = await esperar(() => movimentos().length || mensagens().find((t) => !/Confirma/i.test(t)), 90000);
-      if (!movimentos().length) return falha(mensagens()[0] || (achouLista ? String(achouLista) : "o Agaia não listou os movimentos do processo"));
+      const achouLista = await esperar(() => movimentos().length || sigilo() || mensagens().find((t) => !/Confirma/i.test(t)), 90000);
+      if (!movimentos().length) return sigilo() ? falhaSigilo(sigilo()) : falha(mensagens()[0] || (achouLista ? String(achouLista) : "o Agaia não listou os movimentos do processo"));
       // todos os movimentos com arquivo, um a um (nunca pelo botão “Todos”)
       const lista = movimentos().filter((c) => !c.disabled);
       prog(`marcando ${lista.length} movimentos`);
@@ -118,6 +124,7 @@
           continue;
         }
         // nada rodando e sem resultado: aviso do Agaia (erro) ou demora para começar
+        if (sigilo()) return falhaSigilo(sigilo());
         const ms = mensagens(); if (ms.length) ultimoAviso = ms[0];
         semSinal++;
         if (naTelaDeLogin()) return falha("O Agaia pediu login (sessão expirada). Entre no Agaia e continue a fila.", { sessao: true });
