@@ -795,6 +795,13 @@
       responder({ ok: true }); return false;
     }
     if (m?.acao === "studio-enviar-base") { enviar(m.nome, m.arquivoId, m.b64, !!m.substituir).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
+    if (m?.acao === "studio-cadastrar-minuta") {      // minuta pronta vinda do Agaia: o app a grava no Histórico (organizada por serventia e prompt) e confirma pelo atributo da página
+      const id = "ag" + Date.now() + Math.random().toString(36).slice(2, 5);
+      try { delete document.documentElement.dataset.agaiaCadastro; window.dispatchEvent(new CustomEvent("assessor:cadastrar-minuta", { detail: JSON.stringify({ ...m.dados, reqId: id }) })); } catch (e) { responder({ ok: false, erro: String(e.message || e) }); return false; }
+      esperar(() => { try { const r = JSON.parse(document.documentElement.dataset.agaiaCadastro || "null"); return r && r.reqId === id ? r : null; } catch { return null; } }, 30000)
+        .then((r) => responder(r ? { ok: !!r.ok, id: r.id, erro: r.erro || "" } : { ok: false, erro: "o app do Studio não confirmou o cadastro (atualize a aba do Studio: a versão dela pode ser antiga)" }));
+      return true;
+    }
     if (m?.acao === "studio-ler-minuta" && resultadoTurbo() && (!m.processo || (resultadoTurbo().innerText || "").includes(m.processo))) {      // o resultado do Módulo Turbo está na tela: usa-o, sem procurar no histórico
       const r = lerResultadoTurbo(); responder({ ok: !!r.texto, minuta: r.texto, minutaHtml: r.html, erro: r.texto ? "" : "não consegui ler a minuta do Turbo" }); return false;
     }

@@ -152,7 +152,8 @@ function desenhar() {
       `<label class="radio"><input type="radio" name="modoStudio" data-modo="lupa" ${opcoes.modo === "lupa" ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> Lupa do Magistrado <small>(pega a minuta do assessor em “Visualizar” das pré-analisadas, sobe os autos na Lupa e clica em Auditar)</small></label>` +
       `<label class="radio"><input type="radio" name="modoStudio" data-modo="turbo" ${opcoes.modo === "turbo" ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> ⚡ Análise Turbo <small>(Módulo Turbo Independente: anexa o PDF com OCR, Auto-detectar, e gera)</small></label>` +
       `<label>Enviar os autos ao Studio como: <select data-entrada ${opcoes.studio ? "" : "disabled"}><option value="pdf" ${entradaStudio === "pdf" ? "selected" : ""}>PDF (arquivo completo)</option><option value="txt" ${entradaStudio === "txt" ? "selected" : ""}>texto extraído do PDF com OCR (mais rápido)</option></select> <small>(o .txt de cada processo também é salvo ao lado do PDF)</small></label></div>`;
-    h += `<p><button id="baixarLote" ${fila2.length ? "" : "disabled"}>⬇ Baixar PDFs dos ${fila2.length} processo(s)</button> <small>Ordem da fila: “${esc(Ordenar.MODOS[$("modo").value])}”. Cada processo gera <b>número-OCR.pdf</b>.</small></p></div>`;
+    h += `<p><button id="baixarLote" ${fila2.length ? "" : "disabled"}>⬇ Baixar PDFs dos ${fila2.length} processo(s)</button> <small>Ordem da fila: “${esc(Ordenar.MODOS[$("modo").value])}”. Cada processo gera <b>número-OCR.pdf</b>.</small></p></div>` +
+      `<div class="opcoes"><b>ou, sem baixar PDF:</b><br><button id="enviarAgaia" ${fila2.length ? "" : "disabled"} title="O Agaia lê o processo direto do Projudi; a esteira abre cada processo no Agaia, executa o prompt e lança a minuta no Histórico do Studio">🤖 Enviar os ${fila2.length} processo(s) ao Agaia</button> <small>Um de cada vez, na ordem da fila. Quando o Agaia não consegue (arquivado, segredo de justiça…), o motivo fica registrado no processo e a esteira segue para o próximo.</small></div>`;
     window.__candidatos = fila2;
   }
 
@@ -266,6 +267,25 @@ function csv() {
     }
     await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/" + hoje, opcoes: { atualizarBase: false, studio: { ativo: opcoes.studio, modo: opcoes.modo, docs: false } } } });
     chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + id) });
+  });
+  // Esteira → Agaia (sem baixar PDF): cada processo entra na fila da esteira no modo "agaia"; a esteira abre o processo no Agaia, executa o prompt e lança a minuta no Histórico do Studio
+  document.addEventListener("click", async (e) => {
+    if (!e.target.closest || !e.target.closest("#enviarAgaia")) return;
+    const fila = window.__candidatos || []; if (!fila.length) return;
+    const btn = e.target.closest("#enviarAgaia"); btn.disabled = true;
+    const { enfileirar, todos } = await import("./esteira-banco.js");
+    const jaNaFila = new Set((await todos()).filter((i) => i.modo === "agaia" && ["aguardando", "analisando", "pausado"].includes(i.estado)).map((i) => String(i.processo).replace(/\D/g, "").slice(0, 13)));
+    const { automacao: aut = {} } = await chrome.storage.sync.get("automacao");
+    let n = 0, sem = [];
+    for (const p of fila) {
+      const k = String(p.processo).replace(/\D/g, "").slice(0, 13) || p.processo; if (jaNaFila.has(k)) continue; jaNaFila.add(k);
+      const prompt = aut[p.serventia]?.promptAgaia || aut[p.serventia]?.prompt || (globalThis.Sugestoes ? Sugestoes.prompt(p.serventia) : "") || "";
+      if (!prompt) { sem.push(p.serventia); }
+      await enfileirar({ processo: p.processo, url: p.url, urlPre: p.urlPre || "", serventia: p.serventia, serventiaUrl: p.serventiaUrl || "", prompt, modo: "agaia", pdfNome: "(Agaia — sem PDF)", classificador: nomeCls(p) }, new Uint8Array([0]));
+      n++;
+    }
+    try { chrome.runtime.sendMessage({ acao: "esteira-abrir" }); } catch (err) { /* a esteira abre pelo link */ }
+    btn.textContent = `✔ ${n} processo(s) enviados à esteira (modo Agaia)` + (sem.length ? ` — sem prompt do Agaia em: ${[...new Set(sem)].join(", ")} (defina “Prompt no Agaia” na tabela de serventias)` : "");
   });
   $("csv").onclick = csv;
   document.addEventListener("toggle", (e) => { if (e.target && e.target.id === "det-cls") clsAberto = e.target.open; }, true);

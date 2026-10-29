@@ -98,3 +98,11 @@ async function analisarTurbo(aba, arquivoId, opcoes) {
     await dorme(2000);
   }
 }
+
+/** Lança no Histórico do Studio uma minuta que já veio pronta de fora (Agaia). Devolve { ok, id } ou { ok:false, erro }. */
+export async function cadastrarNoStudio(dados) {
+  const aba = await acharStudio();
+  const r = await chrome.tabs.sendMessage(aba.id, { acao: "studio-cadastrar-minuta", dados });
+  if (!r?.ok) throw new Error(r?.erro || "o Studio não confirmou o cadastro da minuta");
+  return r;
+}

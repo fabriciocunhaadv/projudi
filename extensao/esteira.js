@@ -1,5 +1,6 @@
 import { todos, atualizar, lerPdf, remover, enfileirar, ROTULO, ATIVOS } from "./esteira-banco.js";
-import { analisarNoStudio, lerMinutaAtual, consultarGigantes } from "./studio-cliente.js";
+import { analisarNoStudio, lerMinutaAtual, consultarGigantes, cadastrarNoStudio } from "./studio-cliente.js";
+import { executarNoAgaia, retomarExecucao } from "./agaia-cliente.js";
 import { criarDocumento, abrirLadoALado, lerDocumento, tipoDaMinuta, nomeDoc } from "./docs-api.js";
 import { paragrafosDeHtml } from "./docs-core.js";
 import { textoDoPdf } from "./pdf-texto.js";
@@ -47,12 +48,49 @@ async function recuperarDoStudio(it, rodada, valida) {
   return false;
 }
 
+// Modo Agaia: não baixa PDF. O Agaia lê o processo do Projudi e devolve a minuta; a esteira a lança no Histórico do Studio (serventia + prompt) e segue.
+// Qualquer mensagem do Agaia (arquivado, segredo de justiça, erro…) fica registrada no processo e a fila segue para o próximo.
+async function cadastrarAgaia(it, r) {
+  const dados = { processo: it.processo, serventia: it.serventia || "", prompt: it.prompt || "", promptAgaia: r.prompt || "", minutaHtml: r.minutaHtml || "", minutaTexto: r.minutaTexto || "", aproximado: r.aproximado || "", origem: "Agaia" };
+  try { const c = await cadastrarNoStudio(dados); return { ok: true, id: c.id }; } catch (err) { return { ok: false, erro: String(err.message || err) }; }
+}
+async function analisarNoAgaia(it, valida) {
+  const andamento = (t) => atualizar(it.id, { aviso: "Agaia: " + t });
+  const opcoes = { aoAndamento: andamento, aindaValido: valida };
+  // a esteira recarregou ou o computador voltou no meio: se a execução anterior terminou (ou ainda roda) na aba do Agaia, aproveita em vez de rodar de novo
+  let r = it.agaiaPedido ? await retomarExecucao(it.agaiaPedido, opcoes).catch(() => null) : null;
+  if (!r) r = await executarNoAgaia(it, { ...opcoes, aoIniciar: (ped) => atualizar(it.id, { agaiaPedido: ped }) }).catch((err) => ({ ok: false, erro: String(err.message || err) }));
+  if (!(await valida()) || r.cancelado) return;
+  if (!r.ok) {
+    if (r.sessao) { pausaAte = Date.now() + 3 * 60000; await atualizar(it.id, { estado: "aguardando", erro: "", agaiaPedido: null, aviso: "O Agaia pediu login: entre no Agaia; a fila retoma em 3 minutos." }); return; }
+    await atualizar(it.id, { estado: "erro", erro: "Agaia: " + r.erro, agaiaErro: r.erro, agaiaPedido: null, aviso: "A esteira seguiu para o próximo processo." });
+    return;
+  }
+  const texto = r.minutaTexto || "";
+  // 1º guarda a minuta na própria esteira (nada se perde se o Studio estiver fechado, a internet cair ou o computador desligar); 2º entrega ao Studio
+  await atualizar(it.id, { estado: "concluido", erro: "", minuta: texto, minutaHtml: r.minutaHtml || "", tipo: tipoDaMinuta(texto), agaiaPedido: null, cadastroPendente: true, aviso: "Minuta recebida do Agaia; entregando ao Studio…" });
+  const c = await cadastrarAgaia(it, r);
+  await atualizar(it.id, { cadastroPendente: !c.ok, aviso: c.ok ? "Minuta feita no Agaia e entregue ao Studio: ela é gravada no Histórico em segundo plano (veja o selo 🤖 Agaia no Studio)." + (r.aproximado ? " ⚠ " + r.aproximado : "") : "Minuta feita no Agaia e guardada aqui, mas ainda NÃO entregue ao Studio (" + c.erro + "). A esteira tenta de novo sozinha; enquanto isso use “Copiar minuta”." });
+}
+let ultimaTentativaCadastro = 0;
+async function cadastrosPendentes(lista) {      // o Studio estava fechado/ocupado quando a minuta chegou: tenta lançar de novo (no máximo a cada 60 s)
+  const pend = lista.filter((i) => i.modo === "agaia" && i.estado === "concluido" && i.cadastroPendente && i.minuta);
+  if (!pend.length || Date.now() - ultimaTentativaCadastro < 60000) return;
+  ultimaTentativaCadastro = Date.now();
+  for (const it of pend) {
+    const c = await cadastrarAgaia(it, { minutaHtml: it.minutaHtml, minutaTexto: it.minuta });
+    if (c.ok) await atualizar(it.id, { cadastroPendente: false, aviso: "Minuta feita no Agaia e entregue ao Studio: ela é gravada no Histórico em segundo plano (veja o selo 🤖 Agaia no Studio)." });
+    else await atualizar(it.id, { aviso: "Minuta feita no Agaia; falta lançar no Histórico do Studio (" + c.erro + "). A esteira tenta de novo." });
+  }
+}
+
 async function analisar(it) {
   const intervaloTurbo = () => { if (it.modo === "turbo") pausaTurboAte = Date.now() + 60000; };      // janela de 1 minuto da cota gratuita: o próximo Turbo espera 60 s
   const rodada = Date.now() + Math.random();
   await atualizar(it.id, { estado: "analisando", erro: "", rodada });
   const valida = async () => (await todos()).find((x) => x.id === it.id)?.rodada === rodada;      // o usuário pode ter escolhido outro caminho no meio
   try {
+    if (it.modo === "agaia") return await analisarNoAgaia(it, valida);
     const bytes = await lerPdf(it.id);
     if (!bytes) throw new Error("o PDF deste processo não está mais guardado");
     if (!it.prompt && (it.modo === "analise" || it.modo === "lupa")) throw Object.assign(new Error("este processo está sem prompt definido: a esteira não usa o prompt que estiver ativo no Studio (poderia ser de outra matéria). Defina o prompt da serventia no painel e envie de novo."), { semRetry: true });
@@ -154,6 +192,7 @@ async function passo() {
   try {
     const lista = await todos();
     await verificarGigantes(lista);
+    await cadastrosPendentes(lista);
     const rec = lista.find((i) => i.estado === "recebida");      // minuta enviada pelo botão da tela do Studio
     if (rec) { await atualizar(rec.id, { estado: "analisando", rodada: Date.now() + Math.random() }); try { await entregar(rec, await lerPdf(rec.id), rec.minutaRecebida, "", rec.htmlRecebido || ""); } catch (e) { await atualizar(rec.id, { estado: "erro", erro: e.message }); } return; }
     const conf = lista.find((i) => i.estado === "conferido");
@@ -189,7 +228,7 @@ async function desenhar() {
     if (it.modo === "mesa" && it.estado === "concluido") b.push(`<label title="Inclui esta audiência na pauta (formato do modelo do gabinete)"><input type="checkbox" data-pauta="${it.id}" ${it.pautaSel ? "checked" : ""}> incluir na pauta</label>`);
     if (it.estado === "concluido" && (it.minuta || "").length > 200) b.push(`<button data-a="copiar" data-id="${it.id}" title="Copia a minuta que a extensão recebeu do Studio (garantia caso ela não apareça no Histórico do app)">📋 Copiar minuta</button>`);
     b.push(`<button data-a="excluir" data-id="${it.id}" title="Tira este processo da fila e apaga o PDF guardado (não mexe no Projudi nem nos arquivos já baixados)">🗑 Excluir</button>`);
-    return `<tr><td>${n + 1}</td><td>${esc(it.processo)}<br><small>${esc(it.tipo || "")}</small></td><td class="e-${it.estado}">${esc(ROTULO[it.estado] || it.estado)}${it.erro ? "<br>" + esc(it.erro) : ""}${it.aviso ? `<br><small>${esc(it.aviso)}</small>` : ""}${it.injecao ? (it.injecao.estado === "vermelha" ? `<br><small class="inj-v">🚨 Prompt injection nos autos: ${esc(it.injecao.texto || "confira a tarja vermelha no app")}</small>` : `<br><small class="inj-ok">✅ Prompt injection: nada encontrado</small>`) : ""}</td><td>${b.join(" ")}</td></tr>`;
+    return `<tr><td>${n + 1}</td><td>${esc(it.processo)}<br><small>${esc(it.tipo || "")}</small></td><td class="e-${it.estado}">${esc(it.modo === "agaia" && it.estado === "analisando" ? "rodando no Agaia…" : it.modo === "agaia" && it.estado === "concluido" ? "concluído (Agaia)" : ROTULO[it.estado] || it.estado)}${it.erro ? "<br>" + esc(it.erro) : ""}${it.aviso ? `<br><small>${esc(it.aviso)}</small>` : ""}${it.injecao ? (it.injecao.estado === "vermelha" ? `<br><small class="inj-v">🚨 Prompt injection nos autos: ${esc(it.injecao.texto || "confira a tarja vermelha no app")}</small>` : `<br><small class="inj-ok">✅ Prompt injection: nada encontrado</small>`) : ""}</td><td>${b.join(" ")}</td></tr>`;
   }).join("") : '<tr><td colspan="4">Fila vazia.</td></tr>';
   const conc = lista.filter((x) => x.modo === "mesa" && x.estado === "concluido"), marc = conc.filter((x) => x.pautaSel);
   $("pautaBarra").style.display = conc.length ? "" : "none"; $("pautaN").textContent = marc.length; $("pautaGerar").disabled = !marc.length;
