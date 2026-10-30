@@ -6,3 +6,6 @@ Bibliotecas de terceiros empacotadas (a extensão não carrega código da intern
 As licenças estão em vendor/licencas/.
 
 Alteração nas bibliotecas: em tesseract.min.js e worker.min.js os três endereços padrão de CDN (jsdelivr), que só valem quando o código chamador não informa os caminhos, foram trocados por "vendor-local-sem-rede/". A extensão sempre informa workerPath, corePath e langPath locais (ocr-motor.js), então nada muda no funcionamento; a troca só garante que o pacote não contém nenhum endereço de código hospedado fora dele.
+
+Segunda alteração (versão 1.0.72): em tesseract.min.js a função que cria o worker deixou de montar um Blob com `importScripts(<endereço>)` (caminho opcional, workerBlobURL, que a extensão nunca usava: ocr-motor.js passa workerBlobURL:false) e agora só faz `new Worker(workerPath)` com o arquivo local empacotado.
+Em pdf.min.mjs, o auxiliar _createCDNWrapper (que só serviria para carregar o worker de OUTRO endereço montando um Blob com import()) foi desativado; a extensão usa sempre o worker local empacotado (vendor/pdf.worker.min.mjs).
