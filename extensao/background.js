@@ -223,7 +223,7 @@ async function capturarEAbrir(tabId) {
 chrome.commands.onCommand.addListener((c) => c === "capturar-tela" && capturarEAbrir().catch(console.error));
 
 // Pede ao Projudi (aba "Navegação de Arquivos") para abrir a janela "Gerar PDF"; lá o gerarpdf.js marca os arquivos e gera.
-importScripts("tabs-retry.js", "gerar-util.js", "lancar-projudi.js");
+importScripts("tabs-retry.js", "gerar-util.js", "projudi-quadro.js", "lancar-projudi.js");
 async function abrirGerarPdf(tabId) {
   if (!tabId) return false;
   const r = await GerarUtil.capturarGerar(tabId);

@@ -34,16 +34,23 @@ BUSCA = """<html><head><meta charset="utf-8"><title>Busca</title></head><body>
 <script>document.getElementById('c').onclick=async()=>{ const r=await (await fetch('/api/modelos?q='+encodeURIComponent(document.getElementById('q').value))).json();
  document.getElementById('t').innerHTML='<tr><th></th><th>Id</th><th>Modelo</th><th>Serventia</th><th>Tipo Modelo</th><th>Selecionar</th><th>Excluir</th></tr>'+r.map(m=>'<tr><td></td><td>'+m[0]+'</td><td>'+m[1]+'</td><td>'+m[2]+'</td><td>'+m[3]+'</td><td><button title="Selecionar" onclick="location.href=\\'/escolher?m='+encodeURIComponent(m[1])+'\\'"><i class="fa-check"></i></button></td><td><button title="Excluir" onclick="fetch(\\'/api/excluir\\')"><i class="fa-trash"></i></button></td></tr>').join(''); };</script></body></html>"""
 
+MOLDURA = """<html><head><meta charset="utf-8"><title>Processo Judicial</title></head><body><div id="cab">Processo Judicial</div><div id="menu"><a href="/">Página Inicial</a> Processos Conclusões</div>
+<iframe id="Principal" name="Principal" src="/home" style="width:100%;height:600px"></iframe></body></html>"""
+LISTA = """<html><body><h2>Conclusos</h2><table><tr><td><a href="BuscaProcesso?Id_Processo=9">5914870-27</a></td><td><form id="f" action="/form" method="get" target="_blank"><button title="Pré-Analisar" type="button" onclick="document.getElementById('f').submit()">P</button></form></td></tr></table></body></html>"""
+
 def atender(route):
     u = urlparse(route.request.url); q = parse_qs(u.query)
     def ok(body, tipo="text/html; charset=utf-8"): route.fulfill(status=200, headers={"content-type": tipo}, body=body)
-    if u.path == "/form": ok(form())
+    if u.path == "/": ok(MOLDURA)
+    elif u.path == "/home": ok("<html><body><h2>Página inicial</h2></body></html>")
+    elif u.path == "/PreAnalisarConclusao": ok(LISTA)
+    elif u.path == "/form": ok(form())
     elif u.path == "/busca-modelo": ok(BUSCA)
     elif u.path == "/api/tipos": ok(json.dumps([t for t in TIPOS if q.get("q", [""])[0].lower() in t.lower()]), "application/json")
     elif u.path == "/api/set-tipo": st["tipo"] = q["t"][0]; ok("{}", "application/json")
     elif u.path == "/api/modelos": st["consultas"] += 1; ok(json.dumps([m for m in MODELOS if q.get("q", [""])[0].lower() in m[1].lower()]), "application/json")
     elif u.path == "/api/excluir": st["excluiu"] = True; ok("{}", "application/json")
-    elif u.path == "/escolher": st["modelo"] = q["m"][0]; route.fulfill(status=302, headers={"location": "/form"}, body="")
+    elif u.path == "/escolher": st["modelo"] = q["m"][0]; ok("<html><body>ok<script>location.replace('/form')</script></body></html>")
     else: route.fulfill(status=404, body="")
 
 tmp = Path(tempfile.mkdtemp()); ext = tmp / "ext"; shutil.copytree(RAIZ, ext)
@@ -53,19 +60,31 @@ with sync_playwright() as p:
         args=["--headless=new", "--no-sandbox", f"--disable-extensions-except={ext}", f"--load-extension={ext}"])
     sw = ctx.service_workers[0] if ctx.service_workers else ctx.wait_for_event("serviceworker")
     ctx.route("https://projudi.tjgo.jus.br/**", atender)
-    aba = ctx.new_page(); aba.goto("https://projudi.tjgo.jus.br/form")
-    minuta = "DECISÃO INTERLOCUTÓRIA\n" + "Trata-se de pedido de habilitação nos autos. " * 6
-    r = sw.evaluate("m => lancarNoProjudi(m, null)", {"processo": "5914870-27.2025.8.09.0166", "texto": minuta, "html": "<h3>DECISÃO INTERLOCUTÓRIA</h3><p>Trata-se de pedido de <b>habilitação</b> nos autos.</p><h3>DISPOSITIVO</h3><p>Defiro.</p>"})
-    print(r)
-    assert r["ok"], r
-    assert st["tipo"] == "Decisão" and st["modelo"] == "Decisão Padrão", st      # não pegou “Decisão Cível” (outro modelo) nem “Decisão Interlocutória” (outro tipo)
-    assert st["excluiu"] is False, "NUNCA pode apertar Excluir"
-    assert aba.url.endswith("/form"), aba.url
-    ck = aba.evaluate("window.__ck")
-    assert "habilitação" in ck and "DISPOSITIVO" in ck and "Defiro" in ck, ck
-    assert ck.count("DECISÃO") == 1 and "Atenda-se" not in ck and "I.C." not in ck and "MCG, data do sistema" in ck and "PODER JUDICIÁRIO" in ck, ck
+    MIN = {"processo": "5914870-27.2025.8.09.0166", "texto": "DECISÃO INTERLOCUTÓRIA\n" + "Trata-se de pedido de habilitação nos autos. " * 6,
+           "html": "<h3>DECISÃO INTERLOCUTÓRIA</h3><p>Trata-se de pedido de <b>habilitação</b> nos autos.</p><h3>DISPOSITIVO</h3><p>Defiro.</p>"}
+    def quadro(aba):
+        return next(f for f in aba.frames if f.url.endswith("/form"))
+    def conferir(aba, moldura):
+        assert st["tipo"] == "Decisão" and st["modelo"] == "Decisão Padrão", st      # não pegou “Decisão Cível” (outro modelo) nem “Decisão Interlocutória” (outro tipo)
+        assert st["excluiu"] is False, "NUNCA pode apertar Excluir"
+        ck = quadro(aba).evaluate("window.__ck")
+        assert "habilitação" in ck and "DISPOSITIVO" in ck and "Defiro" in ck, ck
+        assert ck.count("DECISÃO") == 1 and "Atenda-se" not in ck and "I.C." not in ck and "MCG, data do sistema" in ck and "PODER JUDICIÁRIO" in ck, ck
+        if moldura:      # o cabeçalho e os menus continuam na aba; só o quadro navegou
+            assert aba.url == "https://projudi.tjgo.jus.br/", aba.url
+            assert aba.evaluate("!!document.getElementById('Principal') && document.getElementById('cab').innerText === 'Processo Judicial'")
+    # A) aba na moldura, em outra tela: vai à lista de conclusos DENTRO do quadro, aperta Pré-Analisar (abre no próprio quadro) e segue
+    aba = ctx.new_page(); aba.goto("https://projudi.tjgo.jus.br/")
+    r = sw.evaluate("m => lancarNoProjudi(m, null)", MIN); print("A", r); assert r["ok"], r; conferir(aba, True)
+    # B) aba solta já na pré-análise (sem moldura): usa a tela como está, sem navegar a aba
+    st.update({"tipo": "", "modelo": "", "excluiu": False}); aba.goto("https://projudi.tjgo.jus.br/form")
+    r = sw.evaluate("m => lancarNoProjudi(m, null)", MIN); print("B", r); assert r["ok"], r
+    assert st["tipo"] == "Decisão" and st["modelo"] == "Decisão Padrão" and st["excluiu"] is False and "habilitação" in aba.evaluate("window.__ck"), st
+    # C) aba solta em OUTRA tela (sem cabeçalho/menus): a extensão recupera a moldura (início do Projudi) antes de navegar no quadro
+    st.update({"tipo": "", "modelo": "", "excluiu": False}); aba.goto("https://projudi.tjgo.jus.br/home")
+    r = sw.evaluate("m => lancarNoProjudi(m, null)", MIN); print("C", r); assert r["ok"], r; conferir(aba, True)
     # sem aba do Projudi aberta: não cria aba nova
-    aba.close(); r2 = sw.evaluate("m => lancarNoProjudi(m, null)", {"processo": "5914870-27.2025.8.09.0166", "texto": minuta, "html": ""})
+    aba.close(); r2 = sw.evaluate("m => lancarNoProjudi(m, null)", {**MIN, "html": ""})
     assert not r2["ok"] and "não há aba do Projudi" in r2["erro"], r2
     ctx.close()
 print("OK")

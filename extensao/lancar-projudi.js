@@ -6,6 +6,7 @@
 //   4. coloca a minuta no editor, no lugar do texto-padrão do modelo (cabeçalho e assinatura do modelo ficam).
 // NÃO grava nada no Projudi: o usuário confere e clica em “Salvar Texto Parcial”.
 const LP_BASE = "https://projudi.tjgo.jus.br/";
+const SEM_MOLDURA = "a aba do Projudi está sem o cabeçalho e os menus (tela solta) e não consegui voltar ao início: clique em “Página Inicial” no Projudi e tente de novo";
 const lpDorme = (ms) => new Promise((ok) => setTimeout(ok, ms));
 const lpSem = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
 const lpChave = (p) => { const m = String(p || "").match(/(\d{1,7})[.\-](\d{1,2})(?!\d)/); return m ? m[1].padStart(7, "0") + m[2].padStart(2, "0") : String(p || "").replace(/\D/g, "").slice(0, 9); };
@@ -245,8 +246,8 @@ async function lpJanelas(tab, item) {
   return { pdf: !!janela, aviso: janela ? "" : "não consegui abrir a janela do PDF" };
 }
 
-/** Executa `func` só no quadro principal (um quadro interno sem o campo devolveria um "não achei" que esconderia o resultado certo). Se a tela navegar no meio, devolve null. */
-const lpPrincipal = (tab, func, args = []) => lpScript(tab.id, func, args, false).then((r) => r.find((x) => x && typeof x === "object") || null);
+/** Executa `func` só no quadro do CONTEÚDO (o "Principal" da moldura do Projudi; sem moldura, a própria página): outro quadro sem o campo devolveria um "não achei" que esconderia o resultado certo. Se a tela navegar no meio, devolve null. */
+const lpPrincipal = async (tab, func, args = []) => (await ProjudiQuadro.executar(tab.id, func, args, await ProjudiQuadro.frameDoConteudo(tab.id))).map((x) => x.result).find((x) => x && typeof x === "object") || null;
 
 /** Escolhe o valor de um campo de busca do Projudi: sugestão ao digitar → lupa. A lupa pode abrir uma janela de busca sobre a tela OU navegar a própria aba para uma página de busca
  *  (“Busca de Modelo”): nos dois casos a extensão acompanha, escolhe a linha e espera a tela do formulário voltar. */
@@ -277,7 +278,7 @@ async function lpPaginaDeBusca(tab, valor, chave, tipoNome) {
     const r = await lpPrincipal(tab, lpBuscaDeModelo, ["selecionar", valor, tipoNome]);
     if (r) ultimo = r;
     if (r?.ok) {
-      for (let j = 0; j < 80; j++) { await lpDorme(500); if ((await lpScript(tab.id, lpNaPaginaPreAnalise, [chave], false)).some(Boolean)) return { ok: true, via: "página de busca", linha: r.linha, candidatas: r.candidatas }; }
+      for (let j = 0; j < 80; j++) { await lpDorme(500); if ((await lpScript(tab.id, lpNaPaginaPreAnalise, [chave])).some(Boolean)) return { ok: true, via: "página de busca", linha: r.linha, candidatas: r.candidatas }; }
       return { ok: false, motivo: "selecionei o modelo na busca, mas a tela da pré-análise não voltou" };
     }
     if (r && r.motivo && !r.semLinhas) return { ok: false, motivo: r.motivo + (r.linha ? ` (linha: ${r.linha})` : "") };
@@ -300,8 +301,10 @@ async function lancarNoProjudi(m, abaStudio) {
     const jan = await lpJanelas(tab, item);
     if (!jaNaTela) {
       progresso("abrindo a pré-análise do processo no Projudi…");
-      if (item?.serventiaUrl) { await chrome.tabs.update(tab.id, { url: new URL(item.serventiaUrl, LP_BASE).href }); await lpDorme(600); await lpCarregou(tab.id); await lpDorme(1200); }
-      await chrome.tabs.update(tab.id, { url: LP_BASE + "PreAnalisarConclusao?PaginaAtual=2&tipo=todas" }); await lpDorme(600); await lpCarregou(tab.id); await lpDorme(1500);
+      // navega DENTRO do quadro da moldura do Projudi (a aba mantém o cabeçalho e os menus)
+      if (item?.serventiaUrl) { if (!(await ProjudiQuadro.irPara(tab.id, new URL(item.serventiaUrl, LP_BASE).href))) return { ok: false, erro: SEM_MOLDURA }; await lpDorme(1200); }
+      if (!(await ProjudiQuadro.irPara(tab.id, LP_BASE + "PreAnalisarConclusao?PaginaAtual=2&tipo=todas"))) return { ok: false, erro: SEM_MOLDURA };
+      await lpDorme(1500);
       let r = "", visto = 0;
       for (let k = 0; k < 30 && r !== "clicou" && r !== "sem-botao"; k++) {
         const rs = await lpScript(tab.id, lpClicarPreAnalisar, [chave]);

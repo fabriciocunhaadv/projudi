@@ -7,6 +7,7 @@ import { textoDoPdf } from "./pdf-texto.js";
 import { vigiarAcordado, conferirAcordado } from "./acordado.js";
 import { lerMinutaPre } from "./minuta-pre.js";
 import { chaveProc } from "./proc-chave.js";
+import "./projudi-quadro.js";      // define globalThis.ProjudiQuadro (navegar DENTRO do quadro da moldura do Projudi)
 const BASE = "https://projudi.tjgo.jus.br/";
 const absoluta = (u) => (u ? new URL(u, BASE).href : BASE);
 
@@ -19,7 +20,10 @@ async function abrirNoProjudi(it, url, active = true) {
   // navega dentro de uma aba do Projudi que já esteja aberta (sem abrir aba nova); só cria uma se não houver nenhuma
   const abertas = await chrome.tabs.query({ url: new URL(BASE).origin + "/*" }).catch(() => []);
   const antiga = abertas.find((t) => t.id === it.abas?.projudi) || abertas.find((t) => !t.pinned) || abertas[0];
-  const ir = async (alvo) => { await chrome.tabs.update(aba.id, { url: alvo, active }); await new Promise((ok) => setTimeout(ok, 600)); await new Promise((ok) => { const f = (id, i) => { if (id === aba.id && i.status === "complete") { chrome.tabs.onUpdated.removeListener(f); ok(); } }; chrome.tabs.onUpdated.addListener(f); setTimeout(() => { chrome.tabs.onUpdated.removeListener(f); ok(); }, 30000); }); };
+  const ir = async (alvo) => {
+    // com a moldura (cabeçalho e menus) na aba, navega só o quadro: o usuário não perde o menu nem o caminho de volta ao início
+    if (aba && await ProjudiQuadro.temMoldura(aba.id)) { if (active) await chrome.tabs.update(aba.id, { active: true }); if (await ProjudiQuadro.irPara(aba.id, alvo)) { await new Promise((ok) => setTimeout(ok, 600)); return; } }
+    await chrome.tabs.update(aba.id, { url: alvo, active }); await new Promise((ok) => setTimeout(ok, 600)); await new Promise((ok) => { const f = (id, i) => { if (id === aba.id && i.status === "complete") { chrome.tabs.onUpdated.removeListener(f); ok(); } }; chrome.tabs.onUpdated.addListener(f); setTimeout(() => { chrome.tabs.onUpdated.removeListener(f); ok(); }, 30000); }); };
   const aba = antiga || await chrome.tabs.create({ url: it.serventiaUrl ? absoluta(it.serventiaUrl) : url, active });
   if (antiga) { if (it.serventiaUrl) { await ir(absoluta(it.serventiaUrl)); await new Promise((ok) => setTimeout(ok, 1200)); } await ir(url); if (active) chrome.windows.update(aba.windowId, { focused: true }).catch(() => {}); }
   else if (it.serventiaUrl) { await new Promise((ok) => setTimeout(ok, 3000)); await chrome.tabs.update(aba.id, { url }); }
