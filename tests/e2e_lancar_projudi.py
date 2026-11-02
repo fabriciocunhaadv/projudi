@@ -34,7 +34,12 @@ with sync_playwright() as p:
     b = p.chromium.launch(executable_path=exe, args=["--no-sandbox"]); pg = b.new_page()
     pg.set_content(PAGINA); pg.add_script_tag(content=SRC)
     assert pg.evaluate("lpNaPaginaPreAnalise('591487027')") is True and pg.evaluate("lpNaPaginaPreAnalise('111111111')") is False
-    assert pg.evaluate("lpTipoDoAto('SENTENÇA\\nVistos')") == "Sentença" and pg.evaluate("lpTipoDoAto('DESPACHO\\nIntime-se')") == "Despacho" and pg.evaluate("lpTipoDoAto('DECISÃO INTERLOCUTÓRIA')") == "Decisão"
+    T = lambda texto, card="": pg.evaluate("([a, b]) => lpTipoDoAto(a, b)", [texto, card])
+    assert T("SENTENÇA\nVistos") == "Sentença" and T("DESPACHO\nIntime-se") == "Despacho" and T("DECISÃO INTERLOCUTÓRIA\nx") == "Decisão" and T("DECISÃO SANEADORA\nx") == "Decisão"
+    # decisão em CUMPRIMENTO DE SENTENÇA: a palavra "sentença" no corpo não faz dela uma sentença (erro real: lançou "Sentença Padrão")
+    corpo = "PODER JUDICIÁRIO DO ESTADO DE GOIÁS\nPODER JUDICIÁRIO DO ESTADO DE GOIÁS\nDECISÃO INTERLOCUTÓRIA\nTrata-se de cumprimento de sentença contra a Fazenda Pública; a sentença transitou em julgado. " * 3
+    assert T(corpo) == "Decisão" and T(corpo, "DECISÃO INTERLOCUTÓRIA") == "Decisão" and T("x\n" * 3 + "Trata-se de cumprimento de sentença, ISTO POSTO julgo procedente " * 5) is None
+    assert T(corpo, "SENTENÇA") == "Sentença"      # o rótulo do card manda
     r = pg.evaluate("lpCampoAcao('Tipo de Arquivo', 'Decisão', 'sugestao')"); print(r); assert r["ok"] and pg.input_value("#tipo") == "Decisão", r
     assert pg.evaluate("lpCampoAcao('Modelo', 'Decisão Padrão', 'estado')")["achou"] is True
     r = pg.evaluate("lpCampoAcao('Modelo', 'Decisão Padrão', 'sugestao')"); assert not r["ok"] and r["semSugestao"] and pg.input_value("#modelo") == "", r      # sem sugestões: não deixa texto digitado
@@ -43,12 +48,13 @@ with sync_playwright() as p:
     assert pg.evaluate("lpEstadoDaTela()")["modal"] is True
     r = pg.evaluate("lpCampoAcao('Modelo', 'Decisão Padrão', 'modal')"); print(r); assert r["ok"] and pg.input_value("#modelo") == "Decisão Padrão", r
     assert "Atenda-se" in pg.evaluate("lpLerEditor()")
-    minuta_html = "<h3>DECISÃO</h3><p>Trata-se de pedido de <b>habilitação</b>.</p><h3>DISPOSITIVO</h3><p>Defiro.</p><blockquote>art. 104 do CPC</blockquote>"
+    minuta_html = "<h3>PODER JUDICIÁRIO DO ESTADO DE GOIÁS</h3><h3>PODER JUDICIÁRIO DO ESTADO DE GOIÁS</h3><h3>DECISÃO INTERLOCUTÓRIA</h3><p>Trata-se de pedido de <b>habilitação</b>.</p><h3>DISPOSITIVO</h3><p>Defiro.</p><blockquote>art. 104 do CPC</blockquote>"
     r = pg.evaluate("([h,t]) => lpInserirNoEditor(h, t)", [minuta_html, "DECISÃO\nTrata-se"]); print(r)
     assert r["ok"] and r["tituloAchado"] and r["assinaturaAchada"] and r["removidos"] == 2, r
     novo = pg.evaluate("lpLerEditor()")
     assert "Trata-se de pedido de <b>habilitação</b>" in novo or "<strong>habilitação</strong>" in novo or "habilitação" in novo
     assert novo.count("DECISÃO") == 1, "o título não pode duplicar"
+    assert novo.count("PODER JUDICIÁRIO") == 1 and "INTERLOCUTÓRIA" not in novo, "o cabeçalho do Studio não pode duplicar o do modelo"
     assert "Atenda-se" not in novo and "I.C." not in novo, "texto-padrão do modelo deve sair"
     assert "MCG, data do sistema" in novo and "Rafael Machado de Souza" in novo and "PODER JUDICIÁRIO" in novo, "cabeçalho e assinatura ficam"
     assert novo.index("DECISÃO") < novo.index("Trata-se") < novo.index("DISPOSITIVO") < novo.index("MCG, data do sistema")

@@ -902,7 +902,8 @@
       const processo = numeroLP();
       if (!processo) { dizLP("Não achei o número do processo nesta tela.", true); return; }
       btLP.disabled = true; dizLP("Iniciando…");
-      const r = await chrome.runtime.sendMessage({ acao: "lancar-projudi", processo, texto: texto2, html });
+      const hRes = painelResultado(), rotulo = hRes ? texto(hRes.parentElement).replace(/Resultado\s*&\s*An[aá]lise/i, "").trim().slice(0, 60) : "";      // rótulo do card (ex.: DECISÃO INTERLOCUTÓRIA)
+      const r = await chrome.runtime.sendMessage({ acao: "lancar-projudi", processo, texto: texto2, html, tituloAto: rotulo });
       if (r?.ok) dizLP(`Pronto: ${r.tipo} / “${r.modelo}” com a minuta no editor do Projudi. Confira e clique em “Salvar Texto Parcial”.${r.aviso ? " ⚠ " + r.aviso : ""}`, false, 20000);
       else dizLP("Não deu certo: " + (r?.erro || "sem resposta da extensão") + (r?.passo ? ` (passo: ${r.passo})` : ""), true);
     } catch (e) { dizLP("Não deu certo: " + (e.message || e) + " (se a extensão foi atualizada, recarregue esta aba)", true); }

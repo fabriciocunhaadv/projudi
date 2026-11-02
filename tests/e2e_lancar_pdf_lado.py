@@ -13,7 +13,7 @@ with sync_playwright() as p:
     sw = ctx.service_workers[0] if ctx.service_workers else ctx.wait_for_event("serviceworker")
     assert sw.evaluate("typeof lancarNoProjudi === 'function' && typeof lpInserirNoEditor === 'function'"), "módulo não carregou no service worker"
     # sem aba do Projudi aberta: não cria aba nova, explica
-    r = sw.evaluate("lancarNoProjudi({ processo: '5914870-27.2025.8.09.0166', texto: 'DECISÃO ' + 'x'.repeat(80), html: '' }, null)")
+    r = sw.evaluate("lancarNoProjudi({ processo: '5914870-27.2025.8.09.0166', texto: 'DECISÃO\\n' + 'x'.repeat(80), html: '' }, null)")
     print(r); assert not r["ok"] and "não há aba do Projudi" in r["erro"], r
     base = f"chrome-extension://{sw.url.split('/')[2]}/"
     pg = ctx.new_page(); pg.goto(base + "esteira.html")

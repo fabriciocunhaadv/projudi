@@ -11,12 +11,22 @@ const lpDorme = (ms) => new Promise((ok) => setTimeout(ok, ms));
 const lpSem = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
 const lpChave = (p) => { const m = String(p || "").match(/(\d{1,7})[.\-](\d{1,2})(?!\d)/); return m ? m[1].padStart(7, "0") + m[2].padStart(2, "0") : String(p || "").replace(/\D/g, "").slice(0, 9); };
 
-/** Tipo do ato → nome do arquivo no Projudi. Decisão saneadora/interlocutória usam o tipo “Decisão”. */
-function lpTipoDoAto(texto) {
-  const t = lpSem(String(texto || "").slice(0, 1500)).toUpperCase();
-  if (/\bSENTENCA\b|ISTO POSTO.*JULGO/.test(t)) return "Sentença";
-  if (/\bDESPACHO\b/.test(t)) return "Despacho";
-  return "Decisão";
+/** Tipo do ato (nome do arquivo no Projudi) pelo TÍTULO do ato: o rótulo do card do Studio ou a primeira linha curta que seja só o título (DESPACHO / DECISÃO… / SENTENÇA…).
+ *  NUNCA pela palavra solta no corpo: uma decisão em cumprimento de sentença fala em “sentença” e não é sentença. Decisão interlocutória ou saneadora = “Decisão”. Sem título claro: null (não adivinha). */
+function lpTipoDeTitulo(linha) {
+  const t = lpSem(linha).toUpperCase().replace(/[^A-Z ]/g, " ").replace(/\s+/g, " ").trim();
+  if (!t || t.length > 60) return null;
+  if (/^SENTENCA( |$)/.test(t)) return "Sentença";
+  if (/^DESPACHO( |$)/.test(t)) return "Despacho";
+  if (/^DECISAO( |$)/.test(t)) return "Decisão";
+  return null;
+}
+function lpTipoDoAto(texto, tituloAto) {
+  const doCard = lpTipoDeTitulo(tituloAto || "");
+  if (doCard) return doCard;
+  const linhas = String(texto || "").split(/\n+/).slice(0, 40);
+  for (const l of linhas) { const t = lpTipoDeTitulo(l.replace(/^#+\s*/, "").replace(/\*+/g, "")); if (t) return t; }
+  return null;
 }
 
 // ---------- funções que rodam DENTRO da página do Projudi (autossuficientes: são serializadas por executeScript) ----------
@@ -174,7 +184,10 @@ function lpInserirNoEditor(minutaHtml, minutaTexto) {
   // a minuta como parágrafos formatados (sem o título do ato, que o modelo já traz)
   const box = new DOMParser().parseFromString("<body>" + (minutaHtml || minutaTexto.split(/\n+/).map((l) => (/^#{1,6}\s/.test(l) ? "<h3>" + esc(l.replace(/^#{1,6}\s+/, "")) + "</h3>" : "<p>" + esc(l.replace(/\*\*/g, "")) + "</p>")).join("")) + "</body>", "text/html").body;
   const filhos = [...box.children];
-  while (filhos.length && (!sem(filhos[0].textContent) || TITULO.test(sem(filhos[0].textContent)))) { filhos[0].remove(); filhos.shift(); }
+  const ehTitulo = (e) => { const t = sem(e.textContent); return t.length > 0 && t.length <= 60 && /^(despacho|decisao|sentenca)( |$)/.test(t); };
+  const iTit = filhos.findIndex(ehTitulo);
+  if (iTit >= 0 && iTit <= 8) { for (let k = 0; k <= iTit; k++) filhos[k].remove(); }      // cabeçalho do Studio (“PODER JUDICIÁRIO…”) e título do ato: o modelo do Projudi já traz os dele
+  else while (box.firstElementChild && (!sem(box.firstElementChild.textContent) || TITULO.test(sem(box.firstElementChild.textContent)))) box.firstElementChild.remove();
   const fonte = "font-family:'Times New Roman',serif;font-size:12pt;";
   const novos = [...box.children].map((e) => {
     const t = e.tagName.toLowerCase(), txt = e.innerHTML;
@@ -291,7 +304,9 @@ async function lancarNoProjudi(m, abaStudio) {
   const processo = String(m.processo || ""), chave = lpChave(processo);
   if (!chave) return { ok: false, erro: "não achei o número do processo na minuta aberta no Studio" };
   if (!m.texto || m.texto.length < 50) return { ok: false, erro: "a minuta está vazia" };
-  const tipoNome = lpTipoDoAto(m.texto), modelo = tipoNome + " Padrão";
+  const tipoNome = lpTipoDoAto(m.texto, m.tituloAto);
+  if (!tipoNome) return { ok: false, erro: "não consegui identificar se a minuta é despacho, decisão ou sentença (não achei o título do ato); confira o título no alto da minuta" };
+  const modelo = tipoNome + " Padrão";
   const liberar = await new Promise((pronto) => { if (!navigator.locks) return pronto(() => {}); navigator.locks.request("projudi-aba", () => new Promise((fim) => pronto(() => fim()))).catch(() => pronto(() => {})); });
   try {
     const item = await lpAchaItem(processo);

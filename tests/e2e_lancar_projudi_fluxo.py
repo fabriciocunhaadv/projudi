@@ -60,8 +60,9 @@ with sync_playwright() as p:
         args=["--headless=new", "--no-sandbox", f"--disable-extensions-except={ext}", f"--load-extension={ext}"])
     sw = ctx.service_workers[0] if ctx.service_workers else ctx.wait_for_event("serviceworker")
     ctx.route("https://projudi.tjgo.jus.br/**", atender)
-    MIN = {"processo": "5914870-27.2025.8.09.0166", "texto": "DECISÃO INTERLOCUTÓRIA\n" + "Trata-se de pedido de habilitação nos autos. " * 6,
-           "html": "<h3>DECISÃO INTERLOCUTÓRIA</h3><p>Trata-se de pedido de <b>habilitação</b> nos autos.</p><h3>DISPOSITIVO</h3><p>Defiro.</p>"}
+    MIN = {"processo": "5914870-27.2025.8.09.0166", "tituloAto": "DECISÃO INTERLOCUTÓRIA",
+           "texto": "PODER JUDICIÁRIO DO ESTADO DE GOIÁS\nDECISÃO INTERLOCUTÓRIA\n" + "Trata-se de cumprimento de sentença contra a Fazenda Pública; a sentença transitou em julgado. " * 6,
+           "html": "<h3>PODER JUDICIÁRIO DO ESTADO DE GOIÁS</h3><h3>DECISÃO INTERLOCUTÓRIA</h3><p>Trata-se de pedido de <b>habilitação</b> nos autos.</p><h3>DISPOSITIVO</h3><p>Defiro.</p>"}
     def quadro(aba):
         return next(f for f in aba.frames if f.url.endswith("/form"))
     def conferir(aba, moldura):
@@ -69,7 +70,7 @@ with sync_playwright() as p:
         assert st["excluiu"] is False, "NUNCA pode apertar Excluir"
         ck = quadro(aba).evaluate("window.__ck")
         assert "habilitação" in ck and "DISPOSITIVO" in ck and "Defiro" in ck, ck
-        assert ck.count("DECISÃO") == 1 and "Atenda-se" not in ck and "I.C." not in ck and "MCG, data do sistema" in ck and "PODER JUDICIÁRIO" in ck, ck
+        assert ck.count("PODER JUDICIÁRIO") == 1 and ck.count("DECISÃO") == 1 and "Atenda-se" not in ck and "I.C." not in ck and "MCG, data do sistema" in ck and "PODER JUDICIÁRIO" in ck, ck
         if moldura:      # o cabeçalho e os menus continuam na aba; só o quadro navegou
             assert aba.url == "https://projudi.tjgo.jus.br/", aba.url
             assert aba.evaluate("!!document.getElementById('Principal') && document.getElementById('cab').innerText === 'Processo Judicial'")
