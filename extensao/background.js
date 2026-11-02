@@ -223,7 +223,7 @@ async function capturarEAbrir(tabId) {
 chrome.commands.onCommand.addListener((c) => c === "capturar-tela" && capturarEAbrir().catch(console.error));
 
 // Pede ao Projudi (aba "Navegação de Arquivos") para abrir a janela "Gerar PDF"; lá o gerarpdf.js marca os arquivos e gera.
-importScripts("tabs-retry.js", "gerar-util.js");
+importScripts("tabs-retry.js", "gerar-util.js", "lancar-projudi.js");
 async function abrirGerarPdf(tabId) {
   if (!tabId) return false;
   const r = await GerarUtil.capturarGerar(tabId);
@@ -240,6 +240,7 @@ chrome.runtime.onMessage.addListener((m, s, responder) => {
       .then(() => chrome.tabs.create({ url, active: true })).then(() => responder({ ok: true }), (e) => responder({ ok: false, erro: String(e.message || e) }));
     return true;
   }
+  if (m?.acao === "lancar-projudi") { lancarNoProjudi(m, s.tab).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }      // botão “Lançar no Projudi” da minuta do Studio
   if (m?.acao === "minha-aba") { responder({ tabId: s.tab ? s.tab.id : null }); return false; }
   if (m?.acao === "esteira-abrir") {       // garante a aba que roda a fila de minutas
     const url = chrome.runtime.getURL("esteira.html");

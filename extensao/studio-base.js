@@ -779,6 +779,7 @@
   const temApp = () => /^Assessor Judicial/i.test(document.title || "") || !!document.querySelector("#tour-input-panel, #tour-execute-btn, [data-testid=gigantes-selo], #tour-result-tabs");
   const quadroSemApp = () => !temApp() && (window.top !== window || !!document.querySelector("iframe"));
   chrome.runtime.onMessage.addListener((m, _s, responder) => {
+    if (m?.acao === "lancar-progresso") { if (btLP.disabled) dizLP(m.texto); return false; }      // andamento do botão “Lançar no Projudi” (definido mais abaixo)
     if (quadroSemApp()) return false;
     if (m?.acao === "studio-ping") { responder({ ok: true }); return false; }
     if (m?.acao === "studio-gigantes") { responder({ ok: true, jobs: listaGigantes() }); return false; }
@@ -852,4 +853,41 @@
   }
   // A esteira é automática: a caixa “Enviar a minuta aberta aqui…” não aparece mais (a recuperação manual fica na própria página da esteira).
   void atualizarBotao;
+
+  // ---------- botão flutuante “Lançar no Projudi” ----------
+  // Leva a minuta aberta aqui para o editor da pré-análise do Projudi (tipo e modelo “<Tipo> Padrão”), com o PDF dos autos ao lado. A extensão não grava nada no Projudi.
+  const hostLP = document.createElement("div"); hostLP.setAttribute("data-projudi-ext", "lancar-projudi");
+  const shLP = hostLP.attachShadow({ mode: "open" });
+  shLP.innerHTML = `<style>
+    .w{position:fixed;right:22px;bottom:96px;z-index:2147483645;display:none;flex-direction:column;align-items:flex-end;gap:6px;font:13px system-ui,sans-serif}
+    button{font:700 14px system-ui,sans-serif;padding:11px 18px;border:0;border-radius:999px;cursor:pointer;background:linear-gradient(135deg,#0b3d7a,#1565c0);color:#fff;box-shadow:0 4px 16px #0b3d7a88}
+    button:hover{filter:brightness(1.12)} button:disabled{opacity:.7;cursor:wait}
+    .r{max-width:340px;background:#0b1f3a;color:#fff;padding:7px 11px;border-radius:8px;box-shadow:0 2px 10px #0006;display:none;line-height:1.35}
+    .r.e{background:#7a1010}
+  </style><div class="w"><div class="r"></div><button title="Abre a pré-análise do processo no Projudi (na aba que você já deixou aberta), escolhe o tipo e o modelo padrão, coloca esta minuta no editor e abre o PDF dos autos ao lado. Não grava nada: você confere e salva.">⚖ Lançar no Projudi</button></div>`;
+  const wLP = shLP.querySelector(".w"), btLP = shLP.querySelector("button"), rLP = shLP.querySelector(".r");
+  const dizLP = (t, erro = false) => { rLP.textContent = t; rLP.className = "r" + (erro ? " e" : ""); rLP.style.display = t ? "block" : "none"; };
+  const numeroLP = () => ((document.getElementById("tour-meta-parties-box")?.innerText) || (resultadoTurbo()?.innerText) || document.body.innerText.slice(0, 6000) || "").match(/\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/)?.[0] || "";
+  async function atualizarLP() {
+    try {
+      if (!hostLP.isConnected) document.documentElement.appendChild(hostLP);
+      wLP.style.display = (minutaDoPainel().length > 200 || resultadoTurbo()) ? "flex" : "none";
+    } catch (e) { /* extensão recarregada: esta cópia do script morreu */ }
+  }
+  btLP.onclick = async () => {
+    try {
+      const turbo = resultadoTurbo() ? lerResultadoTurbo() : null;
+      const texto2 = turbo ? turbo.texto : await lerMinuta(), html = turbo ? turbo.html : minutaHtmlDoPainel();
+      if (!texto2) { dizLP("Não achei a minuta nesta tela.", true); return; }
+      const processo = numeroLP();
+      if (!processo) { dizLP("Não achei o número do processo nesta tela.", true); return; }
+      btLP.disabled = true; dizLP("Iniciando…");
+      const r = await chrome.runtime.sendMessage({ acao: "lancar-projudi", processo, texto: texto2, html });
+      if (r?.ok) dizLP(`Pronto: ${r.tipo} / “${r.modelo}” com a minuta no editor do Projudi. Confira e clique em “Salvar Texto Parcial”.${r.aviso ? " ⚠ " + r.aviso : ""}`);
+      else dizLP("Não deu certo: " + (r?.erro || "sem resposta da extensão") + (r?.passo ? ` (passo: ${r.passo})` : ""), true);
+    } catch (e) { dizLP("Não deu certo: " + (e.message || e) + " (se a extensão foi atualizada, recarregue esta aba)", true); }
+    finally { btLP.disabled = false; }
+  };
+  document.documentElement.appendChild(hostLP);
+  atualizarLP(); setInterval(atualizarLP, 2000);
 })();
