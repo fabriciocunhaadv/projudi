@@ -35,8 +35,13 @@ with sync_playwright() as p:
     pg.set_content(PAGINA); pg.add_script_tag(content=SRC)
     assert pg.evaluate("lpNaPaginaPreAnalise('591487027')") is True and pg.evaluate("lpNaPaginaPreAnalise('111111111')") is False
     assert pg.evaluate("lpTipoDoAto('SENTENÇA\\nVistos')") == "Sentença" and pg.evaluate("lpTipoDoAto('DESPACHO\\nIntime-se')") == "Despacho" and pg.evaluate("lpTipoDoAto('DECISÃO INTERLOCUTÓRIA')") == "Decisão"
-    r = pg.evaluate("lpEscolherCampo('Tipo de Arquivo', 'Decisão')"); print(r); assert r["ok"] and pg.input_value("#tipo") == "Decisão", r
-    r = pg.evaluate("lpEscolherCampo('Modelo', 'Decisão Padrão')"); print(r); assert r["ok"] and pg.input_value("#modelo") == "Decisão Padrão" and "lupa" in r["via"], r
+    r = pg.evaluate("lpCampoAcao('Tipo de Arquivo', 'Decisão', 'sugestao')"); print(r); assert r["ok"] and pg.input_value("#tipo") == "Decisão", r
+    assert pg.evaluate("lpCampoAcao('Modelo', 'Decisão Padrão', 'estado')")["achou"] is True
+    r = pg.evaluate("lpCampoAcao('Modelo', 'Decisão Padrão', 'sugestao')"); assert not r["ok"] and r["semSugestao"] and pg.input_value("#modelo") == "", r      # sem sugestões: não deixa texto digitado
+    r = pg.evaluate("lpCampoAcao('Modelo', 'Decisão Padrão', 'lupa')"); assert r["ok"] and r["clicou"], r
+    pg.wait_for_selector("#busca_padrao", state="visible")
+    assert pg.evaluate("lpEstadoDaTela()")["modal"] is True
+    r = pg.evaluate("lpCampoAcao('Modelo', 'Decisão Padrão', 'modal')"); print(r); assert r["ok"] and pg.input_value("#modelo") == "Decisão Padrão", r
     assert "Atenda-se" in pg.evaluate("lpLerEditor()")
     minuta_html = "<h3>DECISÃO</h3><p>Trata-se de pedido de <b>habilitação</b>.</p><h3>DISPOSITIVO</h3><p>Defiro.</p><blockquote>art. 104 do CPC</blockquote>"
     r = pg.evaluate("([h,t]) => lpInserirNoEditor(h, t)", [minuta_html, "DECISÃO\nTrata-se"]); print(r)
@@ -52,6 +57,6 @@ with sync_playwright() as p:
     pg.evaluate("window.CKEDITOR.instances.e.setData('<p>texto livre</p>')")
     r = pg.evaluate("([h,t]) => lpInserirNoEditor(h, t)", ["<p>Minuta</p>", "Minuta"]); assert r["ok"] and not r["tituloAchado"] and "texto livre" in pg.evaluate("lpLerEditor()")
     # campo inexistente
-    r = pg.evaluate("lpEscolherCampo('Rótulo que não existe', 'x')"); assert not r["ok"] and "não achei o campo" in r["motivo"], r
+    r = pg.evaluate("lpCampoAcao('Rótulo que não existe', 'x', 'estado')"); assert not r["ok"] and "não achei o campo" in r["motivo"], r
     b.close()
 print("OK")

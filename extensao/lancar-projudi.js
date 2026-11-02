@@ -45,15 +45,15 @@ function lpClicarPreAnalisar(chave) {
   if (!b) return "sem-botao"; b.click(); return "clicou";
 }
 
-/** Escolhe um valor num campo de busca do Projudi (Tipo de Arquivo / Modelo): primeiro pela lista de sugestões ao digitar; se não houver, pela lupa (janela de busca). */
-async function lpEscolherCampo(rotulo, valor) {
+/** Campo do rótulo (Tipo de Arquivo / Modelo) e o que fazer com ele: "estado" (existe? valor atual), "sugestao" (digita e clica na sugestão), "lupa" (clica na lupa do campo; a tela pode NAVEGAR),
+ *  "modal" (a lupa abriu uma janela de busca sobre a tela: filtra e escolhe a linha). Roda só no quadro principal. */
+async function lpCampoAcao(rotulo, valor, acao) {
   const sem = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
   const esp = (ms) => new Promise((ok) => setTimeout(ok, ms));
   const visivel = (e) => !!e && e.getBoundingClientRect().width > 0 && getComputedStyle(e).visibility !== "hidden";
   const quer = sem(valor);
   const bate = (t) => { const x = sem(t); return x === quer || x.startsWith(quer + " ") ? 2 : x.includes(quer) ? 1 : 0; };
   const clicar = (e) => { for (const tipo of ["mousedown", "mouseup", "click"]) e.dispatchEvent(new MouseEvent(tipo, { bubbles: true, cancelable: true, view: window })); };
-  // o campo: primeiro <input> de texto depois do rótulo
   const rotulos = [...document.querySelectorAll("label,td,th,span,div,b,strong,p")].filter((e) => visivel(e) && e.children.length < 6 && sem(e.firstChild && e.firstChild.nodeType === 3 ? e.firstChild.nodeValue : e.textContent).startsWith(sem(rotulo)));
   const entradas = [...document.querySelectorAll("input")].filter((i) => !/^(hidden|checkbox|radio|button|submit)$/i.test(i.type) && visivel(i));
   let campo = null, rot = null, melhorD = Infinity;
@@ -66,40 +66,87 @@ async function lpEscolherCampo(rotulo, valor) {
       const d = Math.abs(dy) * 3 + Math.abs(ib.left - rb.right) + exato; if (d < melhorD) { melhorD = d; campo = i; rot = r; }
     }
   }
-  if (!campo) return { ok: false, motivo: `não achei o campo “${rotulo}” na tela` };
-  for (let k = 0; k < 40 && (campo.disabled || campo.readOnly) && k < 40; k++) await esp(250);      // o Modelo só libera depois do Tipo
-  const confere = () => bate(campo.value) > 0;      // só é consultado DEPOIS de clicar numa sugestão ou numa linha da busca (o valor digitado por nós é apagado antes)
-  // A) sugestões ao digitar
-  try {
-    campo.focus();
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set; setter.call(campo, valor);
-    for (const t of ["input", "keydown", "keypress", "keyup"]) campo.dispatchEvent(new (t === "input" ? Event : KeyboardEvent)(t, { bubbles: true, key: "a" }));
-    try { const $ = window.jQuery || window.$; if ($ && $(campo).autocomplete) $(campo).autocomplete("search", valor); } catch (e) { /* sem jQuery UI */ }
-    for (let k = 0; k < 16; k++) {
-      await esp(250);
-      const itens = [...document.querySelectorAll(".ui-autocomplete li, .ui-menu-item, ul[role=listbox] li, .autocomplete-suggestion, .autocomplete-items div")].filter(visivel);
-      const melhor = itens.map((e) => [bate(e.textContent), e]).filter((x) => x[0] > 0).sort((a, b) => b[0] - a[0])[0];
-      if (melhor) { clicar(melhor[1].querySelector("a,div") || melhor[1]); await esp(500); if (confere()) return { ok: true, via: "sugestão" }; break; }
-    }
-  } catch (e) { /* tenta a lupa */ }
-  // sem sugestão clicada o texto digitado não vale (o Projudi grava o código escolhido, não o texto): limpa e tenta a lupa
-  try { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(campo, ""); campo.dispatchEvent(new Event("input", { bubbles: true })); } catch (e) { /* nada */ }
-  // B) lupa → janela de busca (#busca_padrao)
-  const caixa = (rot && (rot.closest("tr,fieldset,div") || rot.parentElement)) || document.body;
-  const lupa = [...caixa.querySelectorAll("i,img,a,button,span")].find((e) => /magnif|search|lupa|pesquis|buscar|localizar/i.test(String((e.className && e.className.baseVal) || e.className || "") + " " + (e.getAttribute("title") || "") + " " + (e.getAttribute("alt") || "") + " " + (e.getAttribute("src") || "")));
-  if (!lupa) return { ok: false, motivo: `escolhi nada no campo “${rotulo}”: sem sugestão e sem lupa encontrada` };
-  clicar(lupa.closest("a,button") || lupa);
-  let modal = null; for (let k = 0; k < 20 && !modal; k++) { await esp(250); modal = [...document.querySelectorAll("#busca_padrao, .modalBusca")].find(visivel) || null; }
-  if (!modal) return { ok: false, motivo: `a lupa de “${rotulo}” não abriu a janela de busca` };
-  const filtro = modal.querySelector("#busca_padrao_campos input[type=text], input[type=text]"); if (filtro) { filtro.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(filtro, valor); filtro.dispatchEvent(new Event("input", { bubbles: true })); }
-  const consultar = modal.querySelector("#busca_padraoLocalizar, input[value=Consultar], button"); if (consultar) clicar(consultar);
-  for (let k = 0; k < 30; k++) {
-    await esp(300);
-    const linhas = [...modal.querySelectorAll("#divTabelaBuscaPadrao tr, table tr")].filter((tr) => tr.querySelector("td"));
-    const melhor = linhas.map((tr) => [bate(tr.textContent), tr]).filter((x) => x[0] > 0).sort((a, b) => b[0] - a[0])[0];
-    if (melhor) { const alvo = melhor[1].querySelector("a,button,input[type=radio],input[type=checkbox]") || melhor[1].querySelector("td"); clicar(alvo); await esp(800); if (confere()) return { ok: true, via: "lupa" }; return { ok: true, via: "lupa (não confirmado pelo campo)" }; }
+  if (!campo) return { ok: false, achou: false, motivo: `não achei o campo “${rotulo}” na tela` };
+  if (acao === "estado") return { ok: true, achou: true, valor: campo.value, travado: !!(campo.disabled || campo.readOnly), confere: bate(campo.value) > 0 };
+  const setar = (el, v) => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, v); el.dispatchEvent(new Event("input", { bubbles: true })); };
+  if (acao === "sugestao") {
+    try {
+      campo.focus(); setar(campo, valor);
+      for (const t of ["keydown", "keypress", "keyup"]) campo.dispatchEvent(new KeyboardEvent(t, { bubbles: true, key: "a" }));
+      try { const $ = window.jQuery || window.$; if ($ && $(campo).autocomplete) $(campo).autocomplete("search", valor); } catch (e) { /* sem jQuery UI */ }
+      for (let k = 0; k < 14; k++) {
+        await esp(250);
+        const itens = [...document.querySelectorAll(".ui-autocomplete li, .ui-menu-item, ul[role=listbox] li, .autocomplete-suggestion, .autocomplete-items div")].filter(visivel);
+        const melhor = itens.map((e) => [bate(e.textContent), e]).filter((x) => x[0] > 0).sort((a, b) => b[0] - a[0])[0];
+        if (melhor) { clicar(melhor[1].querySelector("a,div") || melhor[1]); await esp(500); if (bate(campo.value) > 0) return { ok: true, via: "sugestão" }; break; }
+      }
+    } catch (e) { /* cai na lupa */ }
+    try { setar(campo, ""); } catch (e) { /* nada */ }      // o texto digitado por nós não vale (o Projudi grava o código escolhido): limpa
+    return { ok: false, semSugestao: true, motivo: `“${rotulo}” não mostrou sugestões` };
   }
-  return { ok: false, motivo: `a busca de “${rotulo}” não trouxe “${valor}”` };
+  if (acao === "lupa") {
+    const caixa = (rot && (rot.closest("tr,fieldset,div") || rot.parentElement)) || document.body;
+    const lupa = [...caixa.querySelectorAll("i,img,a,button,span")].find((e) => /magnif|search|lupa|pesquis|buscar|localizar/i.test(String((e.className && e.className.baseVal) || e.className || "") + " " + (e.getAttribute("title") || "") + " " + (e.getAttribute("alt") || "") + " " + (e.getAttribute("src") || "")));
+    if (!lupa) return { ok: false, motivo: `não achei a lupa do campo “${rotulo}”` };
+    const alvo = lupa.closest("a,button") || lupa;
+    setTimeout(() => clicar(alvo), 60);      // o clique pode trocar a tela: devolve antes
+    return { ok: true, clicou: true };
+  }
+  if (acao === "modal") {
+    const modal = [...document.querySelectorAll("#busca_padrao, .modalBusca")].find(visivel);
+    if (!modal) return { ok: false, semModal: true };
+    const filtro = modal.querySelector("#busca_padrao_campos input[type=text], input[type=text]"); if (filtro) { filtro.focus(); setar(filtro, valor); }
+    const consultar = modal.querySelector("#busca_padraoLocalizar, input[value=Consultar], button"); if (consultar) clicar(consultar);
+    for (let k = 0; k < 30; k++) {
+      await esp(300);
+      const linhas = [...modal.querySelectorAll("#divTabelaBuscaPadrao tr, table tr")].filter((tr) => tr.querySelector("td"));
+      const melhor = linhas.map((tr) => [bate(tr.textContent), tr]).filter((x) => x[0] > 0).sort((a, b) => b[0] - a[0])[0];
+      if (melhor) { clicar(melhor[1].querySelector("a,button,input[type=radio],input[type=checkbox]") || melhor[1].querySelector("td")); await esp(800); return { ok: true, via: "janela de busca", confere: bate(campo.value) > 0 }; }
+    }
+    return { ok: false, motivo: `a busca de “${rotulo}” não trouxe “${valor}”` };
+  }
+  return { ok: false, motivo: "ação desconhecida" };
+}
+
+/** A tela atual é uma página de busca (“… Busca de Modelo”, com o botão Consultar) ou há janela de busca sobre a tela? */
+function lpEstadoDaTela() {
+  const visivel = (e) => !!e && e.getBoundingClientRect().width > 0;
+  const topo = ((document.body && document.body.innerText) || "").slice(0, 700);
+  const temConsultar = [...document.querySelectorAll("button,input[type=submit],input[type=button],a")].some((e) => /^consultar$/i.test((e.value || e.textContent || "").trim()) && visivel(e));
+  return { busca: /Busca de\s+\S+/i.test(topo) && temConsultar, modal: !![...document.querySelectorAll("#busca_padrao, .modalBusca")].find(visivel), carregando: document.readyState !== "complete" };
+}
+
+/** Página de busca de modelo: fase "consultar" (digita o nome e aperta Consultar) e fase "selecionar" (na linha do modelo, aperta “Selecionar” — nunca “Excluir”). A tela pode recarregar entre as fases. */
+async function lpBuscaDeModelo(fase, valor, tipoNome) {
+  const sem = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+  const visivel = (e) => !!e && e.getBoundingClientRect().width > 0;
+  const clicar = (e) => { for (const tipo of ["mousedown", "mouseup", "click"]) e.dispatchEvent(new MouseEvent(tipo, { bubbles: true, cancelable: true, view: window })); };
+  const quer = sem(valor), bate = (t) => { const x = sem(t); return x === quer ? 3 : x.startsWith(quer + " ") ? 2 : x.includes(quer) ? 1 : 0; };
+  if (fase === "consultar") {
+    const entrada = [...document.querySelectorAll("input[type=text],input:not([type])")].filter(visivel)[0];
+    if (!entrada) return { ok: false, motivo: "não achei o campo de busca do modelo" };
+    entrada.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(entrada, valor); entrada.dispatchEvent(new Event("input", { bubbles: true }));
+    const botao = [...document.querySelectorAll("button,input[type=submit],input[type=button],a")].find((e) => /^consultar$/i.test((e.value || e.textContent || "").trim()) && visivel(e));
+    if (!botao) return { ok: false, motivo: "não achei o botão Consultar" };
+    setTimeout(() => clicar(botao), 60);
+    return { ok: true, clicou: true };
+  }
+  // selecionar: colunas pelo cabeçalho (Id | Modelo | Serventia | Tipo Modelo | Selecionar | Excluir)
+  const linhas = [...document.querySelectorAll("tr")];
+  const cab = linhas.find((tr) => /selecionar/i.test(tr.textContent) && /modelo/i.test(tr.textContent) && !tr.querySelector("input[type=text]"));
+  const nomes = cab ? [...cab.children].map((c) => sem(c.textContent)) : [];
+  const iNome = nomes.findIndex((n) => n === "modelo"), iTipo = nomes.findIndex((n) => /tipo/.test(n)), iSel = nomes.findIndex((n) => /selecionar/.test(n));
+  const dados = linhas.filter((tr) => tr !== cab && tr.children.length >= 3 && tr.querySelector("td") && !tr.querySelector("input[type=text]"));
+  const pontos = dados.map((tr) => { const c = [...tr.children]; const nome = iNome >= 0 ? c[iNome]?.textContent : tr.textContent, tp = iTipo >= 0 ? c[iTipo]?.textContent : ""; return [bate(nome) * 10 + (tipoNome && sem(tp).includes(sem(tipoNome)) ? 5 : 0), tr]; }).filter((x) => x[0] >= 10).sort((a, b) => b[0] - a[0]);
+  if (!pontos.length) return { ok: false, semLinhas: true, linhas: dados.length };
+  const tr = pontos[0][1], c = [...tr.children];
+  const controles = (raiz) => [...raiz.querySelectorAll("button,a,img,i,input[type=button],input[type=image],[onclick]")];
+  const cand = (iSel >= 0 && c[iSel] ? controles(c[iSel]) : []).concat(controles(tr).filter((e) => /selecionar/i.test((e.getAttribute("title") || "") + " " + (e.getAttribute("alt") || "") + " " + (e.value || e.textContent || ""))));
+  const seguro = cand.filter((e) => !/excluir|apagar|remover|delete|trash/i.test((e.getAttribute("title") || "") + " " + (e.getAttribute("alt") || "") + " " + (e.getAttribute("class") || "") + " " + (e.getAttribute("onclick") || "") + " " + (e.textContent || "")));
+  const alvo = seguro[0] || (iSel >= 0 && c[iSel] && !/excluir/i.test(c[iSel].textContent) ? c[iSel] : null);
+  if (!alvo) return { ok: false, motivo: "não achei o botão Selecionar na linha do modelo", linha: tr.textContent.replace(/\s+/g, " ").slice(0, 120) };
+  setTimeout(() => clicar(alvo.closest("a,button") || alvo), 60);
+  return { ok: true, clicou: true, linha: tr.textContent.replace(/\s+/g, " ").trim().slice(0, 120), candidatas: pontos.filter((x) => x[0] === pontos[0][0]).length };
 }
 
 /** Lê o HTML do editor (CKEditor/TinyMCE) deste quadro, ou null. */
@@ -198,6 +245,46 @@ async function lpJanelas(tab, item) {
   return { pdf: !!janela, aviso: janela ? "" : "não consegui abrir a janela do PDF" };
 }
 
+/** Executa `func` só no quadro principal (um quadro interno sem o campo devolveria um "não achei" que esconderia o resultado certo). Se a tela navegar no meio, devolve null. */
+const lpPrincipal = (tab, func, args = []) => lpScript(tab.id, func, args, false).then((r) => r.find((x) => x && typeof x === "object") || null);
+
+/** Escolhe o valor de um campo de busca do Projudi: sugestão ao digitar → lupa. A lupa pode abrir uma janela de busca sobre a tela OU navegar a própria aba para uma página de busca
+ *  (“Busca de Modelo”): nos dois casos a extensão acompanha, escolhe a linha e espera a tela do formulário voltar. */
+async function lpEscolher(tab, rotulo, valor, chave, tipoNome) {
+  let e = null; for (let k = 0; k < 12 && !(e && e.achou); k++) { e = await lpPrincipal(tab, lpCampoAcao, [rotulo, valor, "estado"]); if (!(e && e.achou)) await lpDorme(500); }
+  if (!(e && e.achou)) return { ok: false, motivo: `não achei o campo “${rotulo}” na tela` };
+  if (e.confere) return { ok: true, via: "já estava" };
+  for (let k = 0; k < 40 && e.travado; k++) { await lpDorme(250); e = (await lpPrincipal(tab, lpCampoAcao, [rotulo, valor, "estado"])) || e; }      // o Modelo só libera depois do Tipo
+  const s1 = await lpPrincipal(tab, lpCampoAcao, [rotulo, valor, "sugestao"]);
+  if (s1?.ok) return s1;
+  const l = await lpPrincipal(tab, lpCampoAcao, [rotulo, valor, "lupa"]);
+  if (!l?.ok) return { ok: false, motivo: l?.motivo || `não consegui usar a lupa do campo “${rotulo}”` };
+  for (let k = 0; k < 60; k++) {      // até ~30 s para a busca aparecer
+    await lpDorme(500);
+    const st = await lpPrincipal(tab, lpEstadoDaTela);
+    if (!st || st.carregando) continue;
+    if (st.busca) return await lpPaginaDeBusca(tab, valor, chave, tipoNome);
+    if (st.modal) { const r = await lpPrincipal(tab, lpCampoAcao, [rotulo, valor, "modal"]); return r?.ok ? r : { ok: false, motivo: r?.motivo || `a janela de busca de “${rotulo}” não trouxe “${valor}”` }; }
+  }
+  return { ok: false, motivo: `a lupa de “${rotulo}” não abriu a busca (nem janela nem página)` };
+}
+async function lpPaginaDeBusca(tab, valor, chave, tipoNome) {
+  const c = await lpPrincipal(tab, lpBuscaDeModelo, ["consultar", valor, tipoNome]);
+  if (!c?.ok) return { ok: false, motivo: c?.motivo || "não consegui consultar na página de busca" };
+  let ultimo = null;
+  for (let k = 0; k < 60; k++) {      // a lista pode vir por ajax ou recarregando a página: tenta até achar a linha
+    await lpDorme(700);
+    const r = await lpPrincipal(tab, lpBuscaDeModelo, ["selecionar", valor, tipoNome]);
+    if (r) ultimo = r;
+    if (r?.ok) {
+      for (let j = 0; j < 80; j++) { await lpDorme(500); if ((await lpScript(tab.id, lpNaPaginaPreAnalise, [chave], false)).some(Boolean)) return { ok: true, via: "página de busca", linha: r.linha, candidatas: r.candidatas }; }
+      return { ok: false, motivo: "selecionei o modelo na busca, mas a tela da pré-análise não voltou" };
+    }
+    if (r && r.motivo && !r.semLinhas) return { ok: false, motivo: r.motivo + (r.linha ? ` (linha: ${r.linha})` : "") };
+  }
+  return { ok: false, motivo: `a busca não trouxe nenhum modelo chamado “${valor}”${ultimo && ultimo.linhas != null ? ` (a lista tinha ${ultimo.linhas} linha(s))` : ""}` };
+}
+
 async function lancarNoProjudi(m, abaStudio) {
   const progresso = (texto) => { if (abaStudio?.id != null) chrome.tabs.sendMessage(abaStudio.id, { acao: "lancar-progresso", texto }).catch(() => {}); };
   const processo = String(m.processo || ""), chave = lpChave(processo);
@@ -228,12 +315,12 @@ async function lancarNoProjudi(m, abaStudio) {
     }
     await chrome.tabs.update(tab.id, { active: true }).catch(() => {});
     progresso(`escolhendo o Tipo de Arquivo “${tipoNome}”…`);
-    const tipo = (await lpScript(tab.id, lpEscolherCampo, ["Tipo de Arquivo", tipoNome])).find((x) => x && typeof x === "object");
-    if (!tipo?.ok) return { ok: false, erro: tipo?.motivo || "não consegui escolher o Tipo de Arquivo", passo: "tipo" };
+    const tipo = await lpEscolher(tab, "Tipo de Arquivo", tipoNome, chave, tipoNome);
+    if (!tipo.ok) return { ok: false, erro: tipo.motivo || "não consegui escolher o Tipo de Arquivo", passo: "tipo" };
     await lpDorme(800);
     progresso(`escolhendo o modelo “${modelo}”…`);
-    const mod = (await lpScript(tab.id, lpEscolherCampo, ["Modelo", modelo])).find((x) => x && typeof x === "object");
-    if (!mod?.ok) return { ok: false, erro: (mod?.motivo || "não consegui escolher o Modelo") + ` (o tipo “${tipoNome}” já foi escolhido)`, passo: "modelo" };
+    const mod = await lpEscolher(tab, "Modelo", modelo, chave, tipoNome);
+    if (!mod.ok) return { ok: false, erro: (mod.motivo || "não consegui escolher o Modelo") + ` (o tipo “${tipoNome}” já foi escolhido)`, passo: "modelo" };
     progresso("aguardando o modelo carregar no editor…");
     let carregado = false; for (let k = 0; k < 40 && !carregado; k++) { await lpDorme(500); carregado = (await lpScript(tab.id, lpLerEditor)).some((h) => h && h.replace(/<[^>]+>/g, "").trim().length > 40); }
     if (!carregado) return { ok: false, erro: `escolhi o modelo “${modelo}”, mas o texto dele não apareceu no editor`, passo: "editor" };
