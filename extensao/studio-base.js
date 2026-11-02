@@ -872,8 +872,16 @@
     try {
       if (!hostLP.isConnected) document.documentElement.appendChild(hostLP);
       wLP.style.display = (minutaDoPainel().length > 200 || resultadoTurbo()) ? "flex" : "none";
+      posicionarLP();
     } catch (e) { /* extensão recarregada: esta cópia do script morreu */ }
   }
+  // Fica encostado à ESQUERDA do botão “Editar com o chat Gemini” (acompanha a posição dele); sem esse botão na tela, vai para o canto.
+  function posicionarLP() {
+    const chat = [...document.querySelectorAll("button")].find((b) => /Editar com o chat/i.test(texto(b)) && visivel(b));
+    if (chat) { const r = chat.getBoundingClientRect(); wLP.style.right = Math.max(8, Math.round(innerWidth - r.left + 10)) + "px"; wLP.style.bottom = Math.max(8, Math.round(innerHeight - r.bottom)) + "px"; }
+    else { wLP.style.right = "22px"; wLP.style.bottom = "96px"; }
+  }
+  addEventListener("resize", () => { try { posicionarLP(); } catch (e) { /* nada */ } });
   btLP.onclick = async () => {
     try {
       const turbo = resultadoTurbo() ? lerResultadoTurbo() : null;
@@ -889,5 +897,5 @@
     finally { btLP.disabled = false; }
   };
   document.documentElement.appendChild(hostLP);
-  atualizarLP(); setInterval(atualizarLP, 2000);
+  atualizarLP(); setInterval(atualizarLP, 2000); setInterval(() => { try { if (wLP.style.display === "flex") posicionarLP(); } catch (e) { /* nada */ } }, 400);
 })();
