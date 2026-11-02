@@ -75,7 +75,7 @@ Testado contra um servidor Google simulado (limite 250 mil): (A) processo pequen
 >         const grandes: string[] = (autosGrandes.textos || []).filter((t: any) => typeof t === "string" && t.length >= MIN_CHARS_AUTOS && prompt.includes(t)).sort((a: string, b: string) => b.length - a.length);
 >         if (!grandes.length) throw e;
 >         const principal = grandes[0], extras = grandes.slice(1).filter(t => !principal.includes(t));
->         const unidades = principal.split(/(?=\[Página \d+ de \d+\])/).filter(x => x.length > 0).map((t, i) => ({ n: Number(t.match(/^\[Página (\d+) de/)?.[1] || 0), t }));
+>         const unidades = principal.split(/(?=\[Página \d+ de \d+[^\]]*\])/).filter(x => x.length > 0).map((t, i) => ({ n: Number(t.match(/^\[Página (\d+) de/)?.[1] || 0), t }));
 >         if (unidades.filter(u => u.n > 0).length < 20) throw e;      // sem marcadores de página não dá para classificar com segurança
 >
 >         const limite = limiteDoErro(e);

@@ -42,7 +42,7 @@ class H(BaseHTTPRequestHandler):
             k = txt.find("FATO-803"); open("/tmp/claude-0/work/teste/ctx803.txt", "a").write(f"--- {len(txt)} ---\n" + txt[max(0, k-600):k+200] + "\n")
         if "CLASSIFICADOR DE RELEVÂNCIA" in sist:
             segs = []
-            for pg in re.split(r"(?=\[Página \d+ de \d+\])", txt):
+            for pg in re.split(r"(?=\[Página \d+ de \d+[^\]]*\])", txt):
                 m = re.match(r"\[Página (\d+) de", pg)
                 if not m: continue
                 n = int(m.group(1)); tipo = re.search(r"Movimentacao \d+ - ([^\n]+)", pg); tipo = tipo.group(1) if tipo else ""

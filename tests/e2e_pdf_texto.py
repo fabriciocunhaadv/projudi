@@ -14,5 +14,5 @@ with sync_playwright() as p:
     pg = ctx.new_page(); pg.goto(f"chrome-extension://{sw.url.split('/')[2]}/esteira.html")
     t = pg.evaluate("async (b) => { const { textoDoPdf } = await import('./pdf-texto.js'); return await textoDoPdf(new Uint8Array(b)) }", list(PDF.read_bytes()))
     print(t[:300]); ctx.close()
-assert t.startswith("[Página 1]") and len(t) > 100, t[:200]
+assert t.startswith("[Página 1 de ") and "| Mov. 8, Arq. 2, Pág. 1/4]" in t.split("\n")[0] and len(t) > 100, t[:200]
 print("OK")

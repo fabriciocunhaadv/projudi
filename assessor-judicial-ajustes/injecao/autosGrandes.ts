@@ -61,7 +61,7 @@ export async function gerarComAutosGrandes(gerar: (o: any) => Promise<any>, opts
         const grandes: string[] = (autosGrandes.textos || []).filter((t: any) => typeof t === "string" && t.length >= MIN_CHARS_AUTOS && prompt.includes(t)).sort((a: string, b: string) => b.length - a.length);
         if (!grandes.length) { console.log("[Autos Grandes] Não reduzi: nenhum bloco grande de autos (>=60 mil caracteres) foi encontrado dentro do pedido."); throw e; }
         const principal = grandes[0], extras = grandes.slice(1).filter(t => !principal.includes(t));
-        let unidades = principal.split(/(?=\[Página \d+ de \d+\])/).filter(x => x.length > 0).map((t, i) => ({ n: Number(t.match(/^\[Página (\d+) de/)?.[1] || 0), t }));
+        let unidades = principal.split(/(?=\[Página \d+ de \d+[^\]]*\])/).filter(x => x.length > 0).map((t, i) => ({ n: Number(t.match(/^\[Página (\d+) de/)?.[1] || 0), t }));
         let sintetico = false;
         if (unidades.filter(u => u.n > 0).length < 20) {
             // sem marcadores de página: o texto é dividido em blocos sequenciais (~4 mil caracteres, em quebra de linha) que fazem o papel de "páginas"

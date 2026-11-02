@@ -147,6 +147,16 @@ export async function extractTextFromPdf(
 
     const numPages = pdf.numPages || 1;
     const pageParagraphs: string[] = [];
+    // O Projudi carimba em toda página "Movimentacao N : título" e "Arquivo M: nome - Pag.x/y". A IA não deve adivinhar esses números
+    // (em autos longos ela os desloca): o marcador da página os traz prontos, para serem apenas copiados na citação (Mov. X, Arq. Y, Pág. Z).
+    let locCarimbo: { mov: number; arq: number | null; pag: number | null; de: number | null } | null = null;
+    const marcadorPagina = (n: number, total: number, texto: string): string => {
+      const x = texto.slice(0, 600).replace(/\s+/g, " ");
+      const mov = x.match(/Movimenta[cç][aã]o\s*(\d{1,5})\s*:/i), arq = x.match(/Arquivo\s*(\d{1,4})\s*:.{0,200}?Pag\.?\s*(\d{1,5})\s*\/\s*(\d{1,5})/i);
+      locCarimbo = mov ? { mov: +mov[1], arq: arq ? +arq[1] : null, pag: arq ? +arq[2] : null, de: arq ? +arq[3] : null } : null;
+      const l = locCarimbo ? ` | Mov. ${locCarimbo.mov}${locCarimbo.arq != null ? `, Arq. ${locCarimbo.arq}, Pág. ${locCarimbo.pag}/${locCarimbo.de}` : ""}` : "";
+      return `[Página ${n} de ${total}${l}]`;
+    };
     let ocultoTexto = "";
 
     // Determine which pages to extract for massive dossier optimization:
@@ -387,7 +397,8 @@ export async function extractTextFromPdf(
           }
 
           if (pageTextBlocks.length > 0) {
-            pageParagraphs.push(`[Página ${i} de ${numPages}]\n` + pageTextBlocks.join("\n\n"));
+            const corpoPagina = pageTextBlocks.join("\n\n");
+            pageParagraphs.push(`${marcadorPagina(i, numPages, corpoPagina)}\n` + corpoPagina);
           }
         }
       } catch (pageErr) {

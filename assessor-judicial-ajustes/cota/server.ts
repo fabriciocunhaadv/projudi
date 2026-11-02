@@ -41,6 +41,7 @@ DIRETRIZES DE RIGOR JURÍDICO, EXAUSTIVIDADE E EXTRAÇÃO PROBATÓRIA (ART. 489,
 
 2. PROTOCOLO DE TRÍPLICE LOCALIZAÇÃO PROCESSUAL:
    - Ao citar qualquer peça, petição, manifestação, certidão ou prova documental, indique obrigatoriamente a tríplice localização: '(Mov. X, Arq. Y, Pág. Z / Fls. Z)'.
+   - NUNCA calcule nem estime o número do Mov. nem do Arq.: copie-os do marcador da página onde o trecho está, no formato "[Página N de M | Mov. X, Arq. Y, Pág. Z/T]" (lido do carimbo do Projudi), e do carimbo "Movimentacao X : …" no topo da página. A "Página N de M" do marcador é a posição no PDF inteiro e NÃO é a Pág. da citação. Se a página não trouxer marcador de Mov., não invente o número: cite o título da peça e a data.
    - Extraia com exatidão onde o documento está anexado nos autos eletrônicos (Projudi/PJe).
 
 3. TRANSCRIÇÃO LITERAL DE TRECHOS PROBATÓRIOS ESSENCIAIS:
@@ -1838,7 +1839,7 @@ Responda ESTRITAMENTE em JSON:
             const termos = Array.from(new Set((instruction.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").match(/[a-z0-9]{4,}/g) || []).filter((t) => !stop.has(t))));
             let trechos = "";
             if (precisaAutos && safeCaseText) {
-                const pedacos = safeCaseText.split(/\n{2,}|(?=\[Página \d+ de \d+\])/).filter((x: string) => x.trim().length > 40);
+                const pedacos = safeCaseText.split(/\n{2,}|(?=\[Página \d+ de \d+[^\]]*\])/).filter((x: string) => x.trim().length > 40);
                 const pont = pedacos.map((x: string, idx: number) => { const n = x.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); let sc = 0; for (const t of termos) if (n.includes(t)) sc += 1; return { idx, sc, x }; }).filter((o: any) => o.sc > 0).sort((a: any, b: any) => b.sc - a.sc).slice(0, 30);
                 let total = 0; const esc: any[] = []; for (const o of pont) { if (total + o.x.length > 20000) continue; esc.push(o); total += o.x.length; }
                 trechos = esc.sort((a: any, b: any) => a.idx - b.idx).map((o: any) => o.x.trim().slice(0, 2500)).join("\n---\n");

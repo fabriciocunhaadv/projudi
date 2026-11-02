@@ -31,7 +31,7 @@ const REGRAS: Regra[] = [
   { nivel: "medio", categoria: "Ordem próxima a uma menção à IA", rx: new RegExp(`\\b${ALVO_IA}\\b[^.\\n]{0,160}\\b${VERBO_ORDEM}\\b|\\b${VERBO_ORDEM}\\b[^.\\n]{0,160}\\b(?:modelo de linguagem|llm|chat ?gpt|inteligencia artificial)\\b`, "g") },
 ];
 
-const PAGINA = /\[Página (\d+) de \d+\]/g;
+const PAGINA = /\[Página (\d+) de \d+[^\]]*\]/g;
 const ZW = /[​-‏⁠-⁤﻿]/g;      // espaços de largura zero e marcas invisíveis
 const TAG = /[\u{E0000}-\u{E007F}]/gu;      // bloco "Tags" (contrabando de texto invisível em ASCII)
 const BIDI = /[‪-‮⁦-⁩]/g;

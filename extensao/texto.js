@@ -35,7 +35,7 @@ function mostrar(r) {
   const info = `${r.paginas} página(s)${r.ocr ? `, ${r.ocr} com OCR` : ""}, ${r.texto.length.toLocaleString("pt-BR")} caracteres`;
   const b = document.createElement("b"); b.textContent = r.nome + ".pdf";
   div.append(b, ` — ${info}`);
-  if (r.texto.replace(/\[Página \d+ de \d+\]/g, "").trim().length < 20) {
+  if (r.texto.replace(/\[Página \d+ de \d+[^\]]*\]/g, "").trim().length < 20) {
     const av = document.createElement("div"); av.className = "aviso"; av.textContent = "⚠ Quase nenhum texto foi encontrado neste PDF (imagem muito ruim ou páginas em branco). Tente a qualidade “Alta” ou “Refazer OCR”."; div.append(av);
   }
   const barra = document.createElement("div");
@@ -55,7 +55,7 @@ async function converter(arquivo, opcoes) {
     cancelado: () => cancelado,
   });
   let texto = await textoDoPdf(r.bytes);
-  if (!opcoes.marcadores) texto = texto.replace(/^\[Página \d+(?: de \d+)?\]\n/gm, "");
+  if (!opcoes.marcadores) texto = texto.replace(/^\[Página \d+(?: de \d+)?[^\]]*\]\n/gm, "");
   return { texto, paginas: r.total, ocr: r.ocr };
 }
 

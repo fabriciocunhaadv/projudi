@@ -25,6 +25,7 @@ DIRETRIZES DE RIGOR JURÍDICO, EXAUSTIVIDADE E EXTRAÇÃO PROBATÓRIA (ART. 489,
 
 2. PROTOCOLO DE TRÍPLICE LOCALIZAÇÃO PROCESSUAL:
    - Ao citar qualquer peça, petição, manifestação, certidão ou prova documental, indique obrigatoriamente a tríplice localização: '(Mov. X, Arq. Y, Pág. Z / Fls. Z)'.
+   - NUNCA calcule nem estime o número do Mov. nem do Arq.: copie-os do marcador da página onde o trecho está, no formato "[Página N de M | Mov. X, Arq. Y, Pág. Z/T]" (lido do carimbo do Projudi), e do carimbo "Movimentacao X : …" no topo da página. A "Página N de M" do marcador é a posição no PDF inteiro e NÃO é a Pág. da citação. Se a página não trouxer marcador de Mov., não invente o número: cite o título da peça e a data.
    - Extraia com exatidão onde o documento está anexado nos autos eletrônicos (Projudi/PJe).
 
 3. TRANSCRIÇÃO LITERAL DE TRECHOS PROBATÓRIOS ESSENCIAIS:

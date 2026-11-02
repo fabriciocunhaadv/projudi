@@ -24,7 +24,7 @@ export function dividirTextoEmPartes(texto: string, maxChars: number): string[] 
         const janelaIni = Math.floor(maxChars * 0.7);
         const janela = resto.slice(janelaIni, maxChars);
         let corte = -1;
-        const reg = /\n\[Página \d+ de \d+\]/g;
+        const reg = /\n\[Página \d+ de \d+[^\]]*\]/g;
         let m: RegExpExecArray | null;
         while ((m = reg.exec(janela))) corte = janelaIni + m.index + 1;
         if (corte < 0) { const p = janela.lastIndexOf("\n\n"); if (p >= 0) corte = janelaIni + p + 2; }
