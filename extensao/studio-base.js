@@ -862,11 +862,16 @@
     .w{position:fixed;right:22px;bottom:96px;z-index:2147483645;display:none;flex-direction:column;align-items:flex-end;gap:6px;font:13px system-ui,sans-serif}
     button{font:700 14px system-ui,sans-serif;padding:11px 18px;border:0;border-radius:999px;cursor:pointer;background:linear-gradient(135deg,#0b3d7a,#1565c0);color:#fff;box-shadow:0 4px 16px #0b3d7a88}
     button:hover{filter:brightness(1.12)} button:disabled{opacity:.7;cursor:wait}
-    .r{max-width:340px;background:#0b1f3a;color:#fff;padding:7px 11px;border-radius:8px;box-shadow:0 2px 10px #0006;display:none;line-height:1.35}
+    .r{position:relative;max-width:340px;background:#0b1f3a;color:#fff;padding:8px 30px 8px 11px;border-radius:8px;box-shadow:0 2px 10px #0006;display:none;line-height:1.35}
     .r.e{background:#7a1010}
-  </style><div class="w"><div class="r"></div><button title="Abre a pré-análise do processo no Projudi (na aba que você já deixou aberta), escolhe o tipo e o modelo padrão, coloca esta minuta no editor e abre o PDF dos autos ao lado. Não grava nada: você confere e salva.">⚖ Lançar no Projudi</button></div>`;
-  const wLP = shLP.querySelector(".w"), btLP = shLP.querySelector("button"), rLP = shLP.querySelector(".r");
-  const dizLP = (t, erro = false) => { rLP.textContent = t; rLP.className = "r" + (erro ? " e" : ""); rLP.style.display = t ? "block" : "none"; };
+    .r .x{all:unset;position:absolute;top:4px;right:6px;width:20px;height:20px;line-height:20px;text-align:center;font:700 16px system-ui,sans-serif;color:#fff;opacity:.8;cursor:pointer;border-radius:50%}
+    .r .x:hover{opacity:1;background:#ffffff33}
+  </style><div class="w"><div class="r"><span class="t"></span><button class="x" type="button" title="Fechar esta mensagem" aria-label="Fechar">×</button></div><button class="p" title="Abre a pré-análise do processo no Projudi (na aba que você já deixou aberta), escolhe o tipo e o modelo padrão, coloca esta minuta no editor e abre o PDF dos autos ao lado. Não grava nada: você confere e salva.">⚖ Lançar no Projudi</button></div>`;
+  const wLP = shLP.querySelector(".w"), btLP = shLP.querySelector("button.p"), rLP = shLP.querySelector(".r");
+  let timerLP = null;
+  // mensagem do botão: tem "×" para fechar; o aviso de sucesso some sozinho em 20 s (andamento e erro ficam até fechar)
+  const dizLP = (t, erro = false, ms = 0) => { clearTimeout(timerLP); rLP.querySelector(".t").textContent = t; rLP.className = "r" + (erro ? " e" : ""); rLP.style.display = t ? "block" : "none"; if (t && ms) timerLP = setTimeout(() => dizLP(""), ms); };
+  rLP.querySelector(".x").onclick = () => dizLP("");
   const numeroLP = () => ((document.getElementById("tour-meta-parties-box")?.innerText) || (resultadoTurbo()?.innerText) || document.body.innerText.slice(0, 6000) || "").match(/\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/)?.[0] || "";
   async function atualizarLP() {
     try {
@@ -875,12 +880,19 @@
       posicionarLP();
     } catch (e) { /* extensão recarregada: esta cópia do script morreu */ }
   }
-  // Fica encostado à ESQUERDA do botão “Editar com o chat Gemini” (acompanha a posição dele); sem esse botão na tela, vai para o canto.
+  // Posição: encostado à ESQUERDA do botão “Editar com o chat Gemini” (chat fechado) ou do “Recolher” (chat aberto, no fluxo da página); acompanha a rolagem.
+  // Sem nenhum dos dois na tela, vai para o canto, acima do selo “MySQL – Hostinger” do app (não cobre o chat nem esse selo).
   function posicionarLP() {
-    const chat = [...document.querySelectorAll("button")].find((b) => /Editar com o chat/i.test(texto(b)) && visivel(b));
-    if (chat) { const r = chat.getBoundingClientRect(); wLP.style.right = Math.max(8, Math.round(innerWidth - r.left + 10)) + "px"; wLP.style.bottom = Math.max(8, Math.round(innerHeight - r.bottom)) + "px"; }
-    else { wLP.style.right = "22px"; wLP.style.bottom = "96px"; }
+    const bts = [...document.querySelectorAll("button")];
+    const ancora = bts.find((b) => /Editar com o chat/i.test(texto(b)) && visivel(b)) || bts.find((b) => b.getAttribute("data-testid") === "fechar-chat-gemini" && visivel(b));
+    const r = ancora && ancora.getBoundingClientRect();
+    if (r && r.bottom > 0 && r.top < innerHeight && r.left > 0) {
+      const h = btLP.getBoundingClientRect().height || 40;
+      wLP.style.right = Math.max(8, Math.round(innerWidth - r.left + 10)) + "px";
+      wLP.style.bottom = Math.max(8, Math.round(innerHeight - r.bottom - (h - r.height) / 2)) + "px";
+    } else { wLP.style.right = "22px"; wLP.style.bottom = "64px"; }
   }
+  addEventListener("scroll", () => { try { posicionarLP(); } catch (e) { /* nada */ } }, true);
   addEventListener("resize", () => { try { posicionarLP(); } catch (e) { /* nada */ } });
   btLP.onclick = async () => {
     try {
@@ -891,7 +903,7 @@
       if (!processo) { dizLP("Não achei o número do processo nesta tela.", true); return; }
       btLP.disabled = true; dizLP("Iniciando…");
       const r = await chrome.runtime.sendMessage({ acao: "lancar-projudi", processo, texto: texto2, html });
-      if (r?.ok) dizLP(`Pronto: ${r.tipo} / “${r.modelo}” com a minuta no editor do Projudi. Confira e clique em “Salvar Texto Parcial”.${r.aviso ? " ⚠ " + r.aviso : ""}`);
+      if (r?.ok) dizLP(`Pronto: ${r.tipo} / “${r.modelo}” com a minuta no editor do Projudi. Confira e clique em “Salvar Texto Parcial”.${r.aviso ? " ⚠ " + r.aviso : ""}`, false, 20000);
       else dizLP("Não deu certo: " + (r?.erro || "sem resposta da extensão") + (r?.passo ? ` (passo: ${r.passo})` : ""), true);
     } catch (e) { dizLP("Não deu certo: " + (e.message || e) + " (se a extensão foi atualizada, recarregue esta aba)", true); }
     finally { btLP.disabled = false; }
