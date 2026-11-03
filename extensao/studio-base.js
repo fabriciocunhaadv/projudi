@@ -896,6 +896,9 @@
   addEventListener("resize", () => { try { posicionarLP(); } catch (e) { /* nada */ } });
   btLP.onclick = async () => {
     try {
+      // se o usuário ainda está digitando direto na minuta, fecha o campo (que salva sozinho) e espera a visão formatada voltar antes de ler
+      const ativo = document.activeElement;
+      if (ativo && ativo.tagName === "TEXTAREA" && ativo.closest("div.font-serif")) { ativo.blur(); await esperar(() => !document.querySelector("div.font-serif textarea"), 4000); await esperar(() => false, 300); }
       const turbo = resultadoTurbo() ? lerResultadoTurbo() : null;
       const texto2 = turbo ? turbo.texto : await lerMinuta(), html = turbo ? turbo.html : minutaHtmlDoPainel();
       if (!texto2) { dizLP("Não achei a minuta nesta tela.", true); return; }
@@ -903,7 +906,7 @@
       if (!processo) { dizLP("Não achei o número do processo nesta tela.", true); return; }
       btLP.disabled = true; dizLP("Iniciando…");
       const hRes = painelResultado(), rotulo = hRes ? texto(hRes.parentElement).replace(/Resultado\s*&\s*An[aá]lise/i, "").trim().slice(0, 60) : "";      // rótulo do card (ex.: DECISÃO INTERLOCUTÓRIA)
-      const r = await chrome.runtime.sendMessage({ acao: "lancar-projudi", processo, texto: texto2, html, tituloAto: rotulo });
+      const r = await Promise.race([chrome.runtime.sendMessage({ acao: "lancar-projudi", processo, texto: texto2, html, tituloAto: rotulo }), new Promise((ok) => setTimeout(() => ok({ ok: false, erro: "a extensão não respondeu em 4 minutos; clique de novo (se persistir, recarregue o Projudi e esta aba)" }), 240000))]);
       if (r?.ok) dizLP(`Pronto: ${r.tipo} / “${r.modelo}” com a minuta no editor do Projudi. Confira e clique em “Salvar Texto Parcial”.${r.aviso ? " ⚠ " + r.aviso : ""}`, false, 20000);
       else dizLP("Não deu certo: " + (r?.erro || "sem resposta da extensão") + (r?.passo ? ` (passo: ${r.passo})` : ""), true);
     } catch (e) { dizLP("Não deu certo: " + (e.message || e) + " (se a extensão foi atualizada, recarregue esta aba)", true); }

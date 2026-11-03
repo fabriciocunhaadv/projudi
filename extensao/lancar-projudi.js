@@ -307,17 +307,13 @@ async function lancarNoProjudi(m, abaStudio) {
   const tipoNome = lpTipoDoAto(m.texto, m.tituloAto);
   if (!tipoNome) return { ok: false, erro: "não consegui identificar se a minuta é despacho, decisão ou sentença (não achei o título do ato); confira o título no alto da minuta" };
   const modelo = tipoNome + " Padrão";
-  // A aba do Projudi é de uma operação por vez (lote, pré-análise...). Espera até 20 s, avisando na tela; depois desiste com um motivo claro em vez de ficar em "Iniciando…" para sempre.
-  progresso("verificando se o Projudi está livre…");
-  const ctl = new AbortController(), parar = setTimeout(() => ctl.abort(), 20000);
-  let ocupado = false;
+  // "Lançar no Projudi" tem prioridade sobre o que a extensão estiver fazendo na aba (lote, pré-análise, esteira): toma a vez dessas tarefas em vez de esperar por elas.
+  progresso("assumindo a aba do Projudi…");
   const liberar = await new Promise((pronto) => {
     if (!navigator.locks) return pronto(() => {});
-    navigator.locks.request("projudi-aba", { signal: ctl.signal }, () => new Promise((fim) => { const solta = () => fim(); const teto = setTimeout(solta, 5 * 60 * 1000); pronto(() => { clearTimeout(teto); solta(); }); }))
-      .catch(() => { ocupado = true; pronto(null); });
+    navigator.locks.request("projudi-aba", { steal: true }, () => new Promise((fim) => { const teto = setTimeout(fim, 5 * 60 * 1000); pronto(() => { clearTimeout(teto); fim(); }); }))
+      .catch(() => pronto(() => {}));
   });
-  clearTimeout(parar);
-  if (ocupado || !liberar) return { ok: false, erro: "o Projudi está ocupado com outra tarefa da extensão (lote, pré-análise ou leitura de processos). Espere terminar ou pause essa tarefa e clique de novo", passo: "ocupado" };
   try {
     const item = await lpAchaItem(processo);
     const { tab, jaNaTela } = await lpAcharAba(chave);
