@@ -236,9 +236,16 @@ function lpTemPdf(id) {
 
 /** Acha a aba do Projudi que já está aberta: de preferência a que já está na pré-análise deste processo; senão a primeira não fixada. Nunca cria aba nova (derrubaria a sessão). */
 async function lpAcharAba(chave) {
-  const abertas = await chrome.tabs.query({ url: LP_BASE + "*" }).catch(() => []);
-  for (const t of abertas) { if ((await lpScript(t.id, lpNaPaginaPreAnalise, [chave])).some(Boolean)) return { tab: t, jaNaTela: true }; }
-  const tab = abertas.find((t) => !t.pinned) || abertas[0] || null;
+  const todas = await chrome.tabs.query({ url: LP_BASE + "*" }).catch(() => []);
+  // abas de ARQUIVO do processo (PDF/relatório aberto, "BuscaProcesso?...Arquivo=") não são a aba de trabalho: a extensão mexe só na aba principal, a que tem a moldura com cabeçalho e menus
+  const ehArquivo = (t) => /[?&](?:id_)?(?:Movimentacao)?Arquivo=|\bArquivo=|CodigoVerificacao|\.pdf\b/i.test(t.url || "") || /\.pdf\s*$/i.test(t.title || "");
+  const candidatas = todas.filter((t) => !ehArquivo(t));
+  const comMoldura = [];
+  for (const t of candidatas) { if (await ProjudiQuadro.temMoldura(t.id)) comMoldura.push(t); }
+  const lista = comMoldura.length ? comMoldura : candidatas;
+  for (const t of lista) { if ((await lpScript(t.id, lpNaPaginaPreAnalise, [chave])).some(Boolean)) return { tab: t, jaNaTela: true }; }
+  const ordem = [...lista].sort((a, b) => (b.active ? 1 : 0) - (a.active ? 1 : 0) || (b.lastAccessed || 0) - (a.lastAccessed || 0));
+  const tab = ordem.find((t) => !t.pinned) || ordem[0] || null;
   return { tab, jaNaTela: false };
 }
 
