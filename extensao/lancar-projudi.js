@@ -212,7 +212,11 @@ function lpInserirNoEditor(minutaHtml, minutaTexto) {
 }
 
 // ---------- orquestração (service worker) ----------
-const lpScript = (tabId, func, args = [], allFrames = true) => chrome.scripting.executeScript({ target: { tabId, allFrames }, world: "MAIN", func, args }).then((r) => r.map((x) => x.result)).catch(() => []);
+// Uma aba que não responde (carregando, dormindo, visualizador de PDF) não pode segurar o lançamento: passados 20 s, a chamada devolve vazio.
+const lpScript = (tabId, func, args = [], allFrames = true) => Promise.race([
+  chrome.scripting.executeScript({ target: { tabId, allFrames }, world: "MAIN", func, args }).then((r) => r.map((x) => x.result)).catch(() => []),
+  new Promise((ok) => setTimeout(() => ok([]), 20000)),
+]);
 function lpCarregou(tabId, ms = 60000) {
   return new Promise((ok) => {
     const fim = setTimeout(() => { chrome.tabs.onUpdated.removeListener(ou); ok(false); }, ms);
@@ -320,17 +324,16 @@ async function lancarNoProjudi(m, abaStudio) {
     if (!navigator.locks) return pronto(() => {});
     navigator.locks.request("projudi-aba", { steal: true }, () => new Promise((fim) => { const teto = setTimeout(fim, 5 * 60 * 1000); pronto(() => { clearTimeout(teto); fim(); }); }))
       .catch(() => pronto(() => {}));
+    setTimeout(() => pronto(() => {}), 3000);      // se a troca de vez demorar, segue sem ela
   });
   try {
-    const item = await lpAchaItem(processo);
+    progresso("procurando a aba principal do Projudi…");
     const { tab, jaNaTela } = await lpAcharAba(chave);
     if (!tab) return { ok: false, erro: "não há aba do Projudi aberta: abra e entre no Projudi (a extensão não abre aba nova para não derrubar a sessão)" };
-    progresso("dividindo a tela: Projudi à esquerda e PDF à direita…");
-    const jan = await lpJanelas(tab, item);
     if (!jaNaTela) {
       progresso("abrindo a pré-análise do processo no Projudi…");
       // navega DENTRO do quadro da moldura do Projudi (a aba mantém o cabeçalho e os menus)
-      const svUrl = m.serventiaUrl || item?.serventiaUrl;
+      const svUrl = m.serventiaUrl;
       if (m.serventiaUrl) await chrome.storage.local.set({ lancar_ultima_serventia: new URL(m.serventiaUrl, LP_BASE).href }).catch(() => {});
       if (svUrl) { if (!(await ProjudiQuadro.irPara(tab.id, new URL(svUrl, LP_BASE).href))) return { ok: false, erro: SEM_MOLDURA }; await lpDorme(1200); }
       if (!(await ProjudiQuadro.irPara(tab.id, LP_BASE + "PreAnalisarConclusao?PaginaAtual=2&tipo=todas"))) return { ok: false, erro: SEM_MOLDURA };
@@ -363,7 +366,6 @@ async function lancarNoProjudi(m, abaStudio) {
     const avisos = [];
     if (!ins.tituloAchado) avisos.push("não achei o título do ato no modelo: a minuta foi colocada no fim do texto");
     else if (!ins.assinaturaAchada) avisos.push("não achei a linha “..., data do sistema” no modelo: o texto-padrão do modelo foi mantido; apague o que sobrar");
-    if (jan.aviso) avisos.push(jan.aviso);
     return { ok: true, tipo: tipoNome, modelo, removidos: ins.removidos, aviso: avisos.join(" · ") };
   } finally { liberar(); }
 }
