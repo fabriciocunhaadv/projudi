@@ -1,4 +1,4 @@
-# (atualizado: versão 1.0.79)
+# (atualizado: versão 1.0.80)
 
 # Rejeição "Incluir código hospedado remotamente em um item do Manifesto V3" (versão 1.0.68)
 
@@ -15,4 +15,4 @@ Our extension does not load or execute any remotely hosted code. All JavaScript 
 
 ## Complemento – versão 1.0.72
 O trecho citado no e-mail (vendor/tesseract.min.js: `new Blob(['importScripts("'+workerPath+'")'])`) era um caminho opcional (`workerBlobURL`) da biblioteca, nunca usado (a extensão passa `workerBlobURL:false` e `workerPath` local). Na 1.0.72 ele foi removido: o worker agora é criado sempre direto de arquivo do pacote (`new Worker(workerPath)`). Também foi neutralizado em vendor/pdf.min.mjs o auxiliar `_createCDNWrapper` (Blob + import()). Texto para o revisor (inglês): "Version 1.0.72 removes the Blob/importScripts worker-creation path and every CDN URL from the bundled third-party libraries; all code runs from files inside the package. Please re-review 1.0.72."
-Arquivo a enviar: `publicacao/projudi-extensao-1.0.79.zip`.
+Arquivo a enviar: `publicacao/projudi-extensao-1.0.80.zip`.
