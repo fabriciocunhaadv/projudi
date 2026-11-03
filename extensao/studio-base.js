@@ -864,10 +864,15 @@
     button:hover{filter:brightness(1.12)} button:disabled{opacity:.7;cursor:wait}
     .r{position:relative;max-width:340px;background:#0b1f3a;color:#fff;padding:8px 30px 8px 11px;border-radius:8px;box-shadow:0 2px 10px #0006;display:none;line-height:1.35}
     .r.e{background:#7a1010}
+    .sv{display:none;flex-direction:column;gap:4px;max-width:360px;background:#fff;color:#12263f;border:1px solid #9bb6d6;border-radius:10px;padding:10px;box-shadow:0 4px 16px #0005}
+    .sv b{font-size:13px;margin-bottom:2px}
+    .sv button{font:600 12.5px system-ui,sans-serif;text-align:left;padding:7px 10px;border-radius:7px;background:#eef4fc;color:#12263f;border:1px solid #c5d6ec;box-shadow:none}
+    .sv button.s{background:#0b3d7a;color:#fff;border-color:#0b3d7a}
+    .sv .c{background:transparent;border:0;color:#5a6b80;text-align:center}
     .r .x{all:unset;position:absolute;top:4px;right:6px;width:20px;height:20px;line-height:20px;text-align:center;font:700 16px system-ui,sans-serif;color:#fff;opacity:.8;cursor:pointer;border-radius:50%}
     .r .x:hover{opacity:1;background:#ffffff33}
-  </style><div class="w"><div class="r"><span class="t"></span><button class="x" type="button" title="Fechar esta mensagem" aria-label="Fechar">×</button></div><button class="p" title="Abre a pré-análise do processo no Projudi (na aba que você já deixou aberta), escolhe o tipo e o modelo padrão, coloca esta minuta no editor e abre o PDF dos autos ao lado. Não grava nada: você confere e salva.">⚖ Lançar no Projudi</button></div>`;
-  const wLP = shLP.querySelector(".w"), btLP = shLP.querySelector("button.p"), rLP = shLP.querySelector(".r");
+  </style><div class="w"><div class="sv"></div><div class="r"><span class="t"></span><button class="x" type="button" title="Fechar esta mensagem" aria-label="Fechar">×</button></div><button class="p" title="Abre a pré-análise do processo no Projudi (na aba que você já deixou aberta), escolhe o tipo e o modelo padrão, coloca esta minuta no editor e abre o PDF dos autos ao lado. Não grava nada: você confere e salva.">⚖ Lançar no Projudi</button></div>`;
+  const wLP = shLP.querySelector(".w"), btLP = shLP.querySelector("button.p"), rLP = shLP.querySelector(".r"), svLP = shLP.querySelector(".sv");
   let timerLP = null;
   // mensagem do botão: tem "×" para fechar; o aviso de sucesso some sozinho em 20 s (andamento e erro ficam até fechar)
   const dizLP = (t, erro = false, ms = 0) => { clearTimeout(timerLP); rLP.querySelector(".t").textContent = t; rLP.className = "r" + (erro ? " e" : ""); rLP.style.display = t ? "block" : "none"; if (t && ms) timerLP = setTimeout(() => dizLP(""), ms); };
@@ -904,9 +909,23 @@
       if (!texto2) { dizLP("Não achei a minuta nesta tela.", true); return; }
       const processo = numeroLP();
       if (!processo) { dizLP("Não achei o número do processo nesta tela.", true); return; }
+      // em qual serventia do Projudi lançar? (só as que não estão ocultas na extensão); a última escolhida já vem marcada
+      let serventiaUrl = "";
+      try {
+        const sv = await chrome.runtime.sendMessage({ acao: "lancar-serventias", processo });
+        if (sv?.serventias?.length) {
+          serventiaUrl = await new Promise((ok) => {
+            svLP.innerHTML = ""; const t = document.createElement("b"); t.textContent = "Lançar em qual serventia do Projudi?"; svLP.appendChild(t);
+            for (const x of sv.serventias) { const b = document.createElement("button"); b.type = "button"; b.textContent = x.serventia + (x.perfil ? " — " + x.perfil : ""); if (x.url === sv.sugerida) b.className = "s"; b.onclick = () => { svLP.style.display = "none"; ok(x.url); }; svLP.appendChild(b); }
+            const c = document.createElement("button"); c.type = "button"; c.className = "c"; c.textContent = "Cancelar"; c.onclick = () => { svLP.style.display = "none"; ok(null); }; svLP.appendChild(c);
+            svLP.style.display = "flex";
+          });
+          if (serventiaUrl === null) return;
+        }
+      } catch (e) { /* sem lista: usa a serventia do processo, se a extensão a conhecer */ }
       btLP.disabled = true; dizLP("Iniciando…");
       const hRes = painelResultado(), rotulo = hRes ? texto(hRes.parentElement).replace(/Resultado\s*&\s*An[aá]lise/i, "").trim().slice(0, 60) : "";      // rótulo do card (ex.: DECISÃO INTERLOCUTÓRIA)
-      const r = await Promise.race([chrome.runtime.sendMessage({ acao: "lancar-projudi", processo, texto: texto2, html, tituloAto: rotulo }), new Promise((ok) => setTimeout(() => ok({ ok: false, erro: "a extensão não respondeu em 4 minutos; clique de novo (se persistir, recarregue o Projudi e esta aba)" }), 240000))]);
+      const r = await Promise.race([chrome.runtime.sendMessage({ acao: "lancar-projudi", processo, serventiaUrl, texto: texto2, html, tituloAto: rotulo }), new Promise((ok) => setTimeout(() => ok({ ok: false, erro: "a extensão não respondeu em 4 minutos; clique de novo (se persistir, recarregue o Projudi e esta aba)" }), 240000))]);
       if (r?.ok) dizLP(`Pronto: ${r.tipo} / “${r.modelo}” com a minuta no editor do Projudi. Confira e clique em “Salvar Texto Parcial”.${r.aviso ? " ⚠ " + r.aviso : ""}`, false, 20000);
       else dizLP("Não deu certo: " + (r?.erro || "sem resposta da extensão") + (r?.passo ? ` (passo: ${r.passo})` : ""), true);
     } catch (e) { dizLP("Não deu certo: " + (e.message || e) + " (se a extensão foi atualizada, recarregue esta aba)", true); }

@@ -330,7 +330,9 @@ async function lancarNoProjudi(m, abaStudio) {
     if (!jaNaTela) {
       progresso("abrindo a pré-análise do processo no Projudi…");
       // navega DENTRO do quadro da moldura do Projudi (a aba mantém o cabeçalho e os menus)
-      if (item?.serventiaUrl) { if (!(await ProjudiQuadro.irPara(tab.id, new URL(item.serventiaUrl, LP_BASE).href))) return { ok: false, erro: SEM_MOLDURA }; await lpDorme(1200); }
+      const svUrl = m.serventiaUrl || item?.serventiaUrl;
+      if (m.serventiaUrl) await chrome.storage.local.set({ lancar_ultima_serventia: new URL(m.serventiaUrl, LP_BASE).href }).catch(() => {});
+      if (svUrl) { if (!(await ProjudiQuadro.irPara(tab.id, new URL(svUrl, LP_BASE).href))) return { ok: false, erro: SEM_MOLDURA }; await lpDorme(1200); }
       if (!(await ProjudiQuadro.irPara(tab.id, LP_BASE + "PreAnalisarConclusao?PaginaAtual=2&tipo=todas"))) return { ok: false, erro: SEM_MOLDURA };
       await lpDorme(1500);
       let r = "", visto = 0;

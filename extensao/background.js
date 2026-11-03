@@ -241,6 +241,18 @@ chrome.runtime.onMessage.addListener((m, s, responder) => {
     return true;
   }
   if (m?.acao === "lancar-projudi") { lancarNoProjudi(m, s.tab).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }      // botão “Lançar no Projudi” da minuta do Studio
+  if (m?.acao === "lancar-serventias") {      // lista as serventias NÃO ocultas para o usuário escolher onde lançar a minuta
+    (async () => {
+      const { estado } = await chrome.storage.local.get("estado"), oc = await getOcultas();
+      const vistos = new Set(), lista = [];
+      for (const sv of (estado?.serventias || [])) { if (!sv.url || oc.servs.includes(sv.serventia) || oc.cargos.includes(sv.perfil) || vistos.has(sv.url)) continue; vistos.add(sv.url); lista.push({ serventia: sv.serventia, perfil: sv.perfil || "", url: sv.url }); }
+      const { lancar_ultima_serventia: ultima = "" } = await chrome.storage.local.get("lancar_ultima_serventia");
+      const item = m.processo ? await lpAchaItem(m.processo).catch(() => null) : null;
+      const sugerida = [ultima, item?.serventiaUrl ? new URL(item.serventiaUrl, LP_BASE).href : ""].find((u) => u && lista.some((x) => x.url === u)) || "";
+      return { ok: true, serventias: lista, sugerida };
+    })().then(responder, (e) => responder({ ok: false, serventias: [], erro: String(e.message || e) }));
+    return true;
+  }
   if (m?.acao === "minha-aba") { responder({ tabId: s.tab ? s.tab.id : null }); return false; }
   if (m?.acao === "esteira-abrir") {       // garante a aba que roda a fila de minutas
     const url = chrome.runtime.getURL("esteira.html");
