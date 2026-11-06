@@ -238,10 +238,18 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
     try {
       // vigia o andamento: o OCR de um processo grande pode levar vários minutos, mas sem NENHUM sinal da página de OCR por 5 min (ou 27 min enquanto o Projudi gera o PDF) ela travou
       const t0 = Date.now(), parado0 = (await chrome.storage.local.get("lote_parado_ms")).lote_parado_ms;
+      let sumida = 0;
       for (;;) {
         const d = await chrome.storage.local.get(["lote_fim_" + chave, "lote_prog_" + chave]), pr = d["lote_prog_" + chave];
         if (d["lote_fim_" + chave]) { fim = d["lote_fim_" + chave]; break; }
-        const semSinal = Date.now() - (pr?.t || t0), limite = parado0 || (/^Pedindo o PDF/i.test(pr?.txt || "") ? 27 * 60000 : 8 * 60000);
+        // etapas em que a aba pode ficar em silêncio de verdade (o Projudi gera o PDF; a biblioteca grava/salva o arquivo final de uma vez): mais paciência (20 min). Nas demais, 8 min.
+        const semSinal = Date.now() - (pr?.t || t0), limite = parado0 || (/^Pedindo o PDF/i.test(pr?.txt || "") ? 27 * 60000 : /^(Gerando o PDF|Gravando texto|Salvando o PDF|Conferindo o texto)/i.test(pr?.txt || "") ? 20 * 60000 : 8 * 60000);
+        // a aba de OCR sumiu (fechada ou caiu por falta de memória)? Então não adianta esperar: falha na hora, dizendo o que viu
+        if (pr && semSinal > 20000) {
+          let viva = true; try { viva = (await chrome.runtime.getContexts({ contextTypes: ["TAB"] })).some((c) => (c.documentUrl || "").includes("ocr.html")); } catch (e) { viva = true; }
+          sumida = viva ? 0 : sumida + 1;
+          if (sumida >= 3) throw new Error(`a aba de OCR foi fechada ou caiu${pr?.txt ? ` (último andamento: “${String(pr.txt).slice(0, 60)}”)` : ""}; pode ter faltado memória neste processo grande — tente de novo depois`);
+        }
         if (semSinal > limite || Date.now() - t0 > 90 * 60000) {
           try { for (const c of await chrome.runtime.getContexts({ contextTypes: ["TAB"] })) if ((c.documentUrl || "").includes("ocr.html")) chrome.tabs.remove(c.tabId).catch(() => {}); } catch (e) { /* sem getContexts */ }
           throw new Error(`o OCR travou${pr?.txt ? ` em “${String(pr.txt).slice(0, 60)}”` : ""} (${Math.round(semSinal / 60000)} min sem sinal); a aba de OCR foi fechada e o processo pulado — tente de novo depois`);

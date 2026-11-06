@@ -212,11 +212,15 @@ export async function fazerOcr(bytes, opcoes, ganchos = {}) {
   if (cancelado()) throw new Error("cancelado");
 
   // 3) embutir o texto invisível nas páginas originais
+  // Devolve o controle sem timer (aba em segundo plano tem timer limitado a 1 por minuto) e avisa o andamento: a fila só dá o processo como travado se esta etapa ficar em silêncio.
+  const ceder = () => new Promise((ok) => { const c = new MessageChannel(); c.port1.onmessage = () => { c.port1.close(); ok(); }; c.port2.postMessage(0); });
   status("Gerando o PDF…");
   const doc = await PDFDocument.load(bytes);
   const font = await doc.embedFont(StandardFonts.Helvetica);
-  let palavras = 0;
+  let palavras = 0, gravadas = 0, ultimaCessao = performance.now();
   for (const [i, { palavras: ps, viewport, escala: s }] of resultados) {
+    if (performance.now() - ultimaCessao > Number(globalThis.__OCR_CEDER_MS ?? 400)) { status(`Gravando texto: página ${gravadas + 1} de ${resultados.size}`); await ceder(); ultimaCessao = performance.now(); if (cancelado()) throw new Error("cancelado"); }
+    gravadas++;
     const page = doc.getPage(i - 1);
     page.pushOperators(pushGraphicsState(), setTextRenderingMode(TextRenderingMode.Invisible));
     for (const w of ps) {
@@ -230,10 +234,12 @@ export async function fazerOcr(bytes, opcoes, ganchos = {}) {
     }
     page.pushOperators(popGraphicsState());
   }
+  status("Salvando o PDF final (pode levar alguns minutos)…"); await ceder();
   const saida = await doc.save();
   log(`  ${palavras} palavras reconhecidas em ${resultados.size} página(s)${puladas.length ? `; ${puladas.length} sem OCR (${puladas.map((x) => x.pagina).join(", ")})` : ""}.`);
 
   // 4) conferência: o texto agora é extraível?
+  status("Conferindo o texto do PDF final…"); await ceder();
   const novo = await pdfjs.getDocument({ data: saida.slice() }).promise;
   let ok = 0;
   for (const i of alvo.slice(0, 5)) { const p = await novo.getPage(i); if ((await textoDaPagina(p)) >= MIN_CHARS) ok++; }
