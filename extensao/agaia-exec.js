@@ -33,6 +33,11 @@
     return achados;
   }
   const modalAberto = () => [...document.querySelectorAll(".modal.show")].find(visivel) || null;
+  /** Fecha o modal pelo “X” do canto (nunca por “Não, quero ajustar”). */
+  const fecharModal = (modal) => {
+    const x = [...modal.querySelectorAll("button, a, [role=button]")].find((b) => visivel(b) && !/ajustar|n[aã]o\b|cancelar/i.test(texto(b)) && (/\bclose\b|btn-close/i.test(b.className || "") || /^[×✕✖xX]$/.test(texto(b)) || /fechar|close/i.test(b.getAttribute("aria-label") || b.title || "") || b.hasAttribute("data-dismiss") || b.hasAttribute("data-bs-dismiss")));
+    if (x) x.click();
+  };
   // processo em segredo de justiça: o Agaia pede uma declaração de responsabilidade (“Entendi e desejo continuar”) e depois exige o PDF anonimizado.
   // A declaração é do usuário e o PDF não faz parte deste modo: a esteira NÃO confirma por ele; registra o motivo e segue.
   const sigilo = () => { const t = [texto(modalAberto()), ...mensagens()].join(" "); return /sigilos|segredo de justi/i.test(t) ? t.replace(/\s+/g, " ").trim().slice(0, 400) : ""; };
@@ -100,7 +105,7 @@
       if (!botao) return falha("o botão Executar do Agaia não ficou disponível" + (mensagens()[0] ? ": " + mensagens()[0] : ""));
       prog("executando no Agaia");
       botao.click();
-      const t0 = Date.now(); let rodou = false, ultimoAviso = "", estavel = 0, ultimoTam = -1, semSinal = 0;
+      const t0 = Date.now(); let rodou = false, ultimoAviso = "", estavel = 0, ultimoTam = -1, semSinal = 0; let confirmou = 0;
       while (Date.now() - t0 < p.limiteMs) {
         await dorme(1000);
         const modal = modalAberto();
@@ -108,8 +113,13 @@
           const t = texto(modal);
           if (/Digite o resultado exibido|exibido na imagem|captcha|n[aã]o sou um rob/i.test(t)) return falha("O Agaia pediu uma verificação (conta na imagem), que precisa de uma pessoa: " + t.slice(0, 300), { verificacao: true });
           const ok = [...modal.querySelectorAll("button")].find((b) => /^\s*(Sim,? continuar|Confirmar|Continuar|Sim|OK)\s*$/i.test(texto(b)) && visivel(b) && !b.disabled);
-          if (ok && /Confirma[cç][aã]o de execu[cç][aã]o|deseja continuar/i.test(t)) { prog("confirmando a execução"); ok.click(); await dorme(800); continue; }
-          if (!ok) { ultimoAviso = t.slice(0, 500); }
+          if (ok && /Confirma[cç][aã]o de execu[cç][aã]o|deseja continuar/i.test(t)) {
+            // às vezes o Agaia mostra esta confirmação de novo no FIM da execução e ela não some depois do “Sim, continuar”: aí é preciso fechá-la no “X”, senão o resultado nunca é entregue
+            prog("confirmando a execução"); ok.click(); confirmou++; await dorme(800);
+            const ainda = modalAberto();
+            if (ainda && confirmou >= 2) fecharModal(ainda);
+            if (!temResultado()) continue;      // sem resultado ainda: segue esperando; com resultado: cai na entrega abaixo, mesmo com o aviso aberto
+          } else if (!ok) { ultimoAviso = t.slice(0, 500); }
         }
         if (executando()) { rodou = true; semSinal = 0; prog("o Agaia está processando"); continue; }
         if (temResultado()) {

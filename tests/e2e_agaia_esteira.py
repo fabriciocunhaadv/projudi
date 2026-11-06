@@ -38,10 +38,10 @@ window.marcadosOrdem = [];
 function atualizar() { window.marcadosOrdem.push(document.querySelectorAll('.check_movimento:checked').length); }
 function executar() {
   if (CENARIO === 'captcha') { modal('Aviso: Dependendo do tamanho do processo... Digite o resultado exibido na imagem. 10 - 2 <input id="resp">', '<button>Confirmar</button>'); return; }
-  modal('O conteúdo do prompt menciona jurisprudência/ementa, mas não há vínculo em JurisAGAIA. Deseja continuar a execução mesmo sem JurisAGAIA?', '<button id="nao">Não, quero ajustar</button><button id="sim" onclick="confirmou()">Sim, continuar</button>');
+  modal('O conteúdo do prompt menciona jurisprudência/ementa, mas não há vínculo em JurisAGAIA. Deseja continuar a execução mesmo sem JurisAGAIA?', '<button id="nao">Não, quero ajustar</button><button id="sim" onclick="confirmou()">Sim, continuar</button>' + (CENARIO === 'teimoso' ? '<button class="btn-close" aria-label="Close" onclick="fechar()">×</button>' : ''));
 }
 function confirmou() {
-  fechar(); document.getElementById('em-exec').style.display = 'block';
+  if (CENARIO !== 'teimoso') fechar(); document.getElementById('em-exec').style.display = 'block';
   setTimeout(() => { document.getElementById('em-exec').style.display = 'none'; document.getElementById('resultado_conteudo').innerHTML = %(minuta)s; document.getElementById('form_execucao_lock_overlay').classList.add('is-active'); document.getElementById('jurisprudencia_execucao_status').style.display = 'block'; setTimeout(() => document.getElementById('jurisprudencia_execucao_status').style.display = 'none', 1500); }, 2500);
 }
 </script></body></html>"""
@@ -96,6 +96,10 @@ def main():
         estado["cenarios"]["5285462.72.2025"] = "captcha"
         r3 = ver.evaluate("async () => { const ag = await import('./agaia-cliente.js'); return await ag.executarNoAgaia({ processo: '5285462-72.2025.8.09.0166', prompt: 'Outros Área Judicial - Fabrício Juizado Especial Civel' }, { limiteMs: 60000 }); }")
         print("captcha:", r3); assert not r3["ok"] and r3.get("verificacao"), r3
+        # aviso que NÃO some depois do "Sim, continuar" (só no X): a extensão fecha no X e entrega o resultado
+        estado["cenarios"]["5285466.76.2025"] = "teimoso"
+        r7 = ver.evaluate("async () => { const ag = await import('./agaia-cliente.js'); return await ag.executarNoAgaia({ processo: '5285466-76.2025.8.09.0166', prompt: 'Outros Área Judicial - Fabrício Juizado Especial Civel' }, { limiteMs: 60000 }); }")
+        print("teimoso:", {k: (v if k != "minutaHtml" else len(v or "")) for k, v in r7.items()}); assert r7["ok"] and "DECISÃO INTERLOCUTÓRIA" in r7["minutaTexto"], r7
         # sessão expirada
         estado["cenarios"]["5285463.73.2025"] = "login"
         r4 = ver.evaluate("async () => { const ag = await import('./agaia-cliente.js'); return await ag.executarNoAgaia({ processo: '5285463-73.2025.8.09.0166', prompt: 'x' }, { limiteMs: 60000 }); }")
