@@ -1,5 +1,7 @@
 // Página de OCR: tela, arrastar/soltar e OCR automático dos PDFs baixados do Projudi. O trabalho pesado está em ocr-motor.js.
 import { fazerOcr, fmt, descreverErro } from "./ocr-motor.js";
+import { reportarSaude, instalarSaude } from "./saude-fila.js";
+instalarSaude("ocr");
 import { textoDoPdf } from "./pdf-texto.js";
 import { extrairPauta } from "./pauta-extrator.js";
 import { chaveProc } from "./proc-chave.js";
@@ -103,6 +105,7 @@ async function automatico(idDownload) {
     setTimeout(() => window.close(), 4000);
   } catch (e) {
     rodando = false; $("cancelar").disabled = true;
+    void reportarSaude("ocr", "erro", "Não consegui ler o PDF baixado: " + descreverErro(e));
     log("✖ " + descreverErro(e));
     $("status").innerHTML = '<span class="erro">Não consegui ler o PDF baixado.</span> Solte o arquivo aqui em cima, ou ative “Permitir acesso a URLs de arquivo” nos detalhes da extensão (chrome://extensions).';
     avisar("OCR do PDF do Projudi", "Não consegui ler o PDF baixado. Abra a página de OCR e solte o arquivo, ou ative “Permitir acesso a URLs de arquivo” na extensão.");
@@ -188,6 +191,7 @@ async function interceptado(idJob) {
     document.body.dataset.pronto = "1";
     setTimeout(() => window.close(), 5000);
   } catch (e) {
+    void reportarSaude("ocr", "erro", descreverErro(e));
     log("✖ " + descreverErro(e));
     $("status").innerHTML = `<span class="erro">${descreverErro(e)}</span>`;
     avisar("PDF do processo", descreverErro(e));

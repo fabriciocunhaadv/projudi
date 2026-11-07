@@ -1,4 +1,6 @@
 import { todos, atualizar, lerPdf, remover, enfileirar, ROTULO, ATIVOS } from "./esteira-banco.js";
+import { instalarSaude } from "./saude-fila.js";
+instalarSaude("esteira");
 import { analisarNoStudio, lerMinutaAtual, consultarGigantes, cadastrarNoStudio } from "./studio-cliente.js";
 import { executarNoAgaia, retomarExecucao } from "./agaia-cliente.js";
 import { criarDocumento, abrirLadoALado, lerDocumento, tipoDaMinuta, nomeDoc } from "./docs-api.js";

@@ -778,6 +778,25 @@
   // o app tem o título "Assessor Judicial" e vários elementos fixos; a tela cheia da minuta, por exemplo, não tem a área de entrada dos autos
   const temApp = () => /^Assessor Judicial/i.test(document.title || "") || !!document.querySelector("#tour-input-panel, #tour-execute-btn, [data-testid=gigantes-selo], #tour-result-tabs");
   const quadroSemApp = () => !temApp() && (window.top !== window || !!document.querySelector("iframe"));
+  // ----- Saúde do sistema: entrega ao app os eventos que a extensão anotou (fila em chrome.storage.local) e remove da fila o que o app confirmou -----
+  const entregarSaude = async () => {
+    try {
+      if (quadroSemApp() || !temApp()) return;
+      const el = document.documentElement;
+      if (el.dataset.projudiSaudeAck) {      // o app confirmou o recebimento: tira esses itens da fila
+        const ids = new Set(JSON.parse(el.dataset.projudiSaudeAck || "[]")); delete el.dataset.projudiSaudeAck;
+        const { saudeFila = [] } = await chrome.storage.local.get("saudeFila"); await chrome.storage.local.set({ saudeFila: saudeFila.filter((x) => !ids.has(x.id)) });
+      }
+      const { saudeFila = [], saudeVivo = 0 } = await chrome.storage.local.get(["saudeFila", "saudeVivo"]);
+      if (Date.now() - saudeVivo > 24 * 3600_000) {      // uma vez por dia: avisa qual versão da extensão está em uso
+        saudeFila.push({ id: "v" + Date.now().toString(36), ts: Date.now(), versao: chrome.runtime.getManifest().version, modulo: "extensao", severidade: "info", mensagem: "Extensão ativa" });
+        await chrome.storage.local.set({ saudeFila: saudeFila.slice(-60), saudeVivo: Date.now() });
+      }
+      if (saudeFila.length && !el.dataset.projudiSaudeFila) { el.dataset.projudiSaudeFila = JSON.stringify(saudeFila.slice(0, 40)); window.dispatchEvent(new Event("projudi:saude")); }
+    } catch (e) { /* sem armazenamento da extensão: nada a entregar */ }
+  };
+  setInterval(entregarSaude, 15000); setTimeout(entregarSaude, 5000);
+
   chrome.runtime.onMessage.addListener((m, _s, responder) => {
     if (m?.acao === "lancar-progresso") { if (btLP.disabled) dizLP(m.texto); return false; }      // andamento do botão “Lançar no Projudi” (definido mais abaixo)
     if (quadroSemApp()) return false;

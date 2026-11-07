@@ -1,4 +1,6 @@
 import { chaveProc } from "./proc-chave.js";
+import { instalarSaude } from "./saude-fila.js";
+instalarSaude("lote");
 import { montarPdf, nomePadrao, semBarra, acharServentia } from "./modelos-pdf.js";
 import { enviarBase } from "./studio-cliente.js";
 import { manterAcordado } from "./acordado.js";

@@ -1,5 +1,6 @@
 // Fila (esteira) das minutas: Studio -> Google Docs -> cadastro no Projudi, um processo por vez.
 // Os downloads não dependem dela. O PDF fica no IndexedDB (grande); o estado de cada item, no chrome.storage.local.
+import { reportarSaude } from "./saude-fila.js";
 const BANCO = "projudi_esteira", K = (id) => "esteira_" + id;
 export const ATIVOS = ["analisando", "recebida", "pausado", "conferindo", "conferido", "cadastrando", "gigante"];
 
@@ -31,7 +32,9 @@ export const ler = async (id) => (await chrome.storage.local.get(K(id)))[K(id)];
 export function atualizar(id, mudancas) {
   return navigator.locks.request("esteira-item", async () => {
     const it = await ler(id); if (!it) return null;
-    const novo = { ...it, ...mudancas }; await chrome.storage.local.set({ [K(id)]: novo }); return novo;
+    const novo = { ...it, ...mudancas }; await chrome.storage.local.set({ [K(id)]: novo });
+    if (mudancas.estado === "erro" && mudancas.erro) void reportarSaude(/^Agaia/i.test(mudancas.erro) ? "agaia" : "esteira", "erro", mudancas.erro, { modo: it.modo });      // painel Saúde do sistema
+    return novo;
   });
 }
 export async function remover(ids) {
