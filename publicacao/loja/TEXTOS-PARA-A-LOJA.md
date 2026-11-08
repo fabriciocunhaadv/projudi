@@ -41,6 +41,7 @@ Todas usam dados fictícios (comarca "Exemplo", processos inventados).
 - **storage / unlimitedStorage:** guardar configurações, a fila de processos e as minutas no computador do usuário.
 - **clipboardWrite:** copiar para a área de transferência a minuta e o diagnóstico, a pedido do usuário.
 - **power:** impedir que o computador entre em suspensão enquanto a extensão processa em segundo plano um lote de processos (download dos PDFs e OCR, que levam vários minutos). Só mantém o computador acordado durante o processamento e libera assim que termina; nenhum dado é coletado por essa permissão.
+- **Acesso opcional a sites oficiais de leis e jurisprudência (optional_host_permissions: planalto.gov.br, portal.stf.jus.br, stj.jus.br, cjf.jus.br, lexml.gov.br, normas.leg.br, camara.leg.br, senado.leg.br, goias.gov.br, leis.org, leisestaduais.com.br, jusbrasil.com.br):** pedido SOMENTE quando o administrador do app clica em “Testar também pelo navegador”, para abrir esses sites (só leitura, sem cookies) e mostrar ao app o que o navegador consegue acessar. Nada é acessado sem o clique e a autorização do usuário.
 - **Acesso opcional a planalto.gov.br (optional_host_permissions):** pedido SOMENTE quando o administrador do app clica em “Buscar leis pelo navegador”, para baixar, no navegador dele, o texto oficial das leis (endereços do Planalto) e entregá-lo ao app Assessor Judicial. Só endereços de leis do Planalto são aceitos; sem o clique e a autorização do usuário, nada é acessado.
 - **Acesso a sites:** *.tjgo.jus.br (Projudi: ler conclusões, gerar PDF, editor de minutas); judicial-mysql.assessor.net.br (app Assessor Judicial: enviar o PDF do processo e ler a minuta gerada, a pedido do usuário); docs.google.com/document/* (mostrar a barra de apoio no documento da minuta aberto ao lado do PDF; sem acesso à conta Google).
 
@@ -68,3 +69,5 @@ Visibilidade: **Privada** (testadores confiáveis, com os e-mails Google dos ass
 **Versão 1.0.66:** sem a permissão `tabGroups` (só agrupava abas) e com o acesso ao Google Docs limitado a `docs.google.com/document/*`; pacote com todas as licenças das bibliotecas; política de privacidade e textos da loja atualizados para dizer que o app Assessor Judicial tem servidor próprio e quais dados recebe. Nenhuma permissão nova.
 
 **Versão 1.0.88:** acrescenta o acesso OPCIONAL (pedido na hora, a pedido do administrador do app) a planalto.gov.br, para baixar as leis oficiais no navegador e entregá-las ao app; sem mudança nas permissões obrigatórias.
+
+**Versão 1.0.89:** acrescenta o teste de acesso pelo navegador (permissões opcionais de sites oficiais, pedidas na hora a pedido do administrador do app); sem mudança nas permissões obrigatórias.

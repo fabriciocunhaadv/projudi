@@ -804,11 +804,18 @@
       if (quadroSemApp()) return;
       const pedido = JSON.parse(el.dataset.projudiLeisPedido || "null"); delete el.dataset.projudiLeisPedido;
       if (!pedido || !Array.isArray(pedido.leis)) return;
-      chrome.runtime.sendMessage({ acao: "leis-abrir", pedidoId: String(pedido.pedidoId || ""), leis: pedido.leis.slice(0, 40).map((l) => ({ id: l.id, nome: l.nome, url: l.url })) }, (r) => {
+      chrome.runtime.sendMessage({ acao: "leis-abrir", pedidoId: String(pedido.pedidoId || ""), modo: pedido.modo === "teste" ? "teste" : "leis", leis: pedido.leis.slice(0, 40).map((l) => ({ id: l.id, nome: l.nome, url: l.url })) }, (r) => {
         if (chrome.runtime.lastError || !r?.ok) { el.dataset.projudiLeisFim = JSON.stringify({ pedidoId: pedido.pedidoId, erro: chrome.runtime.lastError?.message || r?.erro || "a extensão não abriu a busca" }); window.dispatchEvent(new Event("projudi:leis-fim")); }
       });
     } catch (e) { /* pedido inválido */ }
   });
+  const entregarTeste = async (m) => {      // resultado de UM site do teste de acesso (só números e uma amostra de texto)
+    const el = document.documentElement, t0 = Date.now();
+    while (el.dataset.projudiTesteEntrega) { if (Date.now() - t0 > 30000) throw new Error("o app não terminou de receber o resultado anterior"); await dorme(200); }
+    el.dataset.projudiTesteEntrega = JSON.stringify({ pedidoId: m.pedidoId, resultado: m.resultado });
+    window.dispatchEvent(new Event("projudi:teste-entrega"));
+    return { ok: true };
+  };
   const entregarLei = async (m) => {      // coloca UMA lei no atributo da página e espera o app ler (para não perder nenhuma)
     const el = document.documentElement, t0 = Date.now();
     while (el.dataset.projudiLeiEntrega) { if (Date.now() - t0 > 90000) throw new Error("o app não terminou de receber a lei anterior"); await dorme(300); }
@@ -822,7 +829,8 @@
     if (quadroSemApp()) return false;
     if (m?.acao === "studio-ping") { responder({ ok: true }); return false; }
     if (m?.acao === "studio-lei-entrega") { entregarLei(m).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
-    if (m?.acao === "studio-leis-fim") { document.documentElement.dataset.projudiLeisFim = JSON.stringify({ pedidoId: m.pedidoId, feitas: m.feitas, falhas: m.falhas, bloqueios: m.bloqueios }); window.dispatchEvent(new Event("projudi:leis-fim")); responder({ ok: true }); return false; }
+    if (m?.acao === "studio-teste-entrega") { entregarTeste(m).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
+    if (m?.acao === "studio-leis-fim") { document.documentElement.dataset.projudiLeisFim = JSON.stringify({ pedidoId: m.pedidoId, modo: m.modo || "leis", feitas: m.feitas, falhas: m.falhas, bloqueios: m.bloqueios }); window.dispatchEvent(new Event("projudi:leis-fim")); responder({ ok: true }); return false; }
     if (m?.acao === "studio-gigantes") { responder({ ok: true, jobs: listaGigantes() }); return false; }
     if (m?.acao === "studio-parte") {     // recebe um arquivo em pedaços
       const p = partes.get(m.id) || []; const bin = atob(m.b64), b = new Uint8Array(bin.length);
