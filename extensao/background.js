@@ -254,7 +254,7 @@ chrome.runtime.onMessage.addListener((m, s, responder) => {
     return true;
   }
   if (m?.acao === "leis-abrir") {       // o app (Central de fontes) pediu para buscar as leis do Planalto pelo navegador: guarda o pedido e abre a página que pede a permissão e busca
-    chrome.storage.local.set({ leisJob: { pedidoId: String(m.pedidoId || ""), modo: m.modo === "teste" ? "teste" : "leis", tabId: s.tab ? s.tab.id : null, leis: Array.isArray(m.leis) ? m.leis.slice(0, 40) : [] } })
+    chrome.storage.local.set({ leisJob: { pedidoId: String(m.pedidoId || ""), modo: m.modo === "teste" ? "teste" : m.modo === "fonte" ? "fonte" : "leis", tabId: s.tab ? s.tab.id : null, leis: Array.isArray(m.leis) ? m.leis.slice(0, 40) : [], fontesBusca: Array.isArray(m.fontesBusca) ? m.fontesBusca.slice(0, 20) : [] } })
       .then(() => chrome.tabs.create({ url: chrome.runtime.getURL("leis.html"), active: true })).then(() => responder({ ok: true }), (e) => responder({ ok: false, erro: String(e.message || e) }));
     return true;
   }
