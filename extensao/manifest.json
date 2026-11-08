@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Conclusões Projudi",
-  "version": "1.0.87",
+  "version": "1.0.88",
   "description": "Confere automaticamente as conclusões não analisadas e pré-analisadas de cada serventia no Projudi/TJGO.",
   "permissions": [
     "activeTab",
@@ -13,6 +13,10 @@
     "storage",
     "clipboardWrite",
     "unlimitedStorage"
+  ],
+  "optional_host_permissions": [
+    "https://www.planalto.gov.br/*",
+    "https://planalto.gov.br/*"
   ],
   "host_permissions": [
     "https://*.tjgo.jus.br/*",

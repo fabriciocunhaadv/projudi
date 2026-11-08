@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Atualizar leis pelo navegador</title>
+<style>
+body{font:14px system-ui,sans-serif;margin:0;background:#f8fafc;color:#0f172a}
+main{max-width:760px;margin:0 auto;padding:24px 16px}
+h1{font-size:18px;margin:0 0 6px} p{color:#475569;line-height:1.5}
+button{padding:10px 18px;border:0;border-radius:999px;background:#673de6;color:#fff;font-weight:700;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}
+ul{list-style:none;padding:0;margin:16px 0} li{padding:6px 10px;border-bottom:1px solid #e2e8f0;display:flex;gap:8px;font-size:13px}
+.ok{color:#047857}.erro{color:#be123c}.espera{color:#64748b}
+#resumo{font-weight:700;margin-top:12px}
+</style></head>
+<body><main>
+<h1>Atualizar as leis do Planalto pelo seu navegador</h1>
+<p>O Planalto bloqueia o servidor do Studio, mas não o seu navegador. Esta página baixa as leis daqui e as entrega ao Studio, que as guarda para todos os gabinetes. Só são buscados endereços de leis do <b>planalto.gov.br</b>.</p>
+<p id="permissao"></p>
+<button id="iniciar">Permitir acesso ao Planalto e buscar</button>
+<div id="resumo"></div>
+<ul id="lista"></ul>
+</main><script type="module" src="leis.js"></script></body></html>

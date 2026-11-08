@@ -253,6 +253,11 @@ chrome.runtime.onMessage.addListener((m, s, responder) => {
     })().then(responder, (e) => responder({ ok: false, serventias: [], erro: String(e.message || e) }));
     return true;
   }
+  if (m?.acao === "leis-abrir") {       // o app (Central de fontes) pediu para buscar as leis do Planalto pelo navegador: guarda o pedido e abre a página que pede a permissão e busca
+    chrome.storage.local.set({ leisJob: { pedidoId: String(m.pedidoId || ""), tabId: s.tab ? s.tab.id : null, leis: Array.isArray(m.leis) ? m.leis.slice(0, 40) : [] } })
+      .then(() => chrome.tabs.create({ url: chrome.runtime.getURL("leis.html"), active: true })).then(() => responder({ ok: true }), (e) => responder({ ok: false, erro: String(e.message || e) }));
+    return true;
+  }
   if (m?.acao === "minha-aba") { responder({ tabId: s.tab ? s.tab.id : null }); return false; }
   if (m?.acao === "esteira-abrir") {       // garante a aba que roda a fila de minutas
     const url = chrome.runtime.getURL("esteira.html");
