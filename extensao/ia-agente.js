@@ -99,6 +99,17 @@
     return { ok: true, antes };
   }
 
+  // Remove rótulos de botões da tela que vêm misturados ao texto (ex.: barra “Reescrever / Buscar julgados / Perguntar”).
+  const limpar = (t) => String(t || "").replace(/Reescrever\s*Buscar julgados\s*Perguntar/gi, "").split("\n").filter((l) => !/^\s*(Reescrever|Buscar julgados|Perguntar|Baixar|Copiar|Ver fontes|Editar|Compartilhar)\s*$/i.test(l)).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  // Painel lateral com um documento longo (metade direita da tela, sem caixa de mensagem dentro).
+  function painelDocumento() {
+    const W = innerWidth;
+    const c = [...document.querySelectorAll("div,section,article,aside,main")].filter(visivel).filter((e) => { const r = e.getBoundingClientRect(); return r.left > W * 0.35 && r.width < W * 0.75 && textoDe(e).length > 800 && !e.querySelector("textarea,[contenteditable='true']"); });
+    if (!c.length) return null;
+    return c.sort((a, b) => textoDe(b).length - textoDe(a).length || a.getBoundingClientRect().width * a.getBoundingClientRect().height - b.getBoundingClientRect().width * b.getBoundingClientRect().height)[0];
+  }
+  async function estabilizar(el, ms) { let u = textoDe(el).length, desde = Date.now(); while (Date.now() - desde < ms) { await dorme(500); const n = textoDe(el).length; if (n !== u) { u = n; desde = Date.now(); } } }
+
   // Espera a resposta: começou (botão "parar" ou texto novo) e terminou (sem "parar" e texto estável por `estavelMs`).
   async function esperarResposta(ms = 600000, estavelMs = 6000) {
     const marca = window.__projudiIAMarca || { antes: 0, textoAntes: "" };
@@ -113,7 +124,13 @@
       if (ult !== ultimo) { ultimo = ult; desde = Date.now(); }
       if (comecou && novo && !gerando && ult && Date.now() - desde >= estavelMs) {
         const el = rs[rs.length - 1];
-        return { ok: true, texto: ult, html: el.innerHTML };
+        let texto = limpar(ult), html = el.innerHTML, origem = "chat";
+        // IAs que entregam a peça num painel lateral (ex.: Jusbrasil “Criou Peça”): o chat só traz um aviso curto; a minuta está no painel
+        if (texto.length < 2000) {
+          const d = await esperarPor(painelDocumento, 25000, 1000);
+          if (d) { await estabilizar(d, 3000); const t = limpar(textoDe(d)); if (t.length > texto.length) { texto = t; html = d.innerHTML; origem = "painel"; } }
+        }
+        return { ok: true, texto, html, origem };
       }
       if (!comecou && Date.now() - t0 > 90000) throw new Error("a IA não começou a responder (a mensagem pode não ter sido enviada)");
       await dorme(1000);

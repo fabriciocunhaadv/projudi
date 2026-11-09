@@ -68,7 +68,7 @@ export async function executarNaIa(it, { id, bytes, promptTexto, aoAndamento = (
       if (!(await aindaValido())) return { ok: false, cancelado: true };
       try {
         const r = await msg(aba, { acao: "ia-esperar", ms: 90000, estavelMs: 6000 });
-        if ((r.texto || "").trim().length < 80) return { ok: false, erro: `${s.nome} respondeu com texto curto demais (“${(r.texto || "").slice(0, 80)}”)` };
+        if ((r.texto || "").trim().length < 400) return { ok: false, erro: `não consegui capturar a minuta do ${s.nome}: só veio um texto curto (“${(r.texto || "").slice(0, 80)}”). A minuta pode estar num painel lateral: rode “Diagnosticar tela da IA” e me envie o resultado.` };
         return { ok: true, minutaTexto: r.texto, minutaHtml: r.html || "" };
       } catch (e) {
         if (!/tempo limite|Receiving end|message channel/i.test(e.message) || Date.now() - t0 > 12 * 60000) throw e;
