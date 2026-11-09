@@ -36,7 +36,11 @@
   const botaoEnviar = () => primeiro(perfil().enviar) || [...document.querySelectorAll("button")].filter(visivel).find((b) => /^(enviar|send)( mensagem| message)?$/i.test((b.getAttribute("aria-label") || b.title || textoDe(b)).trim()));
   const botaoParar = () => primeiro(perfil().parar) || [...document.querySelectorAll("button")].filter(visivel).find((b) => /^(parar|stop)( gera[cç][aã]o| generating| streaming| resposta)?\b/i.test((b.getAttribute("aria-label") || b.title || "").trim()));
   const campoArquivo = () => [...document.querySelectorAll("input[type='file']")].find((i) => !i.accept || /pdf|\*|application|\.pdf/i.test(i.accept)) || document.querySelector("input[type='file']");
-  const botaoAnexar = () => primeiro(perfil().anexar) || [...document.querySelectorAll("button, [role='button']")].filter(visivel).find((b) => /anex|attach|upload|adicionar (arquivo|foto)|add (file|photo)/i.test((b.getAttribute("aria-label") || b.title || "")));
+  const ROTULO_ANEXAR = /anex|attach|upload|adicion|add (file|photo|content)|arquivo|\bfile|\bmais\b|\bmore\b|ferramenta|^\+$/i, NAO_ANEXAR = /enviar|send|microfone|mic\b|voz|voice|ditar|dictat|gravar|record|modelo|model|flash|pro\b|pensar|think|parar|stop/i;
+  const rotuloDe = (b) => (b.getAttribute("aria-label") || b.title || "").trim() || textoDe(b).slice(0, 30);
+  // área da caixa de mensagem: sobe a partir dela até um contêiner que tenha botões (para achar o "+" mesmo sem rótulo conhecido)
+  const areaDaCaixa = () => { let e = compositor(); for (let i = 0; e && i < 7; i++, e = e.parentElement) if (e.querySelectorAll("button,[role='button']").length >= 2 && e.getBoundingClientRect().width > 250) return e; return document; };
+  const botaoAnexar = () => primeiro(perfil().anexar) || [...areaDaCaixa().querySelectorAll("button, [role='button']")].filter(visivel).find((b) => { const r = rotuloDe(b); return ROTULO_ANEXAR.test(r) && !NAO_ANEXAR.test(r); });
   const respostas = () => todosVisiveis(perfil().resposta);
   const pedeLogin = () => !compositor() && ([...document.querySelectorAll("a,button")].some((e) => /^(log ?in|entrar|sign ?in|fazer login|login)$/i.test(textoDe(e))) || /\/(login|auth|signin|accounts)/i.test(location.pathname + location.hostname));
   const bloqueio = () => /verifique que (você|voce) é humano|verify you are human|just a moment|captcha/i.test(document.title + " " + (document.body?.innerText || "").slice(0, 400));
@@ -73,22 +77,27 @@
   const partes = new Map();
   function b64ParaArquivo(nome, b64) { const bin = atob(b64); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new File([u], nome, { type: "application/pdf" }); }
   async function anexar(nome, b64) {
-    const arq = b64ParaArquivo(nome, b64);
-    let campo = campoArquivo();
-    if (!campo) { const b = botaoAnexar(); if (b) { b.click(); campo = await esperarPor(campoArquivo, 6000); if (!campo) { /* menu: procura a opção "enviar arquivo" */ const op = await esperarPor(() => [...document.querySelectorAll("[role='menuitem'], button, li")].filter(visivel).find((e) => /(enviar|carregar|upload|adicionar|add).*(arquivo|file|computador|computer)|arquivo|from computer/i.test(textoDe(e) || e.getAttribute("aria-label") || "")), 3000); if (op) { op.click(); campo = await esperarPor(campoArquivo, 5000); } } } }
-    if (campo) {
-      const dt = new DataTransfer(); dt.items.add(arq); campo.files = dt.files;
-      campo.dispatchEvent(new Event("input", { bubbles: true })); campo.dispatchEvent(new Event("change", { bubbles: true }));
-    } else {      // sem campo de arquivo: simula o arrastar-e-soltar sobre a caixa de mensagem
-      const alvo = compositor() || document.body; const dt = new DataTransfer(); dt.items.add(arq);
-      for (const tipo of ["dragenter", "dragover", "drop"]) alvo.dispatchEvent(new DragEvent(tipo, { dataTransfer: dt, bubbles: true, cancelable: true }));
-    }
-    const base = nome.replace(/\.pdf$/i, "");
-    const ok = await esperarPor(() => { const t = document.body.innerText || ""; return t.includes(nome) || t.includes(base) || t.includes(base.slice(0, 20)); }, 90000, 500);
-    if (!ok) throw new Error("não consegui confirmar o upload do PDF na tela da IA");
-    await esperarPor(() => !document.querySelector("[role='progressbar'], progress, [class*='uploading' i]"), 120000, 500);      // espera o fim do envio (e do processamento)
-    await dorme(1500);
-    return { ok: true };
+    const arq = b64ParaArquivo(nome, b64), base = nome.replace(/\.pdf$/i, "");
+    const apareceu = (ms) => esperarPor(() => { const t = document.body.innerText || ""; return t.includes(nome) || t.includes(base) || t.includes(base.slice(0, 20)); }, ms, 500);
+    const novoDt = () => { const dt = new DataTransfer(); dt.items.add(arq); return dt; };
+    const tentativas = [];
+    const porCampo = async (campo) => { campo.files = novoDt().files; campo.dispatchEvent(new Event("input", { bubbles: true })); campo.dispatchEvent(new Event("change", { bubbles: true })); };
+    // 1) campo de arquivo que já existe na página
+    tentativas.push(["campo de arquivo", async () => { const c = campoArquivo(); if (!c) return false; await porCampo(c); return apareceu(10000); }]);
+    // 2) colar o arquivo na caixa de mensagem (Gemini, ChatGPT e Claude aceitam)
+    tentativas.push(["colar na caixa", async () => { const c = compositor(); if (!c) return false; c.focus(); c.dispatchEvent(new ClipboardEvent("paste", { clipboardData: novoDt(), bubbles: true, cancelable: true })); return apareceu(8000); }]);
+    // 3) arrastar e soltar sobre a caixa
+    tentativas.push(["arrastar e soltar", async () => { const alvo = compositor() || document.body; const dt = novoDt(); for (const t of ["dragenter", "dragover", "drop"]) alvo.dispatchEvent(new DragEvent(t, { dataTransfer: dt, bubbles: true, cancelable: true })); return apareceu(8000); }]);
+    // 4) último recurso: abrir o botão de anexar (+) e o item "enviar arquivo" do menu para fazer o campo de arquivo aparecer
+    tentativas.push(["botão de anexar", async () => {
+      const b = botaoAnexar(); if (!b) return false; b.click();
+      let c = await esperarPor(campoArquivo, 4000);
+      if (!c) { const op = await esperarPor(() => [...document.querySelectorAll("[role='menuitem'], [role='option'], button, li")].filter(visivel).find((e) => /(enviar|carregar|fazer upload|upload|adicionar|add).*(arquivo|file|computador|computer)|arquivos? do computador|from computer/i.test(textoDe(e) || e.getAttribute("aria-label") || "")), 3000); if (op) { op.click(); c = await esperarPor(campoArquivo, 4000); } }
+      if (!c) return false; await porCampo(c); return apareceu(60000);
+    }]);
+    const falhas = [];
+    for (const [nomeEst, f] of tentativas) { let ok = false; try { ok = await f(); } catch (e) { falhas.push(`${nomeEst}: ${e.message}`); } if (ok) { await esperarPor(() => !document.querySelector("[role='progressbar'], progress, [class*='uploading' i]"), 120000, 500); await dorme(1500); return { ok: true, como: nomeEst }; } falhas.push(nomeEst); }
+    throw new Error("não consegui anexar o PDF na tela da IA (tentei: " + falhas.join("; ") + "). Rode “Diagnosticar tela da IA”.");
   }
 
   async function enviar() {
@@ -127,7 +136,7 @@
         let texto = limpar(ult), html = el.innerHTML, origem = "chat";
         // IAs que entregam a peça num painel lateral (ex.: Jusbrasil “Criou Peça”): o chat só traz um aviso curto; a minuta está no painel
         if (texto.length < 2000) {
-          const d = await esperarPor(painelDocumento, 25000, 1000);
+          const d = await esperarPor(painelDocumento, 15000, 1000);
           if (d) { await estabilizar(d, 3000); const t = limpar(textoDe(d)); if (t.length > texto.length) { texto = t; html = d.innerHTML; origem = "painel"; } }
         }
         return { ok: true, texto, html, origem };

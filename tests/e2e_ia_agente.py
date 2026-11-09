@@ -25,10 +25,18 @@ PAG_C = """<html><body style="margin:0"><div style="display:flex;width:1200px"><
 <script>document.getElementById('f').onchange=e=>document.getElementById('chip').textContent=e.target.files[0].name;
 document.getElementById('s').onclick=()=>{const m=document.createElement('div');m.className='assistant-msg';window.__enviado=document.getElementById('t').value;m.textContent='Revise e valide o conteudo antes de qualquer uso processual.';document.getElementById('msgs').appendChild(m);
 setTimeout(()=>{document.getElementById('painel').innerHTML='<div><button>Baixar</button><h3>Decisao de regularizacao</h3><p>PODER JUDICIARIO</p>'+'<p>Fundamentacao longa da minuta. </p>'.repeat(60)+'<p>ReescreverBuscar julgadosPerguntar</p><p>Dispositivo final.</p></div>';},2500);};</script></body></html>"""
+PAG_D = """<html><body><div id=msgs></div><div class=ql-editor contenteditable=true role=textbox aria-label="Insira um comando" style="width:400px;height:40px;border:1px solid"></div>
+<button id=mais style="width:30px">+</button><button aria-label="Enviar" id=s>Enviar</button><div id=chip></div>
+<script>const ed=document.querySelector('.ql-editor');
+ed.addEventListener('paste',e=>{const f=e.clipboardData&&e.clipboardData.files[0];if(f){e.preventDefault();document.getElementById('chip').textContent=f.name;}});
+document.getElementById('s').onclick=()=>{window.__enviado=ed.innerText;const m=document.createElement('message-content');m.textContent='Resposta pronta do modelo '.repeat(10);document.getElementById('msgs').appendChild(m);};</script></body></html>"""
+PAG_E = """<html><body><div id=msgs></div><textarea id=t aria-label="Pergunte" style="width:300px"></textarea><button aria-label="Adicionar arquivos e mais" id=mais>+</button><button type=submit id=s>Enviar</button><div id=chip></div>
+<script>document.getElementById('mais').onclick=()=>{if(document.getElementById('f'))return;const i=document.createElement('input');i.type='file';i.id='f';i.style.display='none';i.onchange=e=>document.getElementById('chip').textContent=e.target.files[0].name;document.body.appendChild(i);};
+document.getElementById('s').onclick=()=>{window.__enviado=document.getElementById('t').value;const m=document.createElement('div');m.dataset.messageAuthorRole='assistant';m.textContent='Resposta pronta do modelo '.repeat(10);document.getElementById('msgs').appendChild(m);};</script></body></html>"""
 b64 = base64.b64encode(b"%PDF-1.4 fake").decode()
 with sync_playwright() as p:
     b = p.chromium.launch(executable_path='/opt/pw-browsers/chromium', args=['--no-sandbox'], proxy={'server':'http://127.0.0.1:1'})
-    for nome, pag, host in [("A-contenteditable", PAG_A, "chatgpt.com"), ("B-textarea", PAG_B, "ia.jusbrasil.com.br"), ("C-painel-lateral", PAG_C, "ia.jusbrasil.com.br")]:
+    for nome, pag, host in [("A-contenteditable", PAG_A, "chatgpt.com"), ("B-textarea", PAG_B, "ia.jusbrasil.com.br"), ("C-painel-lateral", PAG_C, "ia.jusbrasil.com.br"), ("D-gemini-colar", PAG_D, "gemini.google.com"), ("E-botao-mais", PAG_E, "chatgpt.com")]:
         c = b.new_context(); pg = c.new_page()
         pg.route("**/*", (lambda pag: (lambda r: r.fulfill(body=pag, content_type="text/html")))(pag))
         pg.goto(f"http://{host}/x", wait_until='commit'); pg.wait_for_selector('body'); pg.add_script_tag(content=agente)

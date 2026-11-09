@@ -7,7 +7,7 @@
 - Regras: pedir autorização antes de mexer no monitor/erros e em mudanças grandes; desfazer o que ele não gostar; **não** contornar proteção anti-bot (Planalto/Cloudflare); **não** usar LexNode (usa Grounding do Gemini); vídeos de uso ficam em outra conversa.
 
 ## Repositórios
-1. **Extensão** (este repo, branch `claude/determined-bardeen-xtc9lq`, pasta `extensao/`). Pacote da loja: `python3 empacotar.py` → `publicacao/projudi-extensao-<versão>.zip` (o usuário envia à Chrome Web Store; versão atual **1.0.93**; sempre aumentar `version`).
+1. **Extensão** (este repo, branch `claude/determined-bardeen-xtc9lq`, pasta `extensao/`). Pacote da loja: `python3 empacotar.py` → `publicacao/projudi-extensao-<versão>.zip` (o usuário envia à Chrome Web Store; versão atual **1.0.94**; sempre aumentar `version`).
 2. **Studio** `fabriciocunhaadv/assessor-judicial-mysql` (React+Vite+TS, Express, MySQL Hostinger, Gemini). Deploy a partir da `main`. Local: `/home/user/assessor-judicial-mysql`.
 
 ## Pontes extensão ↔ Studio
@@ -25,6 +25,9 @@ Reenvio de análise guardada; monitor **Saúde** (retenção 30 dias, avisos 7/3
 **Roteiro do painel (aprovado em partes)**: feito = Central + erros agrupados. Feito também: calibragem por motor, ficha do gabinete, aba da extensão. NÃO fazer (recusado): painel de limites ajustáveis e regras automáticas. Possível futuro: qualidade das minutas (👍/👎 do usuário). O usuário disse: *sem automação por enquanto* e quer entender antes o que mudaria no comportamento do sistema (explicar quando perguntar).
 
 **Teste real do Jusbrasil (usuário, 09/11)**: anexar, colar prompt e enviar funcionaram; a minuta vem num PAINEL LATERAL ("Criou Peça"), então o agente leu só o aviso do chat. Corrigido na 1.0.93 (`painelDocumento()` em `ia-agente.js`, limpeza de rótulos de botões, recusa de texto < 400 caracteres). ChatGPT/Gemini/Claude ainda sem teste real.
+
+**Testes reais (09/11)**: Claude = funcionou (mas as partes saíam erradas: corrigido no Studio, `pegarParte` só aceita linha que começa pelo rótulo); Gemini = faltou achar o botão de anexar; ChatGPT = erro (mensagem não vista). 1.0.94: anexar PDF por 4 estratégias com verificação (campo de arquivo → colar na caixa → arrastar/soltar → botão "+"), erros com a etapa entre colchetes. **Pedir ao usuário a mensagem exata do erro** se ChatGPT/Gemini ainda falharem.
+**Super Admin (layout)**: `src/components/SuperAdminNav.tsx` = menu lateral agrupado (Visão geral / Acompanhamento / Cadastros / Sistema), seletor com grupos no celular; abre na Central. Teste: `testes/teste_superadmin_layout.py`.
 
 ## Pendências / atenção
 - **IA externa NÃO foi validada nos sites reais** (só em páginas simuladas). Os sites mudam: usar "Diagnosticar tela da IA" no painel e ajustar os perfis em `ia-agente.js`. Pode haver captcha/login; termos de uso das IAs podem restringir automação.

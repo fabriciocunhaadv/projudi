@@ -32,7 +32,8 @@ async function abaDaIa(id, nova) {
   await chrome.scripting.executeScript({ target: { tabId: aba.id }, files: ["ia-agente.js"] });
   return aba;
 }
-const msg = async (aba, m) => { const r = await chrome.tabs.sendMessage(aba.id, m); if (!r?.ok) throw new Error(r?.erro || "a tela da IA não respondeu"); return r; };
+const ETAPAS = { "ia-diagnosticar": "olhar a tela", "ia-parte": "enviar o PDF à aba", "ia-anexar": "anexar o PDF", "ia-escrever": "colar o prompt", "ia-enviar": "clicar em enviar", "ia-esperar": "esperar a resposta" };
+const msg = async (aba, m) => { let r; try { r = await chrome.tabs.sendMessage(aba.id, m); } catch (e) { throw new Error(`[${ETAPAS[m.acao] || m.acao}] ${e.message}`); } if (!r?.ok) throw new Error(`[${ETAPAS[m.acao] || m.acao}] ${r?.erro || "a tela da IA não respondeu"}`); return r; };
 
 /** Diagnóstico: o que o agente enxerga na aba da IA (abre a aba se preciso, SEM trocar de conversa). */
 export async function diagnosticarIa(id) {
@@ -71,7 +72,7 @@ export async function executarNaIa(it, { id, bytes, promptTexto, aoAndamento = (
         if ((r.texto || "").trim().length < 400) return { ok: false, erro: `não consegui capturar a minuta do ${s.nome}: só veio um texto curto (“${(r.texto || "").slice(0, 80)}”). A minuta pode estar num painel lateral: rode “Diagnosticar tela da IA” e me envie o resultado.` };
         return { ok: true, minutaTexto: r.texto, minutaHtml: r.html || "" };
       } catch (e) {
-        if (!/tempo limite|Receiving end|message channel/i.test(e.message) || Date.now() - t0 > 12 * 60000) throw e;
+        if (!/tempo limite|Receiving end|message channel|não terminou de responder/i.test(e.message) || Date.now() - t0 > 12 * 60000) throw e;
         aoAndamento(`${s.nome} ainda respondendo… (${Math.round((Date.now() - t0) / 60000)} min)`);
       }
     }
