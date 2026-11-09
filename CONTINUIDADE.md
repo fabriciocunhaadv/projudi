@@ -5,6 +5,7 @@
 ## Quem e como
 - Usuário: advogado/magistrado (Montes Claros de Goiás). Falar em **português simples**, sem jargão.
 - Regras: pedir autorização antes de mexer no monitor/erros e em mudanças grandes; desfazer o que ele não gostar; **não** contornar proteção anti-bot (Planalto/Cloudflare); **não** usar LexNode (usa Grounding do Gemini); vídeos de uso ficam em outra conversa.
+- **Arquivo compartilhado entre conversas**: ANTES de qualquer comando, ajuste ou solicitação, buscar e puxar a branch nova da extensão (`git fetch origin claude/determined-bardeen-xtc9lq` e juntar) e reler este CONTINUIDADE.md; ao terminar, atualizar sem apagar o que outras conversas gravaram.
 
 ## Repositórios
 1. **Extensão** (este repo, branch `claude/determined-bardeen-xtc9lq`, pasta `extensao/`). Pacote da loja: `python3 empacotar.py` → `publicacao/projudi-extensao-<versão>.zip` (o usuário envia à Chrome Web Store; versão atual **1.0.92**; sempre aumentar `version`).
