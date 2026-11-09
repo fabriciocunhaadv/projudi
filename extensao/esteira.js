@@ -235,6 +235,7 @@ async function passo() {
     const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig");
     const bloqueiam = ["analisando", "recebida", "pausado"];      // só bloqueia enquanto o Studio trabalha (ou o usuário precisa escolher); conferência/Projudi não seguram a fila
     if (lista.some((i) => bloqueiam.includes(i.estado))) return;
+    if ((await chrome.storage.local.get("filaPausada")).filaPausada) return;      // pausada pelo celular: não começa processo novo (o que já estava rodando termina)
     const prox = lista.find((i) => i.estado === "aguardando");
     if (prox && prox.modo === "turbo" && Date.now() < pausaTurboAte) return;      // janela de 1 minuto da cota gratuita entre dois Turbo
     if (prox) await analisar(prox);
@@ -255,16 +256,43 @@ async function publicarResumo(forcar) {
   if (!dono || (!forcar && Date.now() - ultimoResumo < 5000)) return;
   ultimoResumo = Date.now();
   try {
-    const lista = await todos(), conta = (...est) => lista.filter((i) => est.includes(i.estado)).length;
+    const lista = await todos(), conta = (...est) => lista.filter((i) => est.includes(i.estado)).length, pausadaManual = !!(await chrome.storage.local.get("filaPausada")).filaPausada;
     const ativo = lista.find((i) => ["analisando", "gigante"].includes(i.estado)) || lista.find((i) => i.estado === "aguardando") || lista[lista.length - 1];
     const erro = [...lista].reverse().find((i) => i.estado === "erro");
     const login = lista.find((i) => i.estado === "aguardando" && /pediu login|verifica[çc][ãa]o humana|captcha/i.test(i.aviso || ""));
     await chrome.storage.local.set({ filaResumo: {
       total: lista.length, aguardando: conta("aguardando"), analisando: conta("analisando", "gigante", "recebida", "conferido", "cadastrando"), concluidos: conta("concluido"), erros: conta("erro"), pausados: conta("pausado", "conferindo"),
-      modo: ativo?.modo || "", ia: ativo?.modo === "ia" ? (SITES_IA[ativo.iaId]?.nome || "") : "", pausa: login ? String(login.aviso).slice(0, 160) : "", ultimoErro: erro ? String(erro.erro || "").slice(0, 200) : "", versao: chrome.runtime.getManifest().version, ts: Date.now() } });
+      modo: ativo?.modo || "", ia: ativo?.modo === "ia" ? (SITES_IA[ativo.iaId]?.nome || "") : "", pausa: login ? String(login.aviso).slice(0, 160) : "", ultimoErro: erro ? String(erro.erro || "").slice(0, 200) : "", versao: chrome.runtime.getManifest().version, pausadaManual, ts: Date.now() } });
   } catch (e) { /* sem armazenamento: segue sem avisar o celular */ }
 }
 setInterval(publicarResumo, 20000); setTimeout(publicarResumo, 4000);
+
+// Comandos vindos do celular (Minha fila): o app deixa em chrome.storage.local `filaComandos`; a aba dona executa, anota o resultado em `filaComandosResultado`
+// e o script do Studio o devolve ao app. Só 3 comandos, todos reversíveis: pausar, retomar e repetir os que deram erro. Nada é apagado nem lançado no Projudi.
+async function processarComandos() {
+  if (!dono) return;
+  try {
+    const { filaComandos = [], filaComandosFeitos = [], filaComandosResultado = [] } = await chrome.storage.local.get(["filaComandos", "filaComandosFeitos", "filaComandosResultado"]);
+    const novos = filaComandos.filter((c) => c && c.id && !filaComandosFeitos.includes(c.id) && Date.now() - (c.ts || 0) < 10 * 60_000);
+    if (!novos.length) return;
+    const res = [];
+    for (const c of novos) {
+      let ok = true, mensagem = "";
+      if (c.tipo === "pausar") { await chrome.storage.local.set({ filaPausada: { ts: Date.now(), por: "celular" } }); mensagem = "Fila pausada. O processo em andamento termina; nenhum novo começa."; }
+      else if (c.tipo === "retomar") { await chrome.storage.local.remove("filaPausada"); mensagem = "Fila retomada."; setTimeout(passo, 500); }
+      else if (c.tipo === "repetir_erros") {
+        const erros = (await todos()).filter((i) => i.estado === "erro");
+        for (const i of erros) await atualizar(i.id, { estado: "aguardando", erro: "", rodada: 0, tentativas: 0, cotaVezes: 0, aviso: "refeito por comando do celular" });
+        mensagem = erros.length ? `${erros.length} processo(s) com erro voltaram para a fila.` : "Não havia processo com erro."; pausaAte = 0; desenhar(); setTimeout(passo, 500);
+      } else { ok = false; mensagem = "comando desconhecido"; }
+      res.push({ id: c.id, ok, mensagem, ts: Date.now() });
+    }
+    await chrome.storage.local.set({ filaComandosFeitos: [...filaComandosFeitos, ...novos.map((c) => c.id)].slice(-60), filaComandosResultado: [...filaComandosResultado, ...res].slice(-20) });
+    ultimoResumo = 0; void publicarResumo(true);
+  } catch (e) { /* sem armazenamento: nada a fazer */ }
+}
+setInterval(processarComandos, 4000); try { chrome.storage.onChanged.addListener((c, a) => { if (a === "local" && c.filaComandos) void processarComandos(); }); } catch (e) { /* sem ouvinte */ }
+
 
 async function desenhar() {
   void publicarResumo();

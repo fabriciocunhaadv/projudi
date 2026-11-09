@@ -810,6 +810,32 @@
   try { chrome.storage.onChanged.addListener((c, area) => { if (area === "local" && c.filaResumo) void entregarFila(); }); } catch (e) { /* sem ouvinte */ }
   setInterval(entregarFila, 20000); setTimeout(entregarFila, 5000);
 
+  // ----- Comandos do celular: o app entrega (atributo + evento) e a extensão devolve o resultado do mesmo jeito -----
+  window.addEventListener("projudi:fila-comandos", async () => {
+    try {
+      const novos = JSON.parse(document.documentElement.dataset.projudiFilaComandos || "[]"); delete document.documentElement.dataset.projudiFilaComandos;
+      if (!Array.isArray(novos) || !novos.length) return;
+      const { filaComandos = [] } = await chrome.storage.local.get("filaComandos");
+      const ids = new Set(filaComandos.map((c) => c.id));
+      await chrome.storage.local.set({ filaComandos: [...filaComandos, ...novos.filter((c) => c && c.id && !ids.has(c.id)).map((c) => ({ id: String(c.id), tipo: String(c.tipo), ts: Number(c.ts) || Date.now() }))].slice(-30) });
+    } catch (e) { /* ignora */ }
+  });
+  const devolverResultados = async () => {
+    try {
+      if (quadroSemApp() || !temApp()) return;
+      const { filaComandosResultado = [] } = await chrome.storage.local.get("filaComandosResultado");
+      if (!filaComandosResultado.length || document.documentElement.dataset.projudiFilaResultado) return;
+      document.documentElement.dataset.projudiFilaResultado = JSON.stringify(filaComandosResultado); window.dispatchEvent(new Event("projudi:fila-resultado"));
+    } catch (e) { /* ignora */ }
+  };
+  window.addEventListener("projudi:fila-resultado-ok", async () => {      // o app confirmou quais resultados recebeu: só esses saem da fila
+    try {
+      const ids = new Set(JSON.parse(document.documentElement.dataset.projudiFilaResultadoAck || "[]")); delete document.documentElement.dataset.projudiFilaResultado; delete document.documentElement.dataset.projudiFilaResultadoAck;
+      const { filaComandosResultado = [] } = await chrome.storage.local.get("filaComandosResultado"); await chrome.storage.local.set({ filaComandosResultado: filaComandosResultado.filter((r) => !ids.has(r.id)) });
+    } catch (e) { /* ignora */ }
+  });
+  setInterval(devolverResultados, 5000);
+
   // ----- Central de fontes: o app pede as leis do Planalto (atributo + evento); a extensão busca no navegador do Super Admin e devolve uma lei por vez -----
   window.addEventListener("projudi:leis-pedido", () => {
     const el = document.documentElement;

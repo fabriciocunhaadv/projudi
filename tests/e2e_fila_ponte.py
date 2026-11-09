@@ -19,5 +19,15 @@ with sync_playwright() as p:
     pg.evaluate("() => { window.__mem.filaResumo = { ...window.__mem.filaResumo, concluidos: 9, aguardando: 0, analisando: 0, erros: 1 }; window.__onChanged && window.__onChanged({ filaResumo: {} }, 'local'); }")
     pg.wait_for_function("JSON.parse(document.documentElement.dataset.projudiFilaResumo).concluidos === 9", timeout=10000)
     print("segunda entrega ok")
+    # comandos do celular: o app entrega por atributo + evento e a extensão os guarda; o resultado volta pelo mesmo caminho
+    pg.evaluate("() => { document.documentElement.dataset.projudiFilaComandos = JSON.stringify([{ id: 'c' + 'a'.repeat(31), tipo: 'pausar', ts: Date.now() }]); window.dispatchEvent(new Event('projudi:fila-comandos')); }")
+    pg.wait_for_function("(window.__mem.filaComandos || []).length === 1", timeout=10000)
+    assert pg.evaluate("window.__mem.filaComandos[0].tipo") == "pausar" and pg.evaluate("document.documentElement.dataset.projudiFilaComandos") is None
+    pg.evaluate("() => { window.__mem.filaComandosResultado = [{ id: 'c' + 'a'.repeat(31), ok: true, mensagem: 'Fila pausada.', ts: Date.now() }]; }")
+    pg.wait_for_function("document.documentElement.dataset.projudiFilaResultado", timeout=15000)
+    assert "Fila pausada." in pg.evaluate("document.documentElement.dataset.projudiFilaResultado")
+    pg.evaluate("() => { document.documentElement.dataset.projudiFilaResultadoAck = JSON.stringify(['c' + 'a'.repeat(31)]); window.dispatchEvent(new Event('projudi:fila-resultado-ok')); }")
+    pg.wait_for_function("(window.__mem.filaComandosResultado || []).length === 0", timeout=10000)
+    print("comandos: ida e volta ok")
     b.close()
 print("OK")
