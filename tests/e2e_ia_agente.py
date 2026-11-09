@@ -23,7 +23,7 @@ document.getElementById('s').onclick=()=>{const m=document.createElement('div');
 PAG_C = """<html><body style="margin:0"><div style="display:flex;width:1200px"><div style="width:600px"><div id=msgs></div><textarea id=t style="width:300px"></textarea><input type=file id=f accept=".pdf"><button type=submit id=s>Enviar</button><div id=chip></div></div>
 <div id=painel style="width:600px"></div></div>
 <script>document.getElementById('f').onchange=e=>document.getElementById('chip').textContent=e.target.files[0].name;
-document.getElementById('s').onclick=()=>{const m=document.createElement('div');m.className='assistant-msg';window.__enviado=document.getElementById('t').value;m.textContent='Revise e valide o conteudo antes de qualquer uso processual.';document.getElementById('msgs').appendChild(m);
+document.getElementById('s').onclick=()=>{const m=document.createElement('div');m.className='assistant-msg';window.__enviado=document.getElementById('t').value;const eco=document.createElement('div');eco.className='assistant-msg';eco.textContent=window.__enviado+' (eco da mensagem enviada, com o prompt do Studio)';document.getElementById('msgs').appendChild(eco);m.textContent='Revise e valide o conteudo antes de qualquer uso processual.';document.getElementById('msgs').appendChild(m);
 setTimeout(()=>{document.getElementById('painel').innerHTML='<div><button>Baixar</button><h3>Decisao de regularizacao</h3><p>PODER JUDICIARIO</p>'+'<p>Fundamentacao longa da minuta. </p>'.repeat(60)+'<p>ReescreverBuscar julgadosPerguntar</p><p>Dispositivo final.</p></div>';},2500);};</script></body></html>"""
 PAG_D = """<html><body><div id=msgs></div><div class=ql-editor contenteditable=true role=textbox aria-label="Insira um comando" style="width:400px;height:40px;border:1px solid"></div>
 <button id=mais style="width:30px">+</button><button aria-label="Enviar" id=s>Enviar</button><div id=chip></div>
@@ -36,7 +36,7 @@ document.getElementById('s').onclick=()=>{window.__enviado=document.getElementBy
 b64 = base64.b64encode(b"%PDF-1.4 fake").decode()
 with sync_playwright() as p:
     b = p.chromium.launch(executable_path='/opt/pw-browsers/chromium', args=['--no-sandbox'], proxy={'server':'http://127.0.0.1:1'})
-    for nome, pag, host in [("A-contenteditable", PAG_A, "chatgpt.com"), ("B-textarea", PAG_B, "ia.jusbrasil.com.br"), ("C-painel-lateral", PAG_C, "ia.jusbrasil.com.br"), ("D-gemini-colar", PAG_D, "gemini.google.com"), ("E-botao-mais", PAG_E, "chatgpt.com")]:
+    for nome, pag, host in [("A-contenteditable", PAG_A, "chatgpt.com"), ("B-textarea", PAG_B, "chat.exemplo.com"), ("C-painel-lateral", PAG_C, "ia.jusbrasil.com.br"), ("D-gemini-colar", PAG_D, "gemini.google.com"), ("E-botao-mais", PAG_E, "chatgpt.com")]:
         c = b.new_context(); pg = c.new_page()
         pg.route("**/*", (lambda pag: (lambda r: r.fulfill(body=pag, content_type="text/html")))(pag))
         pg.goto(f"http://{host}/x", wait_until='commit'); pg.wait_for_selector('body'); pg.add_script_tag(content=agente)
@@ -48,6 +48,7 @@ with sync_playwright() as p:
         r = pg.evaluate("__projudiIA.esperarResposta(60000, 2500)")
         if nome.startswith("C"):
             assert r["origem"] == "painel" and "Dispositivo final" in r["texto"] and len(r["texto"]) > 800, r["texto"][:200]
+            assert "Faça a minuta" not in r["texto"] and "eco da mensagem" not in r["texto"], "capturou o eco do prompt"
             assert "Reescrever" not in r["texto"] and "Buscar julgados" not in r["texto"] and "Baixar" not in r["texto"], "lixo da tela ficou no texto"
         else: assert "Minuta parte 4" in r["texto"] or "Resposta pronta" in r["texto"], r
         assert "Faça a minuta" in pg.evaluate("window.__enviado"), "prompt não chegou"

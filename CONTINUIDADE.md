@@ -7,7 +7,7 @@
 - Regras: pedir autorização antes de mexer no monitor/erros e em mudanças grandes; desfazer o que ele não gostar; **não** contornar proteção anti-bot (Planalto/Cloudflare); **não** usar LexNode (usa Grounding do Gemini); vídeos de uso ficam em outra conversa.
 
 ## Repositórios
-1. **Extensão** (este repo, branch `claude/determined-bardeen-xtc9lq`, pasta `extensao/`). Pacote da loja: `python3 empacotar.py` → `publicacao/projudi-extensao-<versão>.zip` (o usuário envia à Chrome Web Store; versão atual **1.0.94**; sempre aumentar `version`).
+1. **Extensão** (este repo, branch `claude/determined-bardeen-xtc9lq`, pasta `extensao/`). Pacote da loja: `python3 empacotar.py` → `publicacao/projudi-extensao-<versão>.zip` (o usuário envia à Chrome Web Store; versão atual **1.0.95**; sempre aumentar `version`).
 2. **Studio** `fabriciocunhaadv/assessor-judicial-mysql` (React+Vite+TS, Express, MySQL Hostinger, Gemini). Deploy a partir da `main`. Local: `/home/user/assessor-judicial-mysql`.
 
 ## Pontes extensão ↔ Studio
@@ -28,6 +28,9 @@ Reenvio de análise guardada; monitor **Saúde** (retenção 30 dias, avisos 7/3
 
 **Testes reais (09/11)**: Claude = funcionou (mas as partes saíam erradas: corrigido no Studio, `pegarParte` só aceita linha que começa pelo rótulo); Gemini = faltou achar o botão de anexar; ChatGPT = erro (mensagem não vista). 1.0.94: anexar PDF por 4 estratégias com verificação (campo de arquivo → colar na caixa → arrastar/soltar → botão "+"), erros com a etapa entre colchetes. **Pedir ao usuário a mensagem exata do erro** se ChatGPT/Gemini ainda falharem.
 **Super Admin (layout)**: `src/components/SuperAdminNav.tsx` = menu lateral agrupado (Visão geral / Acompanhamento / Cadastros / Sistema), seletor com grupos no celular; abre na Central. Teste: `testes/teste_superadmin_layout.py`.
+
+**Jusbrasil (2º teste real, 09/11)**: o agente capturou o PRÓPRIO prompt enviado (eco). 1.0.95: `eco()` descarta qualquer texto que contenha a mensagem enviada; perfil `painel: true` (Jusbrasil) espera o documento do painel lateral (`esperarPainel`), nunca o chat.
+**Ideia em análise (NÃO autorizada ainda): acompanhar a fila pelo celular** — página "Minha fila" (PWA), notificações, chamado com print/texto/PDF, comandos pelo celular. Decisões do usuário: **sem áudio transcrito** (não gastar cota; o chamado é só digitado, com print e PDF); dúvida dele: e quem não usa Telegram? (resposta: Telegram é opcional; o canal principal é o PWA/e-mail; ver conversa). Só implementar após autorização explícita.
 
 ## Pendências / atenção
 - **IA externa NÃO foi validada nos sites reais** (só em páginas simuladas). Os sites mudam: usar "Diagnosticar tela da IA" no painel e ajustar os perfis em `ia-agente.js`. Pode haver captcha/login; termos de uso das IAs podem restringir automação.

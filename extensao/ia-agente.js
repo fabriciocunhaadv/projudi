@@ -18,7 +18,7 @@
       compositor: ["div[contenteditable='true'].ProseMirror", "div[contenteditable='true'][role='textbox']", "fieldset div[contenteditable='true']", "textarea"], resposta: ["[data-testid='assistant-message']", ".font-claude-message", ".font-claude-response"],
       enviar: ["button[aria-label*='Enviar' i]", "button[aria-label*='Send' i]"], parar: ["button[aria-label*='Parar' i]", "button[aria-label*='Stop' i]"],
       anexar: ["button[aria-label*='Anexar' i]", "button[aria-label*='Attach' i]", "button[aria-label*='Add files' i]", "button[aria-label*='Adicionar' i]"] },
-    { id: "jusbrasil", nome: "IA do Jusbrasil", hosts: /(^|\.)ia\.jusbrasil\.com\.br$/, novaConversa: "https://ia.jusbrasil.com.br/conversa",
+    { id: "jusbrasil", nome: "IA do Jusbrasil", painel: true, hosts: /(^|\.)ia\.jusbrasil\.com\.br$/, novaConversa: "https://ia.jusbrasil.com.br/conversa",
       compositor: ["textarea", "div[contenteditable='true'][role='textbox']", "div[contenteditable='true']"], resposta: ["[data-message-author-role='assistant']", "[class*='assistant' i]", "[class*='answer' i]", "[class*='response' i]"],
       enviar: ["button[type='submit']", "button[aria-label*='Enviar' i]", "button[aria-label*='send' i]"], parar: ["button[aria-label*='Parar' i]", "button[aria-label*='Stop' i]"],
       anexar: ["button[aria-label*='Anexar' i]", "button[aria-label*='arquivo' i]", "button[aria-label*='Upload' i]", "button[aria-label*='Adicionar' i]"] },
@@ -41,7 +41,10 @@
   // área da caixa de mensagem: sobe a partir dela até um contêiner que tenha botões (para achar o "+" mesmo sem rótulo conhecido)
   const areaDaCaixa = () => { let e = compositor(); for (let i = 0; e && i < 7; i++, e = e.parentElement) if (e.querySelectorAll("button,[role='button']").length >= 2 && e.getBoundingClientRect().width > 250) return e; return document; };
   const botaoAnexar = () => primeiro(perfil().anexar) || [...areaDaCaixa().querySelectorAll("button, [role='button']")].filter(visivel).find((b) => { const r = rotuloDe(b); return ROTULO_ANEXAR.test(r) && !NAO_ANEXAR.test(r); });
-  const respostas = () => todosVisiveis(perfil().resposta);
+  const normaliza = (t) => String(t || "").replace(/\s+/g, " ").trim();
+  // eco = texto que contém (ou é parte de) a mensagem que NÓS enviamos: nunca vale como resposta da IA
+  const eco = (t) => { const e = normaliza(window.__projudiIAEnviado || ""), x = normaliza(t); if (e.length < 20 || !x) return false; return x.includes(e.slice(0, 150)) || (x.length > 40 && e.includes(x.slice(0, 150))); };
+  const respostas = () => todosVisiveis(perfil().resposta).filter((e) => !eco(textoDe(e)));
   const pedeLogin = () => !compositor() && ([...document.querySelectorAll("a,button")].some((e) => /^(log ?in|entrar|sign ?in|fazer login|login)$/i.test(textoDe(e))) || /\/(login|auth|signin|accounts)/i.test(location.pathname + location.hostname));
   const bloqueio = () => /verifique que (você|voce) é humano|verify you are human|just a moment|captcha/i.test(document.title + " " + (document.body?.innerText || "").slice(0, 400));
 
@@ -52,6 +55,7 @@
   }
 
   async function escrever(texto) {
+    window.__projudiIAEnviado = texto;
     const c = await esperarPor(compositor, 15000);
     if (!c) throw new Error("não achei a caixa de mensagem da IA (rode “Diagnosticar tela da IA”)");
     c.focus();
@@ -113,14 +117,30 @@
   // Painel lateral com um documento longo (metade direita da tela, sem caixa de mensagem dentro).
   function painelDocumento() {
     const W = innerWidth;
-    const c = [...document.querySelectorAll("div,section,article,aside,main")].filter(visivel).filter((e) => { const r = e.getBoundingClientRect(); return r.left > W * 0.35 && r.width < W * 0.75 && textoDe(e).length > 800 && !e.querySelector("textarea,[contenteditable='true']"); });
+    const c = [...document.querySelectorAll("div,section,article,aside,main")].filter(visivel).filter((e) => { const r = e.getBoundingClientRect(); return r.left > W * 0.35 && r.width < W * 0.75 && textoDe(e).length > 800 && !e.querySelector("textarea,[contenteditable='true']") && !eco(textoDe(e)); });
     if (!c.length) return null;
     return c.sort((a, b) => textoDe(b).length - textoDe(a).length || a.getBoundingClientRect().width * a.getBoundingClientRect().height - b.getBoundingClientRect().width * b.getBoundingClientRect().height)[0];
   }
   async function estabilizar(el, ms) { let u = textoDe(el).length, desde = Date.now(); while (Date.now() - desde < ms) { await dorme(500); const n = textoDe(el).length; if (n !== u) { u = n; desde = Date.now(); } } }
 
   // Espera a resposta: começou (botão "parar" ou texto novo) e terminou (sem "parar" e texto estável por `estavelMs`).
+  // IAs que entregam a peça num painel lateral (Jusbrasil): a minuta é o texto do painel, estável e sem o botão de parar; o chat só tem avisos.
+  async function esperarPainel(ms, estavelMs) {
+    const t0 = Date.now(); let ultimo = "", desde = Date.now();
+    for (;;) {
+      if (Date.now() - t0 > ms) throw new Error("a IA não terminou de responder no tempo limite");
+      if (bloqueio()) throw new Error("a IA pediu verificação humana (captcha): resolva na aba dela");
+      const d = painelDocumento(), t = d ? limpar(textoDe(d)) : "";
+      if (d && t.length > 400 && !eco(t)) {
+        if (t !== ultimo) { ultimo = t; desde = Date.now(); }
+        if (!botaoParar() && Date.now() - desde >= estavelMs) return { ok: true, texto: t, html: d.innerHTML, origem: "painel" };
+      }
+      if (!ultimo && Date.now() - t0 > 180000) throw new Error("o painel com a minuta não apareceu (a IA pode ter respondido só no chat)");
+      await dorme(1000);
+    }
+  }
   async function esperarResposta(ms = 600000, estavelMs = 6000) {
+    if (perfil().painel) return esperarPainel(ms, estavelMs);
     const marca = window.__projudiIAMarca || { antes: 0, textoAntes: "" };
     const t0 = Date.now(); let ultimo = "", desde = Date.now(), comecou = false;
     for (;;) {
