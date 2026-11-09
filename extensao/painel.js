@@ -1,4 +1,6 @@
 const $ = (id) => document.getElementById(id);
+const SITES_IA = { chatgpt: { nome: "ChatGPT" }, gemini: { nome: "Gemini" }, claude: { nome: "Claude" }, jusbrasil: { nome: "IA do Jusbrasil" } };      // (o resto vive em ia-externa-cliente.js, carregado só no clique)
+const iaCliente = () => import("./ia-externa-cliente.js");
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const sa = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 const BASE = "https://projudi.tjgo.jus.br/";
@@ -55,7 +57,7 @@ async function carregarSituacao() {
 }
 const celulaSit = (proc) => { const x = sitProc[proc]; return x ? `<span class="sit sit-${x.estado || "baixado"}">${x.icone} ${esc(x.texto)}</span>${x.esteira ? ' <a href="esteira.html" target="_blank">abrir esteira</a>' : ""}` : '<span class="sit-nada">não baixado</span>'; };
 const selCls = new Set(), selSit = new Set(["naoAnalisadas", "preAnalisadas"]), excluidos = new Set();   // seleção para baixar PDFs
-let opcoes = { atualizarBase: false, studio: false, modo: "analise", docs: false, refazer: false };   // o que fazer depois de baixar
+let opcoes = { atualizarBase: false, studio: false, modo: "analise", docs: false, refazer: false, iaId: "chatgpt" };   // o que fazer depois de baixar
 let entradaStudio = "pdf";
 let automacao = {};   // { serventia: { ativa, prompt } } — guardado na conta do Chrome (sincroniza entre computadores)
 const salvarAuto = () => chrome.storage.sync.set({ automacao });
@@ -151,6 +153,8 @@ function desenhar() {
       `<label class="radio"><input type="radio" name="modoStudio" data-modo="analise" ${opcoes.modo === "analise" ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> Análise dos processos (Gerar Minuta Judicial)</label>` +
       `<label class="radio"><input type="radio" name="modoStudio" data-modo="lupa" ${opcoes.modo === "lupa" ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> Lupa do Magistrado <small>(pega a minuta do assessor em “Visualizar” das pré-analisadas, sobe os autos na Lupa e clica em Auditar)</small></label>` +
       `<label class="radio"><input type="radio" name="modoStudio" data-modo="turbo" ${opcoes.modo === "turbo" ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> ⚡ Análise Turbo <small>(Módulo Turbo Independente: anexa o PDF com OCR, Auto-detectar, e gera)</small></label>` +
+      `<label class="radio"><input type="radio" name="modoStudio" data-modo="ia" ${opcoes.modo === "ia" ? "checked" : ""} ${opcoes.studio ? "" : "disabled"}> 🌐 IA externa <small>(a extensão anexa o PDF com OCR na IA escolhida, cola o prompt, espera a minuta e traz para o Histórico do Studio)</small></label>` +
+      (opcoes.modo === "ia" ? `<div class="ia-ext"><label>IA: <select data-iaid ${opcoes.studio ? "" : "disabled"}>${Object.entries(SITES_IA).map(([k, v]) => `<option value="${k}" ${opcoes.iaId === k ? "selected" : ""}>${v.nome}</option>`).join("")}</select></label> <button type="button" data-ia-perm>Autorizar este site</button> <button type="button" data-ia-diag>Diagnosticar tela da IA</button> <small id="iaMsg">Entre na conta da IA nessa aba antes. O Studio cuida só do prompt e do Histórico.</small></div>` : "") +
       `<label>Enviar os autos ao Studio como: <select data-entrada ${opcoes.studio ? "" : "disabled"}><option value="pdf" ${entradaStudio === "pdf" ? "selected" : ""}>PDF (arquivo completo)</option><option value="txt" ${entradaStudio === "txt" ? "selected" : ""}>texto extraído do PDF com OCR (mais rápido)</option></select> <small>(o .txt de cada processo também é salvo ao lado do PDF)</small></label></div>`;
     h += `<p><button id="baixarLote" ${fila2.length ? "" : "disabled"}>⬇ Baixar PDFs dos ${fila2.length} processo(s)</button> <small>Ordem da fila: “${esc(Ordenar.MODOS[$("modo").value])}”. Cada processo gera <b>número-OCR.pdf</b>.</small></p></div>` +
       `<div class="opcoes"><b>ou, sem baixar PDF:</b><br><button id="enviarAgaia" ${fila2.length ? "" : "disabled"} title="O Agaia lê o processo direto do Projudi; a esteira abre cada processo no Agaia, executa o prompt e lança a minuta no Histórico do Studio">🤖 Enviar os ${fila2.length} processo(s) ao Agaia</button> <small>Um de cada vez, na ordem da fila. Quando o Agaia não consegue (arquivado, segredo de justiça…), o motivo fica registrado no processo e a esteira segue para o próximo.</small></div>`;
@@ -237,6 +241,7 @@ function csv() {
     else if (dado.prompt !== undefined) { automacao[dado.prompt] = { ...automacao[dado.prompt], arquivoModelos: t.value.trim() }; salvarAuto(); return; }
     else if (dado.cls !== undefined) { t.checked ? selCls.add(dado.cls) : selCls.delete(dado.cls); }
     else if (dado.op !== undefined) { opcoes[dado.op] = t.checked; chrome.storage.sync.set({ opcoesLote: opcoes }); }
+    else if (dado.iaid !== undefined) { opcoes.iaId = t.value; chrome.storage.sync.set({ opcoesLote: opcoes }); }
     else if (dado.modo !== undefined) { opcoes.modo = dado.modo; chrome.storage.sync.set({ opcoesLote: opcoes }); }
     else if (dado.sit !== undefined) { t.checked ? selSit.add(dado.sit) : selSit.delete(dado.sit); }
     else if (dado.proc !== undefined) { if (t.checked) { excluidos.delete(dado.proc); incluidos.add(dado.proc); } else { excluidos.add(dado.proc); incluidos.delete(dado.proc); } }
@@ -250,6 +255,8 @@ function csv() {
   $("conteudo").addEventListener("click", async (e) => {
     const d = e.target.dataset || {};
     const mexer = (lista, v, add) => { const i = ocultas[lista].indexOf(v); if (add && i < 0) ocultas[lista].push(v); if (!add && i >= 0) ocultas[lista].splice(i, 1); salvarOcultas(); estado = aplicarOcultas(estadoCheio); desenhar(); };
+    if (d.iaPerm !== undefined) { const m = document.getElementById("iaMsg"); const ok = await (await iaCliente()).pedirPermissao(opcoes.iaId).catch(() => false); if (m) m.textContent = ok ? `${SITES_IA[opcoes.iaId].nome} autorizado.` : "Autorização negada."; return; }
+    if (d.iaDiag !== undefined) { const m = document.getElementById("iaMsg"); if (m) m.textContent = "Olhando a tela…"; try { const r = await (await iaCliente()).diagnosticarIa(opcoes.iaId); if (m) m.textContent = (r.pronto ? "✅ Pronto: " : "⚠ Atenção: ") + `caixa: ${r.compositor || "NÃO achada"}; anexar: ${r.botaoAnexar || r.campoArquivo || "NÃO achado"}; enviar: ${r.botaoEnviar || "(só aparece com texto)"}; logado: ${r.logado ? "sim" : "NÃO"}${r.bloqueio ? "; captcha!" : ""}.`; } catch (err) { if (m) m.textContent = "Erro: " + err.message; } return; }
     if (d.ocultarServ !== undefined) return mexer("servs", d.ocultarServ, true);
     if (d.ocultarCargo !== undefined) return mexer("cargos", d.ocultarCargo, true);
     if (d.reativarServ !== undefined) return mexer("servs", d.reativarServ, false);
@@ -265,7 +272,7 @@ function csv() {
       const sem = [...new Set(itens.filter((i) => !i.prompt).map((i) => i.serventia))];
       if (sem.length) { alert("Defina o prompt destas serventias antes de enviar ao Studio (campo “Prompt no Studio” na tabela de serventias):\n\n" + sem.join("\n")); return; }
     }
-    await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/" + hoje, opcoes: { atualizarBase: false, studio: { ativo: opcoes.studio, modo: opcoes.modo, docs: false } } } });
+    await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/" + hoje, opcoes: { atualizarBase: false, studio: { ativo: opcoes.studio, modo: opcoes.modo, docs: false, iaId: opcoes.iaId } } } });
     chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + id) });
   });
   // Esteira → Agaia (sem baixar PDF): cada processo entra na fila da esteira no modo "agaia"; a esteira abre o processo no Agaia, executa o prompt e lança a minuta no Histórico do Studio

@@ -106,3 +106,11 @@ export async function cadastrarNoStudio(dados) {
   if (!r?.ok) throw new Error(r?.erro || "o Studio não confirmou o cadastro da minuta");
   return r;
 }
+
+/** Pede ao app o texto do prompt (pelo nome/título). Devolve { ok, texto, titulo } ou lança erro (com `opcoes` quando não achou). */
+export async function lerPromptDoStudio(nome) {
+  const aba = await acharStudio();
+  const r = await chrome.tabs.sendMessage(aba.id, { acao: "studio-prompt-texto", nome });
+  if (!r?.ok || !r.texto) throw Object.assign(new Error(r?.erro || "o Studio não entregou o texto do prompt"), { opcoes: r?.opcoes });
+  return r;
+}

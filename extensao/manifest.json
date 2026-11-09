@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Conclusões Projudi",
-  "version": "1.0.90",
+  "version": "1.0.91",
   "description": "Confere automaticamente as conclusões não analisadas e pré-analisadas de cada serventia no Projudi/TJGO.",
   "permissions": [
     "activeTab",
@@ -28,7 +28,12 @@
     "https://leisestaduais.com.br/*",
     "https://www.jusbrasil.com.br/*",
     "https://planalto.gov.br/*",
-    "https://acessoainformacao.montesclarosdegoias.go.leg.br/*"
+    "https://acessoainformacao.montesclarosdegoias.go.leg.br/*",
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*",
+    "https://gemini.google.com/*",
+    "https://claude.ai/*",
+    "https://ia.jusbrasil.com.br/*"
   ],
   "host_permissions": [
     "https://*.tjgo.jus.br/*",

@@ -1,7 +1,8 @@
 import { todos, atualizar, lerPdf, remover, enfileirar, ROTULO, ATIVOS } from "./esteira-banco.js";
 import { instalarSaude } from "./saude-fila.js";
 instalarSaude("esteira");
-import { analisarNoStudio, lerMinutaAtual, consultarGigantes, cadastrarNoStudio } from "./studio-cliente.js";
+import { analisarNoStudio, lerMinutaAtual, consultarGigantes, cadastrarNoStudio, lerPromptDoStudio } from "./studio-cliente.js";
+import { executarNaIa, SITES_IA } from "./ia-externa-cliente.js";
 import { executarNoAgaia, retomarExecucao } from "./agaia-cliente.js";
 import { criarDocumento, abrirLadoALado, lerDocumento, tipoDaMinuta, nomeDoc } from "./docs-api.js";
 import { paragrafosDeHtml } from "./docs-core.js";
@@ -57,7 +58,7 @@ async function recuperarDoStudio(it, rodada, valida) {
 // Modo Agaia: não baixa PDF. O Agaia lê o processo do Projudi e devolve a minuta; a esteira a lança no Histórico do Studio (serventia + prompt) e segue.
 // Qualquer mensagem do Agaia (arquivado, segredo de justiça, erro…) fica registrada no processo e a fila segue para o próximo.
 async function cadastrarAgaia(it, r) {
-  const dados = { processo: it.processo, serventia: it.serventia || "", prompt: it.prompt || "", promptAgaia: r.prompt || "", minutaHtml: r.minutaHtml || "", minutaTexto: r.minutaTexto || "", aproximado: r.aproximado || "", origem: "Agaia" };
+  const dados = { processo: it.processo, serventia: it.serventia || "", prompt: it.prompt || "", promptAgaia: r.prompt || "", minutaHtml: r.minutaHtml || "", minutaTexto: r.minutaTexto || "", aproximado: r.aproximado || "", origem: r.origem || (it.modo === "ia" ? (SITES_IA[it.iaId]?.nome || "IA externa") : "Agaia") };
   try { const c = await cadastrarNoStudio(dados); return { ok: true, id: c.id }; } catch (err) { return { ok: false, erro: String(err.message || err) }; }
 }
 async function analisarNoAgaia(it, valida) {
@@ -78,9 +79,31 @@ async function analisarNoAgaia(it, valida) {
   const c = await cadastrarAgaia(it, r);
   await atualizar(it.id, { cadastroPendente: !c.ok, aviso: c.ok ? "Minuta feita no Agaia e entregue ao Studio: ela é gravada no Histórico em segundo plano (veja o selo 🤖 Agaia no Studio)." + (r.aproximado ? " ⚠ " + r.aproximado : "") : "Minuta feita no Agaia e guardada aqui, mas ainda NÃO entregue ao Studio (" + c.erro + "). A esteira tenta de novo sozinha; enquanto isso use “Copiar minuta”." });
 }
+
+// Modo IA externa (ChatGPT/Gemini/Claude): usa o PDF baixado (com OCR), anexa na IA, cola o prompt do Studio, espera a minuta e a lança no Histórico do Studio.
+async function analisarNaIaExterna(it, valida) {
+  const nomeIa = SITES_IA[it.iaId]?.nome || "IA externa";
+  const andamento = (t) => atualizar(it.id, { aviso: `${nomeIa}: ` + t });
+  const bytes = await lerPdf(it.id);
+  if (!bytes) throw new Error("o PDF deste processo não está mais guardado");
+  if (!SITES_IA[it.iaId]) { await atualizar(it.id, { estado: "erro", erro: "IA externa não escolhida: escolha ChatGPT, Gemini ou Claude no painel e envie de novo." }); return; }
+  let promptTexto = "";
+  try { promptTexto = (await lerPromptDoStudio(it.prompt)).texto; } catch (e) { await atualizar(it.id, { estado: "erro", erro: "Prompt: " + e.message, promptOpcoes: e.opcoes?.length ? e.opcoes : undefined }); return; }
+  const r = await executarNaIa(it, { id: it.iaId, bytes, promptTexto, aoAndamento: andamento, aindaValido: valida });
+  if (!(await valida()) || r.cancelado) return;
+  if (!r.ok) {
+    if (r.sessao) { pausaAte = Date.now() + 3 * 60000; await atualizar(it.id, { estado: "aguardando", erro: "", aviso: r.erro + ". A fila retoma em 3 minutos." }); return; }
+    await atualizar(it.id, { estado: "erro", erro: `${nomeIa}: ` + r.erro, aviso: "A esteira seguiu para o próximo processo.", tentativas: r.semRetry ? 9 : undefined });
+    return;
+  }
+  const texto = r.minutaTexto;
+  await atualizar(it.id, { estado: "concluido", erro: "", minuta: texto, minutaHtml: r.minutaHtml || "", tipo: tipoDaMinuta(texto), cadastroPendente: true, aviso: `Minuta recebida de ${nomeIa}; entregando ao Studio…` });
+  const c = await cadastrarAgaia(it, r);
+  await atualizar(it.id, { cadastroPendente: !c.ok, aviso: c.ok ? `Minuta feita no ${nomeIa} e entregue ao Studio: ela é gravada no Histórico em segundo plano (selo 🤖 ${nomeIa}).` : `Minuta feita no ${nomeIa} e guardada aqui, mas ainda NÃO entregue ao Studio (${c.erro}). A esteira tenta de novo sozinha; enquanto isso use “Copiar minuta”.` });
+}
 let ultimaTentativaCadastro = 0;
 async function cadastrosPendentes(lista) {      // o Studio estava fechado/ocupado quando a minuta chegou: tenta lançar de novo (no máximo a cada 60 s)
-  const pend = lista.filter((i) => i.modo === "agaia" && i.estado === "concluido" && i.cadastroPendente && i.minuta);
+  const pend = lista.filter((i) => (i.modo === "agaia" || i.modo === "ia") && i.estado === "concluido" && i.cadastroPendente && i.minuta);
   if (!pend.length || Date.now() - ultimaTentativaCadastro < 60000) return;
   ultimaTentativaCadastro = Date.now();
   for (const it of pend) {
@@ -97,9 +120,10 @@ async function analisar(it) {
   const valida = async () => (await todos()).find((x) => x.id === it.id)?.rodada === rodada;      // o usuário pode ter escolhido outro caminho no meio
   try {
     if (it.modo === "agaia") return await analisarNoAgaia(it, valida);
+    if (it.modo === "ia") return await analisarNaIaExterna(it, valida);
     const bytes = await lerPdf(it.id);
     if (!bytes) throw new Error("o PDF deste processo não está mais guardado");
-    if (!it.prompt && (it.modo === "analise" || it.modo === "lupa")) throw Object.assign(new Error("este processo está sem prompt definido: a esteira não usa o prompt que estiver ativo no Studio (poderia ser de outra matéria). Defina o prompt da serventia no painel e envie de novo."), { semRetry: true });
+    if (!it.prompt && (it.modo === "analise" || it.modo === "lupa" || it.modo === "ia")) throw Object.assign(new Error("este processo está sem prompt definido: a esteira não usa o prompt que estiver ativo no Studio (poderia ser de outra matéria). Defina o prompt da serventia no painel e envie de novo."), { semRetry: true });
     const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig");
     const comTexto = it.modo === "turbo" || ((it.modo === "analise" || (it.modo === "lupa" && it.minutaAssessor)) && esteiraConfig.entrada === "txt");      // Turbo: sempre texto; esteira principal: conforme a escolha do usuário (txt ou PDF)
     const texto = comTexto ? await textoDoPdf(bytes) : "";
@@ -234,7 +258,7 @@ async function desenhar() {
     if (it.modo === "mesa" && it.estado === "concluido") b.push(`<label title="Inclui esta audiência na pauta (formato do modelo do gabinete)"><input type="checkbox" data-pauta="${it.id}" ${it.pautaSel ? "checked" : ""}> incluir na pauta</label>`);
     if (it.estado === "concluido" && (it.minuta || "").length > 200) b.push(`<button data-a="copiar" data-id="${it.id}" title="Copia a minuta que a extensão recebeu do Studio (garantia caso ela não apareça no Histórico do app)">📋 Copiar minuta</button>`);
     b.push(`<button data-a="excluir" data-id="${it.id}" title="Tira este processo da fila e apaga o PDF guardado (não mexe no Projudi nem nos arquivos já baixados)">🗑 Excluir</button>`);
-    return `<tr><td>${n + 1}</td><td>${esc(it.processo)}<br><small>${esc(it.tipo || "")}</small></td><td class="e-${it.estado}">${esc(it.modo === "agaia" && it.estado === "analisando" ? "rodando no Agaia…" : it.modo === "agaia" && it.estado === "concluido" ? "concluído (Agaia)" : ROTULO[it.estado] || it.estado)}${it.erro ? "<br>" + esc(it.erro) : ""}${it.aviso ? `<br><small>${esc(it.aviso)}</small>` : ""}${it.injecao ? (it.injecao.estado === "vermelha" ? `<br><small class="inj-v">🚨 Prompt injection nos autos: ${esc(it.injecao.texto || "confira a tarja vermelha no app")}</small>` : `<br><small class="inj-ok">✅ Prompt injection: nada encontrado</small>`) : ""}</td><td>${b.join(" ")}</td></tr>`;
+    return `<tr><td>${n + 1}</td><td>${esc(it.processo)}<br><small>${esc(it.tipo || "")}</small></td><td class="e-${it.estado}">${esc(it.modo === "agaia" && it.estado === "analisando" ? "rodando no Agaia…" : it.modo === "ia" && it.estado === "analisando" ? `rodando no ${SITES_IA[it.iaId]?.nome || "IA externa"}…` : it.modo === "ia" && it.estado === "concluido" ? `concluído (${SITES_IA[it.iaId]?.nome || "IA externa"})` : it.modo === "agaia" && it.estado === "concluido" ? "concluído (Agaia)" : ROTULO[it.estado] || it.estado)}${it.erro ? "<br>" + esc(it.erro) : ""}${it.aviso ? `<br><small>${esc(it.aviso)}</small>` : ""}${it.injecao ? (it.injecao.estado === "vermelha" ? `<br><small class="inj-v">🚨 Prompt injection nos autos: ${esc(it.injecao.texto || "confira a tarja vermelha no app")}</small>` : `<br><small class="inj-ok">✅ Prompt injection: nada encontrado</small>`) : ""}</td><td>${b.join(" ")}</td></tr>`;
   }).join("") : '<tr><td colspan="4">Fila vazia.</td></tr>';
   const conc = lista.filter((x) => x.modo === "mesa" && x.estado === "concluido"), marc = conc.filter((x) => x.pautaSel);
   $("pautaBarra").style.display = conc.length ? "" : "none"; $("pautaN").textContent = marc.length; $("pautaGerar").disabled = !marc.length;

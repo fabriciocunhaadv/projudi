@@ -1,0 +1,29 @@
+# Continuidade do desenvolvimento — Extensão "Conclusões Projudi" + Studio "Assessor Judicial"
+
+> Documento para abrir uma conversa nova e retomar o trabalho. Diga à IA: "leia CONTINUIDADE.md e continue". Atualize-o ao fim de cada etapa.
+
+## Quem e como
+- Usuário: advogado/magistrado (Montes Claros de Goiás). Falar em **português simples**, sem jargão.
+- Regras: pedir autorização antes de mexer no monitor/erros e em mudanças grandes; desfazer o que ele não gostar; **não** contornar proteção anti-bot (Planalto/Cloudflare); **não** usar LexNode (usa Grounding do Gemini); vídeos de uso ficam em outra conversa.
+
+## Repositórios
+1. **Extensão** (este repo, branch `claude/determined-bardeen-xtc9lq`, pasta `extensao/`). Pacote da loja: `python3 empacotar.py` → `publicacao/projudi-extensao-<versão>.zip` (o usuário envia à Chrome Web Store; versão atual **1.0.91**; sempre aumentar `version`).
+2. **Studio** `fabriciocunhaadv/assessor-judicial-mysql` (React+Vite+TS, Express, MySQL Hostinger, Gemini). Deploy a partir da `main`. Local: `/home/user/assessor-judicial-mysql`.
+
+## Pontes extensão ↔ Studio
+Atributos em `document.documentElement.dataset.*` + eventos (`projudi:leis-pedido`, `projudi:lei-entrega`, `projudi:fonte-entrega`, `projudi:teste-entrega`, `projudi:saude`, `projudi:pedir-prompt`/`projudi:prompt-resposta`, `assessor:cadastrar-minuta`). Script `extensao/studio-base.js` roda na aba do Studio; `studio-cliente.js` fala com ele (`cadastrarNoStudio`, `lerPromptDoStudio`, `analisarNoStudio`).
+
+## Esteira (extensao/esteira.js)
+Itens com `modo`: `analise|lupa|turbo|mesa|agaia|ia`. Fluxo: baixar PDF com OCR → fila → motor. Minuta externa (Agaia/IA) entra no Histórico do Studio com selo da origem (`origemExterna`).
+
+## Feito nesta fase (tudo publicado, salvo o último item)
+Reenvio de análise guardada; monitor **Saúde** (retenção 30 dias, avisos 7/3/1, limpeza); busca de leis do Planalto e teste de acesso pelo navegador (permissões opcionais); Grounding na 1ª etapa com selo; **Fontes pendentes** (global, só Super Admin); layout de Súmulas/Teses/Informativos e Central de fontes; banco resiliente (keepAlive/retry).
+**IA externa (plano B, v1.0.91)**: modo `ia` — a extensão abre ChatGPT / Gemini / Claude / IA do Jusbrasil, anexa o PDF (com OCR), cola o prompt do Studio, espera a minuta e lança no Histórico. Arquivos: `ia-agente.js` (roda na aba da IA; perfis + heurísticas), `ia-externa-cliente.js` (orquestra), integração em `esteira.js`, `painel.js` (radio "IA externa", botões *Autorizar este site* e *Diagnosticar tela da IA*), `manifest.json` (optional hosts). Studio: `src/App.tsx` (ponte do prompt), `minutaExterna.ts`, `HistoryModal.tsx`. Teste: `tests/e2e_ia_agente.py` (páginas simuladas).
+
+## Pendências / atenção
+- **IA externa NÃO foi validada nos sites reais** (só em páginas simuladas). Os sites mudam: usar "Diagnosticar tela da IA" no painel e ajustar os perfis em `ia-agente.js`. Pode haver captcha/login; termos de uso das IAs podem restringir automação.
+- Enviar o pacote 1.0.91 à Chrome Web Store (o usuário faz).
+- Conferir em produção: busca nos sites reais (Planalto/TJGO/Câmara municipal), SQL da Saúde/limpeza no MySQL real, retomada dos Gigantes, efeito do keepAlive/retry.
+
+## Testes
+Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--no-sandbox`); `tests/e2e_*.py` (extensão), Studio em `testes/`. Cuidado: `lambda r, x=y` em `page.route` quebra (Playwright conta argumentos).

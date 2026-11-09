@@ -853,6 +853,13 @@
       responder({ ok: true }); return false;
     }
     if (m?.acao === "studio-enviar-base") { enviar(m.nome, m.arquivoId, m.b64, !!m.substituir).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
+    if (m?.acao === "studio-prompt-texto") {      // IA externa: o app entrega o TEXTO do prompt da serventia (a esteira o cola na conversa da IA)
+      const id = "pr" + Date.now() + Math.random().toString(36).slice(2, 5);
+      try { delete document.documentElement.dataset.projudiPromptResposta; document.documentElement.dataset.projudiPromptPedido = JSON.stringify({ reqId: id, nome: m.nome || "" }); window.dispatchEvent(new Event("projudi:pedir-prompt")); } catch (e) { responder({ ok: false, erro: String(e.message || e) }); return false; }
+      esperar(() => { try { const r = JSON.parse(document.documentElement.dataset.projudiPromptResposta || "null"); return r && r.reqId === id ? r : null; } catch { return null; } }, 15000)
+        .then((r) => responder(r || { ok: false, erro: "o app do Studio não respondeu ao pedido do prompt (atualize a aba do Studio)" }));
+      return true;
+    }
     if (m?.acao === "studio-cadastrar-minuta") {      // minuta pronta vinda do Agaia: o app a grava no Histórico (organizada por serventia e prompt) e confirma pelo atributo da página
       const id = "ag" + Date.now() + Math.random().toString(36).slice(2, 5);
       try { delete document.documentElement.dataset.agaiaCadastro; window.dispatchEvent(new CustomEvent("assessor:cadastrar-minuta", { detail: JSON.stringify({ ...m.dados, reqId: id }) })); } catch (e) { responder({ ok: false, erro: String(e.message || e) }); return false; }
