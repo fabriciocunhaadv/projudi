@@ -247,7 +247,27 @@ async function fecharAbas(it) {
   for (const id of [a.doc, a.pdf, a.projudi].filter(Boolean)) await (a.janelas && id !== a.projudi ? chrome.windows.remove(id) : chrome.tabs.remove(id)).catch(() => {});
 }
 
+
+// Fila no celular: a aba dona da esteira deixa em chrome.storage.local um RESUMO (só números, estados e o último erro curto, sem número de processo);
+// o script do Studio o entrega ao app, que o mostra em "Minha fila" e avisa o celular quando a fila conclui, para por erro, pede login ou o computador cala.
+let ultimoResumo = 0;
+async function publicarResumo(forcar) {
+  if (!dono || (!forcar && Date.now() - ultimoResumo < 5000)) return;
+  ultimoResumo = Date.now();
+  try {
+    const lista = await todos(), conta = (...est) => lista.filter((i) => est.includes(i.estado)).length;
+    const ativo = lista.find((i) => ["analisando", "gigante"].includes(i.estado)) || lista.find((i) => i.estado === "aguardando") || lista[lista.length - 1];
+    const erro = [...lista].reverse().find((i) => i.estado === "erro");
+    const login = lista.find((i) => i.estado === "aguardando" && /pediu login|verifica[çc][ãa]o humana|captcha/i.test(i.aviso || ""));
+    await chrome.storage.local.set({ filaResumo: {
+      total: lista.length, aguardando: conta("aguardando"), analisando: conta("analisando", "gigante", "recebida", "conferido", "cadastrando"), concluidos: conta("concluido"), erros: conta("erro"), pausados: conta("pausado", "conferindo"),
+      modo: ativo?.modo || "", ia: ativo?.modo === "ia" ? (SITES_IA[ativo.iaId]?.nome || "") : "", pausa: login ? String(login.aviso).slice(0, 160) : "", ultimoErro: erro ? String(erro.erro || "").slice(0, 200) : "", versao: chrome.runtime.getManifest().version, ts: Date.now() } });
+  } catch (e) { /* sem armazenamento: segue sem avisar o celular */ }
+}
+setInterval(publicarResumo, 20000); setTimeout(publicarResumo, 4000);
+
 async function desenhar() {
+  void publicarResumo();
   const lista = await todos();
   $("linhas").innerHTML = lista.length ? lista.map((it, n) => {
     const b = [];

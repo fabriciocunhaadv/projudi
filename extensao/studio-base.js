@@ -797,6 +797,19 @@
   };
   setInterval(entregarSaude, 15000); setTimeout(entregarSaude, 5000);
 
+  // ----- Fila no celular: entrega ao app o resumo que a esteira deixou em chrome.storage.local (o app o leva ao servidor) -----
+  let filaVista = "";
+  const entregarFila = async () => {
+    try {
+      if (quadroSemApp() || !temApp()) return;
+      const { filaResumo } = await chrome.storage.local.get("filaResumo"); if (!filaResumo) return;
+      const texto = JSON.stringify(filaResumo); if (texto === filaVista) return; filaVista = texto;
+      document.documentElement.dataset.projudiFilaResumo = texto; window.dispatchEvent(new Event("projudi:fila"));
+    } catch (e) { /* sem armazenamento da extensão */ }
+  };
+  try { chrome.storage.onChanged.addListener((c, area) => { if (area === "local" && c.filaResumo) void entregarFila(); }); } catch (e) { /* sem ouvinte */ }
+  setInterval(entregarFila, 20000); setTimeout(entregarFila, 5000);
+
   // ----- Central de fontes: o app pede as leis do Planalto (atributo + evento); a extensão busca no navegador do Super Admin e devolve uma lei por vez -----
   window.addEventListener("projudi:leis-pedido", () => {
     const el = document.documentElement;
