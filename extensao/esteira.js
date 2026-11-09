@@ -1,5 +1,5 @@
 import { todos, atualizar, lerPdf, remover, enfileirar, ROTULO, ATIVOS } from "./esteira-banco.js";
-import { instalarSaude } from "./saude-fila.js";
+import { instalarSaude, reportarSaude } from "./saude-fila.js";
 instalarSaude("esteira");
 import { analisarNoStudio, lerMinutaAtual, consultarGigantes, cadastrarNoStudio, lerPromptDoStudio } from "./studio-cliente.js";
 import { executarNaIa, SITES_IA } from "./ia-externa-cliente.js";
@@ -89,8 +89,11 @@ async function analisarNaIaExterna(it, valida) {
   if (!SITES_IA[it.iaId]) { await atualizar(it.id, { estado: "erro", erro: "IA externa não escolhida: escolha ChatGPT, Gemini ou Claude no painel e envie de novo." }); return; }
   let promptTexto = "";
   try { promptTexto = (await lerPromptDoStudio(it.prompt)).texto; } catch (e) { await atualizar(it.id, { estado: "erro", erro: "Prompt: " + e.message, promptOpcoes: e.opcoes?.length ? e.opcoes : undefined }); return; }
+  const t0 = Date.now();
   const r = await executarNaIa(it, { id: it.iaId, bytes, promptTexto, aoAndamento: andamento, aindaValido: valida });
   if (!(await valida()) || r.cancelado) return;
+  // painel Calibragem → Extensão: sucesso e falha de cada IA externa (sem texto de processo; o servidor ainda mascara números)
+  reportarSaude("ia-externa", r.ok ? "info" : r.sessao ? "aviso" : "erro", r.ok ? `${nomeIa}: minuta recebida` : `${nomeIa}: ${r.erro}`, { ia: it.iaId, ok: !!r.ok, ms: Date.now() - t0 }, true);
   if (!r.ok) {
     if (r.sessao) { pausaAte = Date.now() + 3 * 60000; await atualizar(it.id, { estado: "aguardando", erro: "", aviso: r.erro + ". A fila retoma em 3 minutos." }); return; }
     await atualizar(it.id, { estado: "erro", erro: `${nomeIa}: ` + r.erro, aviso: "A esteira seguiu para o próximo processo.", tentativas: r.semRetry ? 9 : undefined });

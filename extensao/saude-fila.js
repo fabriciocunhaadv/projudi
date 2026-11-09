@@ -5,11 +5,11 @@ const CHAVE = "saudeFila", MAX = 60, SILENCIO_MS = 10 * 60_000;
 const recentes = new Map();
 
 /** Anota um evento. Nunca lança erro e nunca atrapalha a tarefa da extensão. */
-export async function reportarSaude(modulo, severidade, mensagem, detalhe) {
+export async function reportarSaude(modulo, severidade, mensagem, detalhe, sempre = false) {
   try {
     const msg = String(mensagem || "").replace(/\s+/g, " ").trim().slice(0, 400); if (!msg) return;
     const chave = modulo + "|" + msg.replace(/\d+/g, "#"), agora = Date.now();
-    if (agora - (recentes.get(chave) || 0) < SILENCIO_MS) return;      // o mesmo problema repetido: só o primeiro a cada 10 minutos
+    if (!sempre && agora - (recentes.get(chave) || 0) < SILENCIO_MS) return;      // o mesmo problema repetido: só o primeiro a cada 10 minutos
     recentes.set(chave, agora); if (recentes.size > 200) recentes.clear();
     const { [CHAVE]: fila = [] } = await chrome.storage.local.get(CHAVE);
     fila.push({ id: agora.toString(36) + Math.random().toString(36).slice(2, 6), ts: agora, versao: chrome.runtime.getManifest().version, modulo, severidade, mensagem: msg, detalhe });
