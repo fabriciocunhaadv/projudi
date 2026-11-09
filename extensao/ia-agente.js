@@ -114,6 +114,19 @@
 
   // Remove rótulos de botões da tela que vêm misturados ao texto (ex.: barra “Reescrever / Buscar julgados / Perguntar”).
   const limpar = (t) => String(t || "").replace(/Reescrever\s*Buscar julgados\s*Perguntar/gi, "").split("\n").filter((l) => !/^\s*(Reescrever|Buscar julgados|Perguntar|Baixar|Copiar|Ver fontes|Editar|Compartilhar)\s*$/i.test(l)).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  // Conteúdo do elemento SEM os botões, ícones e dicas da tela (copiar, baixar, “Marca Jusbrasil”…): trabalha numa cópia fora da tela, com o mesmo layout, para o texto manter os parágrafos.
+  function conteudoLimpo(el) {
+    const bruto = limpar(textoDe(el));
+    try {
+      const c = el.cloneNode(true);
+      c.querySelectorAll("button, svg, script, style, input, textarea, select, nav, [role='button'], [role='toolbar'], [role='tooltip'], [aria-hidden='true'], [class*='tooltip' i], [class*='toolbar' i], [data-testid*='copy' i], [data-testid*='feedback' i], [data-testid*='action' i]").forEach((e) => e.remove());
+      const ponte = document.createElement("div"); ponte.style.cssText = `position:fixed;left:-99999px;top:0;width:${Math.max(400, Math.round(el.getBoundingClientRect().width))}px;opacity:0;pointer-events:none`;
+      ponte.appendChild(c); document.body.appendChild(ponte);
+      const texto = limpar(c.innerText || c.textContent || ""), html = c.innerHTML; ponte.remove();
+      if (texto.length >= bruto.length * 0.6) return { texto, html };      // limpou demais (o recipiente tinha nome de botão)? então fica com o original
+    } catch (e) { /* usa o original */ }
+    return { texto: bruto, html: el.innerHTML };
+  }
   // Painel lateral com um documento longo (metade direita da tela, sem caixa de mensagem dentro).
   function painelDocumento() {
     const W = innerWidth;
@@ -133,7 +146,7 @@
       const d = painelDocumento(), t = d ? limpar(textoDe(d)) : "";
       if (d && t.length > 400 && !eco(t)) {
         if (t !== ultimo) { ultimo = t; desde = Date.now(); }
-        if (!botaoParar() && Date.now() - desde >= estavelMs) return { ok: true, texto: t, html: d.innerHTML, origem: "painel" };
+        if (!botaoParar() && Date.now() - desde >= estavelMs) { const c = conteudoLimpo(d); return { ok: true, texto: c.texto, html: c.html, origem: "painel" }; }
       }
       if (!ultimo && Date.now() - t0 > 180000) throw new Error("o painel com a minuta não apareceu (a IA pode ter respondido só no chat)");
       await dorme(1000);
@@ -153,11 +166,11 @@
       if (ult !== ultimo) { ultimo = ult; desde = Date.now(); }
       if (comecou && novo && !gerando && ult && Date.now() - desde >= estavelMs) {
         const el = rs[rs.length - 1];
-        let texto = limpar(ult), html = el.innerHTML, origem = "chat";
+        const cl = conteudoLimpo(el); let texto = cl.texto, html = cl.html, origem = "chat";
         // IAs que entregam a peça num painel lateral (ex.: Jusbrasil “Criou Peça”): o chat só traz um aviso curto; a minuta está no painel
         if (texto.length < 2000) {
           const d = await esperarPor(painelDocumento, 15000, 1000);
-          if (d) { await estabilizar(d, 3000); const t = limpar(textoDe(d)); if (t.length > texto.length) { texto = t; html = d.innerHTML; origem = "painel"; } }
+          if (d) { await estabilizar(d, 3000); const c = conteudoLimpo(d); if (c.texto.length > texto.length) { texto = c.texto; html = c.html; origem = "painel"; } }
         }
         return { ok: true, texto, html, origem };
       }

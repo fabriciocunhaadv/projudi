@@ -24,7 +24,7 @@ PAG_C = """<html><body style="margin:0"><div style="display:flex;width:1200px"><
 <div id=painel style="width:600px"></div></div>
 <script>document.getElementById('f').onchange=e=>document.getElementById('chip').textContent=e.target.files[0].name;
 document.getElementById('s').onclick=()=>{const m=document.createElement('div');m.className='assistant-msg';window.__enviado=document.getElementById('t').value;const eco=document.createElement('div');eco.className='assistant-msg';eco.textContent=window.__enviado+' (eco da mensagem enviada, com o prompt do Studio)';document.getElementById('msgs').appendChild(eco);m.textContent='Revise e valide o conteudo antes de qualquer uso processual.';document.getElementById('msgs').appendChild(m);
-setTimeout(()=>{document.getElementById('painel').innerHTML='<div><button>Baixar</button><h3>Decisao de regularizacao</h3><p>PODER JUDICIARIO</p>'+'<p>Fundamentacao longa da minuta. </p>'.repeat(60)+'<p>ReescreverBuscar julgadosPerguntar</p><p>Dispositivo final.</p></div>';},2500);};</script></body></html>"""
+setTimeout(()=>{document.getElementById('painel').innerHTML='<div><button>Baixar</button><h3>Decisao de regularizacao</h3><p>PODER JUDICIARIO</p><button>Copiar</button><span role="tooltip">Marca Jusbrasil</span><svg width=10 height=10></svg>'+'<p>Fundamentacao longa da minuta. </p>'.repeat(60)+'<p>ReescreverBuscar julgadosPerguntar</p><p>Dispositivo final.</p></div>';},2500);};</script></body></html>"""
 PAG_D = """<html><body><div id=msgs></div><div class=ql-editor contenteditable=true role=textbox aria-label="Insira um comando" style="width:400px;height:40px;border:1px solid"></div>
 <button id=mais style="width:30px">+</button><button aria-label="Enviar" id=s>Enviar</button><div id=chip></div>
 <script>const ed=document.querySelector('.ql-editor');
@@ -49,6 +49,7 @@ with sync_playwright() as p:
         if nome.startswith("C"):
             assert r["origem"] == "painel" and "Dispositivo final" in r["texto"] and len(r["texto"]) > 800, r["texto"][:200]
             assert "Faça a minuta" not in r["texto"] and "eco da mensagem" not in r["texto"], "capturou o eco do prompt"
+            assert "Marca Jusbrasil" not in r["texto"] and "Copiar" not in r["texto"] and "Marca Jusbrasil" not in r["html"], "botões e dicas da tela ficaram na minuta"
             assert "Reescrever" not in r["texto"] and "Buscar julgados" not in r["texto"] and "Baixar" not in r["texto"], "lixo da tela ficou no texto"
         else: assert "Minuta parte 4" in r["texto"] or "Resposta pronta" in r["texto"], r
         assert "Faça a minuta" in pg.evaluate("window.__enviado"), "prompt não chegou"
