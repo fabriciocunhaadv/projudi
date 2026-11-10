@@ -810,6 +810,29 @@
   try { chrome.storage.onChanged.addListener((c, area) => { if (area === "local" && c.filaResumo) void entregarFila(); }); } catch (e) { /* sem ouvinte */ }
   setInterval(entregarFila, 20000); setTimeout(entregarFila, 5000);
 
+  // ----- Uso da extensão: entrega ao app (que envia ao servidor) as contagens locais "uso_ext"; só zera o que o app confirmou -----
+  let entregandoUso = false;
+  async function entregarUso() {
+    if (entregandoUso || window.top !== window) return; entregandoUso = true;
+    try {
+      const { uso_ext = {} } = await chrome.storage.local.get("uso_ext"), dias = {};
+      for (const [d, r] of Object.entries(uso_ext)) { const o = Object.fromEntries(Object.entries(r).filter(([, n]) => n > 0)); if (Object.keys(o).length) dias[d] = o; }
+      if (!Object.keys(dias).length) return;
+      const lote = "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      delete document.documentElement.dataset.assessorUsoExtensaoAck;
+      window.dispatchEvent(new CustomEvent("assessor:uso-extensao", { detail: JSON.stringify({ lote, dias, versao: chrome.runtime.getManifest().version }) }));
+      const ok = await esperar(() => (document.documentElement.dataset.assessorUsoExtensaoAck === lote ? true : null), 20000);
+      if (!ok) return;      // app antigo ou sem login: guarda e tenta de novo depois
+      const subtrair = async () => {
+        const { uso_ext: at = {} } = await chrome.storage.local.get("uso_ext");
+        for (const [d, r] of Object.entries(dias)) { for (const [k, n] of Object.entries(r)) if (at[d]) { at[d][k] = (at[d][k] || 0) - n; if (at[d][k] <= 0) delete at[d][k]; } if (at[d] && !Object.keys(at[d]).length) delete at[d]; }
+        await chrome.storage.local.set({ uso_ext: at });
+      };
+      await (navigator.locks ? navigator.locks.request("uso-ext", subtrair) : subtrair());
+    } catch (e) { /* tenta de novo depois */ } finally { entregandoUso = false; }
+  }
+  setTimeout(entregarUso, 15000); setInterval(entregarUso, 5 * 60000);
+
   // ----- Tratamento de PDF pela extensão: o app entrega o PDF em partes (window.postMessage) e a extensão (página pdf-studio) devolve andamento e texto -----
   if (window.top === window) window.addEventListener("message", async (ev) => {
     const d = ev.data;

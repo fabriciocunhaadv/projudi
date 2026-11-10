@@ -1,5 +1,6 @@
 // PDF para texto: o assessor escolhe um ou vários PDFs do computador e recebe o texto de cada um (.txt). Reaproveita o motor de OCR (só nas páginas-imagem) e a extração de texto.
 import { fazerOcr } from "./ocr-motor.js";
+import { contarUso } from "./uso-ext.js";
 import { textoDoPdf } from "./pdf-texto.js";
 
 const $ = (id) => document.getElementById(id);
@@ -56,6 +57,7 @@ async function converter(arquivo, opcoes) {
   });
   let texto = await textoDoPdf(r.bytes);
   if (!opcoes.marcadores) texto = texto.replace(/^\[Página \d+(?: de \d+)?[^\]]*\]\n/gm, "");
+  void contarUso("pdf_para_texto");
   return { texto, paginas: r.total, ocr: r.ocr };
 }
 

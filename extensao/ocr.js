@@ -1,5 +1,6 @@
 // Página de OCR: tela, arrastar/soltar e OCR automático dos PDFs baixados do Projudi. O trabalho pesado está em ocr-motor.js.
 import { fazerOcr, fmt, descreverErro } from "./ocr-motor.js";
+import { contarUso } from "./uso-ext.js";
 import { reportarSaude, instalarSaude } from "./saude-fila.js";
 instalarSaude("ocr");
 import { textoDoPdf } from "./pdf-texto.js";
@@ -164,6 +165,7 @@ async function interceptado(idJob) {
     };
     $("status").textContent = "Salvando o PDF…";
     const arqPdf = await salvar(new Blob([res.bytes], { type: "application/pdf" }), num + "-OCR.pdf");
+    void contarUso("ocr_processo");
     let semAcesso = [];      // páginas “Não será possível mostrar o Arquivo da movimentação … nível de acesso insuficiente” (arquivo sigiloso/restrito): ficam FORA da análise
     try { const txtPdf = await textoDoPdf(res.bytes); semAcesso = [...new Set([...txtPdf.matchAll(/Movimenta[cç][aã]o\s*(\d+)\s*:\s*([^\n]{0,70})[\s\S]{0,260}?n[ií]vel de acesso/gi)].map((m) => `Mov. ${m[1]}${m[2] ? " (" + m[2].trim() + ")" : ""}`))]; if (semAcesso.length) log("⚠ " + semAcesso.length + " arquivo(s) sem acesso (nível insuficiente): " + semAcesso.join("; ") + " — não entram na análise"); } catch (e) { /* sem texto */ }
     // Pauta de audiências: com a pauta ativa, extrai do texto os dados da audiência e guarda para a página da pauta

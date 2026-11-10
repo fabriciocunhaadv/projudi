@@ -284,6 +284,7 @@ chrome.runtime.onMessage.addListener((m, s, responder) => {
     return true;
   }
   if (m?.acao === "baixar-arquivos") { // vindo do botão na "Navegação de Arquivos": abre a página de seleção
+    navigator.locks.request("uso-ext", async () => { const { uso_ext = {} } = await chrome.storage.local.get("uso_ext"), d = new Date(), z = (n) => String(n).padStart(2, "0"), k = `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`; uso_ext[k] = uso_ext[k] || {}; uso_ext[k].baixar_arquivos = (uso_ext[k].baixar_arquivos || 0) + 1; await chrome.storage.local.set({ uso_ext }); }).catch(() => {});      // contagem de uso (só número)
     const id = String(Date.now());
     chrome.storage.local.set({ ["baixar_" + id]: { ...m.job, tabId: s.tab?.id } })
       .then(() => chrome.tabs.create({ url: chrome.runtime.getURL("baixar.html?job=" + id) }))

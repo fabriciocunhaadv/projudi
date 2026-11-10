@@ -3,6 +3,7 @@
 import { fazerOcr, descreverErro } from "./ocr-motor.js";
 import { textoDoPdf } from "./pdf-texto.js";
 import { quadroDoProcesso } from "./movimentacoes-quadro.js";
+import { contarUso } from "./uso-ext.js";
 import { instalarSaude, reportarSaude } from "./saude-fila.js";
 instalarSaude("pdf-studio");
 
@@ -55,6 +56,7 @@ async function processar() {
     }
     const quadro = await quadroDoProcesso(texto);      // movimentações lidas da tela do processo (se ela foi aberta neste navegador)
     await paraOStudio({ acao: "pdf-studio-resultado", ok: true, quadro, pdfPartes, vazias: res.vazias || [], texto, paginas: res.total, ocr: res.ocr, paginasOcr: res.paginasOcr || [], puladas: (res.puladas || []).map((x) => (typeof x === "object" ? x.pagina : x)), segundos: Math.round((Date.now() - t0) / 1000) });
+    void contarUso("pdf_studio");
     void reportarSaude("pdf-studio", "info", "PDF tratado para o Studio", { paginas: res.total, ocr: res.ocr, ms: Date.now() - t0 }, true);
     status("Pronto."); setTimeout(() => window.close(), 1500);
   } catch (e) {
