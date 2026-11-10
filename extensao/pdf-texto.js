@@ -16,7 +16,8 @@ export function marcadorDaPagina(i, total, loc) {
   return `[Página ${i} de ${total}${l}]`;
 }
 
-export async function textoDoPdf(bytes) {
+// simples=true: marcador só `[Página N de M]` (formato que o Studio entende; ele lê o carimbo do Projudi que continua no texto da página e anota Mov./Arq./Pág. sozinho).
+export async function textoDoPdf(bytes, { simples = false } = {}) {
   const pdf = await pdfjs.getDocument({ data: bytes.slice() }).promise, paginas = [];
   let loc = null;
   for (let i = 1; i <= pdf.numPages; i++) {
@@ -29,7 +30,7 @@ export async function textoDoPdf(bytes) {
     }
     const limpo = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
     loc = localizacaoDoCarimbo(limpo.slice(0, 600), loc);      // o carimbo fica no topo da página
-    paginas.push(`${marcadorDaPagina(i, pdf.numPages, loc)}\n` + limpo);
+    paginas.push(`${simples ? `[Página ${i} de ${pdf.numPages}]` : marcadorDaPagina(i, pdf.numPages, loc)}\n` + limpo);
     page.cleanup();
   }
   await pdf.destroy();

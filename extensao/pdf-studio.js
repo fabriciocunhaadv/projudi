@@ -41,7 +41,7 @@ async function processar() {
     });
     status("Extraindo o texto…"); void paraOStudio({ acao: "pdf-studio-progresso", etapa: "Extraindo o texto", feitas: 0, total: 0 });
     // o marcador de página fica no formato simples que o Studio entende; o carimbo do Projudi (Movimentação/Arquivo/Pág.) continua no texto da página
-    const texto = (await textoDoPdf(res.bytes)).replace(/\[Página (\d+) de (\d+) \|[^\]]*\]/g, "[Página $1 de $2]");
+    const texto = await textoDoPdf(res.bytes, { simples: true });
     // devolve também o PDF JÁ COM OCR (texto selecionável) em partes, para o Studio mostrar/baixar essa versão em vez do original sem texto
     let pdfPartes = 0;
     if (res.bytes && res.ocr > 0 && res.bytes.length <= 80 * 1024 * 1024) {

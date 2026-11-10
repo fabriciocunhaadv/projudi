@@ -48,7 +48,9 @@ export async function imagensDaPagina(page) {
 // O Projudi, ao juntar o processo, joga fora o texto dos documentos e carimba cabeçalho, tarja e rodapé (selo digital) ao redor da imagem:
 // esse texto fica FORA da imagem, então o que vale é o texto que cai dentro da área da imagem.
 export async function precisaOcr(page) {
-  if ((await textoDaPagina(page)) < MIN_CHARS) return true;
+  const nChars = await textoDaPagina(page);
+  if (nChars < MIN_CHARS) return true;
+  if (nChars >= 1500) return false;      // muito texto: é página de texto de verdade (o carimbo do Projudi tem poucas centenas de caracteres); pula a leitura das imagens, que é a parte lenta em autos de milhares de páginas
   const grandes = (await imagensDaPagina(page)).filter((r) => r.fracao >= 0.15);
   if (!grandes.length) return false;
   const tc = await page.getTextContent();

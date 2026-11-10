@@ -7,7 +7,7 @@
 - Regras: pedir autorização antes de mexer no monitor/erros e em mudanças grandes; desfazer o que ele não gostar; **não** contornar proteção anti-bot (Planalto/Cloudflare); **não** usar LexNode (usa Grounding do Gemini); vídeos de uso ficam em outra conversa.
 
 ## Repositórios
-1. **Extensão** (este repo, branch `claude/determined-bardeen-xtc9lq`, pasta `extensao/`). Pacote da loja: `python3 empacotar.py` → `publicacao/projudi-extensao-<versão>.zip` (o usuário envia à Chrome Web Store; versão atual **1.0.100**; sempre aumentar `version`).
+1. **Extensão** (este repo, branch `claude/determined-bardeen-xtc9lq`, pasta `extensao/`). Pacote da loja: `python3 empacotar.py` → `publicacao/projudi-extensao-<versão>.zip` (o usuário envia à Chrome Web Store; versão atual **1.0.101**; sempre aumentar `version`).
 2. **Studio** `fabriciocunhaadv/assessor-judicial-mysql` (React+Vite+TS, Express, MySQL Hostinger, Gemini). Deploy a partir da `main`. Local: `/home/user/assessor-judicial-mysql`.
 
 ## Pontes extensão ↔ Studio
@@ -50,3 +50,5 @@ Reenvio de análise guardada; monitor **Saúde** (retenção 30 dias, avisos 7/3
 Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--no-sandbox`); `tests/e2e_*.py` (extensão), Studio em `testes/`. Cuidado: `lambda r, x=y` em `page.route` quebra (Playwright conta argumentos).
 
 **1.0.100 (10/11)**: a extensão devolve ao Studio também o PDF JÁ COM OCR (texto selecionável), em partes (`pdf-studio-pdf-parte` → `studio-base.js` → `tipo:"pdf-parte"`); o Studio usa esse PDF na visualização (o original não tinha texto selecionável) e avisa páginas de imagem que ficaram sem texto (`puladas`/`vazias`). Cartão do PDF no Studio diz "só o texto vai para a IA". A zona de PDF fica montada ao trocar para a aba Texto (a contagem não some). Pendentes do item C: ler a tabela de Movimentações do Projudi; marcador `[Página N de M]` + `[Mov. · Arq. · Pág.]` no caminho do texto; pasta `casos-reais/`; acelerar "Conferindo páginas" em PDFs de 1800 páginas.
+
+**1.0.101 (10/11)**: marcador de página simples `[Página N de M]` também no caminho do texto da esteira (`textoDoPdf(bytes,{simples:true})`; o formato com ` | Mov…` não era entendido pelo Studio); `precisaOcr` pula a leitura de imagens em páginas com ≥1500 caracteres (acelera "Conferindo páginas"). Pasta `casos-reais/` criada. FALTA do item C: ler a tabela de Movimentações do Projudi (precisa de um HTML real da aba "Movimentações", salvo em `casos-reais/`); `arquivos-core.js` só enxerga movimentos da tela "Navegação de Arquivos".
