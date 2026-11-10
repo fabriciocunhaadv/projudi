@@ -42,7 +42,17 @@ async function processar() {
     status("Extraindo o texto…"); void paraOStudio({ acao: "pdf-studio-progresso", etapa: "Extraindo o texto", feitas: 0, total: 0 });
     // o marcador de página fica no formato simples que o Studio entende; o carimbo do Projudi (Movimentação/Arquivo/Pág.) continua no texto da página
     const texto = (await textoDoPdf(res.bytes)).replace(/\[Página (\d+) de (\d+) \|[^\]]*\]/g, "[Página $1 de $2]");
-    await paraOStudio({ acao: "pdf-studio-resultado", ok: true, texto, paginas: res.total, ocr: res.ocr, paginasOcr: res.paginasOcr || [], puladas: (res.puladas || []).map((x) => (typeof x === "object" ? x.pagina : x)), segundos: Math.round((Date.now() - t0) / 1000) });
+    // devolve também o PDF JÁ COM OCR (texto selecionável) em partes, para o Studio mostrar/baixar essa versão em vez do original sem texto
+    let pdfPartes = 0;
+    if (res.bytes && res.ocr > 0 && res.bytes.length <= 80 * 1024 * 1024) {
+      const TAM = 1_500_000; pdfPartes = Math.ceil(res.bytes.length / TAM);
+      for (let n = 0; n < pdfPartes; n++) {
+        status(`Devolvendo o PDF com OCR ao Studio… ${n + 1}/${pdfPartes}`);
+        let b = ""; const fatia = res.bytes.subarray(n * TAM, (n + 1) * TAM); for (let k = 0; k < fatia.length; k += 0x8000) b += String.fromCharCode(...fatia.subarray(k, k + 0x8000));
+        await paraOStudio({ acao: "pdf-studio-pdf-parte", n, dados: btoa(b) });
+      }
+    }
+    await paraOStudio({ acao: "pdf-studio-resultado", ok: true, pdfPartes, vazias: res.vazias || [], texto, paginas: res.total, ocr: res.ocr, paginasOcr: res.paginasOcr || [], puladas: (res.puladas || []).map((x) => (typeof x === "object" ? x.pagina : x)), segundos: Math.round((Date.now() - t0) / 1000) });
     void reportarSaude("pdf-studio", "info", "PDF tratado para o Studio", { paginas: res.total, ocr: res.ocr, ms: Date.now() - t0 }, true);
     status("Pronto."); setTimeout(() => window.close(), 1500);
   } catch (e) {

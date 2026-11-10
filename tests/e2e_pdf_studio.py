@@ -25,6 +25,7 @@ with sync_playwright() as p:
     m = json.loads(r); print({k: v for k, v in m.items() if k != "texto"}); t = m["texto"]; print(t[:900])
     assert m["ok"] and m["paginas"] == 2 and m["ocr"] == 1 and m["paginasOcr"] == [2], m
     assert "[Página 1 de 2]" in t and "[Página 2 de 2]" in t and "|" not in t.split("[Página 2 de 2]")[0][-30:], "marcadores simples"
+    assert m.get("pdfPartes", 0) >= 1 and m.get("vazias") == [], "devolve o PDF com OCR em partes: " + str({k: v for k, v in m.items() if k != "texto"})
     assert "alimentos" in t.lower(), "texto da página normal"
     img = t.split("[Página 2 de 2]")[1].lower()
     assert "comprovante" in img and ("gabriel" in img or "nogueira" in img) , "OCR leu a página de imagem: " + img[:300]

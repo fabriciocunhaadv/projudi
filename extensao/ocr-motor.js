@@ -244,5 +244,6 @@ export async function fazerOcr(bytes, opcoes, ganchos = {}) {
   let ok = 0;
   for (const i of alvo.slice(0, 5)) { const p = await novo.getPage(i); if ((await textoDaPagina(p)) >= MIN_CHARS) ok++; }
   log(`  Conferência: ${ok}/${Math.min(5, alvo.length)} páginas testadas já têm texto selecionável.`);
-  return { bytes: saida, ocr: resultados.size, total: n, palavras, paginasOcr: [...resultados.keys()], puladas };
+  const vazias = [...resultados].filter(([, r]) => !r.palavras.length).map(([i]) => i);      // OCR rodou mas não reconheceu nenhuma palavra nova (foto ruim, página em branco…)
+  return { bytes: saida, ocr: resultados.size, total: n, palavras, paginasOcr: [...resultados.keys()], puladas, vazias };
 }

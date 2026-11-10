@@ -891,8 +891,8 @@
   chrome.runtime.onMessage.addListener((m, _s, responder) => {
     if (m?.acao === "lancar-progresso") { if (btLP.disabled) dizLP(m.texto); return false; }      // andamento do botão “Lançar no Projudi” (definido mais abaixo)
     if (quadroSemApp()) return false;
-    if ((m?.acao === "pdf-studio-progresso" || m?.acao === "pdf-studio-resultado") && window.top === window) {      // a página da extensão que trata o PDF avisa o andamento e o resultado: repassa ao app
-      try { const { acao, ...resto } = m; window.postMessage({ __projudiResp: "pdf-tratar", tipo: acao === "pdf-studio-resultado" ? "resultado" : "progresso", ...resto }, window.location.origin); } catch (e) { /* ignora */ }
+    if ((m?.acao === "pdf-studio-progresso" || m?.acao === "pdf-studio-resultado" || m?.acao === "pdf-studio-pdf-parte") && window.top === window) {      // a página da extensão que trata o PDF avisa o andamento e o resultado: repassa ao app
+      try { const { acao, ...resto } = m; window.postMessage({ __projudiResp: "pdf-tratar", tipo: acao === "pdf-studio-resultado" ? "resultado" : acao === "pdf-studio-pdf-parte" ? "pdf-parte" : "progresso", ...resto }, window.location.origin); } catch (e) { /* ignora */ }
       return false;
     }
     if (m?.acao === "studio-ping") { responder({ ok: true }); return false; }
