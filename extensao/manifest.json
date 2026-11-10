@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Conclusões Projudi",
-  "version": "1.0.101",
+  "version": "1.0.102",
   "description": "Confere automaticamente as conclusões não analisadas e pré-analisadas de cada serventia no Projudi/TJGO.",
   "permissions": [
     "activeTab",
@@ -82,7 +82,8 @@
         "arquivos-core.js",
         "baixador.js",
         "gerarpdf.js",
-        "modelos-projudi.js"
+        "modelos-projudi.js",
+        "mov-diag.js"
       ],
       "all_frames": true,
       "match_about_blank": true,
