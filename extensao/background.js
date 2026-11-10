@@ -258,6 +258,11 @@ chrome.runtime.onMessage.addListener((m, s, responder) => {
       .then(() => chrome.tabs.create({ url: chrome.runtime.getURL("leis.html"), active: true })).then(() => responder({ ok: true }), (e) => responder({ ok: false, erro: String(e.message || e) }));
     return true;
   }
+  if (m?.acao === "pdf-studio-abrir") {       // o Studio pediu para tratar um PDF inserido pelo usuário: abre (sem trazer para frente) a página que faz o OCR e devolve o texto
+    chrome.tabs.create({ url: chrome.runtime.getURL("pdf-studio.html?id=" + encodeURIComponent(String(m.id || "")) + "&aba=" + (s.tab ? s.tab.id : 0)), active: false })
+      .then((t) => responder({ ok: true, tabId: t.id }), (e) => responder({ ok: false, erro: String(e.message || e) }));
+    return true;
+  }
   if (m?.acao === "minha-aba") { responder({ tabId: s.tab ? s.tab.id : null }); return false; }
   if (m?.acao === "esteira-abrir") {       // garante a aba que roda a fila de minutas
     const url = chrome.runtime.getURL("esteira.html");

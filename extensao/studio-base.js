@@ -3,7 +3,7 @@
 (() => {
   if (window.__projudiStudioBase) return;
   window.__projudiStudioBase = true;
-  try { document.documentElement.dataset.assessorExtensao = chrome.runtime.getManifest().version; } catch (e) { /* sem manifest */ }      // o app mostra a tarja “instale a extensão” só quando este aviso não existe
+  try { document.documentElement.dataset.assessorExtensao = chrome.runtime.getManifest().version; document.documentElement.dataset.assessorExtensaoRecursos = "pdf"; } catch (e) { /* sem manifest */ }      // o app mostra a tarja “instale a extensão” só quando este aviso não existe
   const dorme = (ms) => new Promise((ok) => setTimeout(ok, ms));
   const visivel = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
   const texto = (e) => (e.textContent || "").replace(/\s+/g, " ").trim();
@@ -810,6 +810,24 @@
   try { chrome.storage.onChanged.addListener((c, area) => { if (area === "local" && c.filaResumo) void entregarFila(); }); } catch (e) { /* sem ouvinte */ }
   setInterval(entregarFila, 20000); setTimeout(entregarFila, 5000);
 
+  // ----- Tratamento de PDF pela extensão: o app entrega o PDF em partes (window.postMessage) e a extensão (página pdf-studio) devolve andamento e texto -----
+  if (window.top === window) window.addEventListener("message", async (ev) => {
+    const d = ev.data;
+    if (ev.source !== window || ev.origin !== window.location.origin || !d || d.__projudi !== "pdf-tratar" || typeof d.id !== "string") return;
+    const resp = (o) => window.postMessage({ __projudiResp: "pdf-tratar", id: d.id, ...o }, window.location.origin);
+    const enviar = (acao, extra = {}) => chrome.runtime.sendMessage({ acao, id: d.id, ...extra });
+    try {
+      if (d.fase === "inicio") {
+        const r = await chrome.runtime.sendMessage({ acao: "pdf-studio-abrir", id: d.id });
+        if (!r?.ok) { resp({ tipo: "erro", erro: r?.erro || "a extensão não conseguiu abrir o tratamento do PDF" }); return; }
+        for (let i = 0; i < 60; i++) { try { if ((await enviar("pdf-studio-ping"))?.ok) { resp({ tipo: "pronto" }); return; } } catch (e) { /* a página ainda está abrindo */ } await dorme(500); }
+        resp({ tipo: "erro", erro: "a extensão não respondeu ao pedido (aba de tratamento não abriu)" });
+      } else if (d.fase === "parte") { const r = await enviar("pdf-studio-parte", { n: d.n, dados: d.dados }); resp({ tipo: r?.ok ? "parte-ok" : "erro", n: d.n, erro: r?.ok ? undefined : "a extensão não recebeu uma parte do PDF" }); }
+      else if (d.fase === "fim") { await enviar("pdf-studio-fim"); resp({ tipo: "fim-ok" }); }
+      else if (d.fase === "cancelar") { await enviar("pdf-studio-cancelar").catch(() => {}); }
+    } catch (e) { resp({ tipo: "erro", erro: String(e.message || e) }); }
+  });
+
   // ----- Comandos do celular: o app entrega (atributo + evento) e a extensão devolve o resultado do mesmo jeito -----
   window.addEventListener("projudi:fila-comandos", async () => {
     try {
@@ -873,6 +891,10 @@
   chrome.runtime.onMessage.addListener((m, _s, responder) => {
     if (m?.acao === "lancar-progresso") { if (btLP.disabled) dizLP(m.texto); return false; }      // andamento do botão “Lançar no Projudi” (definido mais abaixo)
     if (quadroSemApp()) return false;
+    if ((m?.acao === "pdf-studio-progresso" || m?.acao === "pdf-studio-resultado") && window.top === window) {      // a página da extensão que trata o PDF avisa o andamento e o resultado: repassa ao app
+      try { const { acao, ...resto } = m; window.postMessage({ __projudiResp: "pdf-tratar", tipo: acao === "pdf-studio-resultado" ? "resultado" : "progresso", ...resto }, window.location.origin); } catch (e) { /* ignora */ }
+      return false;
+    }
     if (m?.acao === "studio-ping") { responder({ ok: true }); return false; }
     if (m?.acao === "studio-lei-entrega") { entregarLei(m).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
     if (m?.acao === "studio-fonte-entrega") { entregarFonte(m).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
