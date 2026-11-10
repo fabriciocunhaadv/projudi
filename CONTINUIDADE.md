@@ -7,7 +7,7 @@
 - Regras: pedir autorização antes de mexer no monitor/erros e em mudanças grandes; desfazer o que ele não gostar; **não** contornar proteção anti-bot (Planalto/Cloudflare); **não** usar LexNode (usa Grounding do Gemini); vídeos de uso ficam em outra conversa.
 
 ## Repositórios
-1. **Extensão** (este repo, branch `claude/determined-bardeen-xtc9lq`, pasta `extensao/`). Pacote da loja: `python3 empacotar.py` → `publicacao/projudi-extensao-<versão>.zip` (o usuário envia à Chrome Web Store; versão atual **1.0.102**; sempre aumentar `version`).
+1. **Extensão** (este repo, branch `claude/determined-bardeen-xtc9lq`, pasta `extensao/`). Pacote da loja: `python3 empacotar.py` → `publicacao/projudi-extensao-<versão>.zip` (o usuário envia à Chrome Web Store; versão atual **1.0.103**; sempre aumentar `version`).
 2. **Studio** `fabriciocunhaadv/assessor-judicial-mysql` (React+Vite+TS, Express, MySQL Hostinger, Gemini). Deploy a partir da `main`. Local: `/home/user/assessor-judicial-mysql`.
 
 ## Pontes extensão ↔ Studio
@@ -54,3 +54,5 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 **1.0.101 (10/11)**: marcador de página simples `[Página N de M]` também no caminho do texto da esteira (`textoDoPdf(bytes,{simples:true})`; o formato com ` | Mov…` não era entendido pelo Studio); `precisaOcr` pula a leitura de imagens em páginas com ≥1500 caracteres (acelera "Conferindo páginas"). Pasta `casos-reais/` criada. FALTA do item C: ler a tabela de Movimentações do Projudi (precisa de um HTML real da aba "Movimentações", salvo em `casos-reais/`); `arquivos-core.js` só enxerga movimentos da tela "Navegação de Arquivos".
 
 **1.0.102**: `mov-diag.js` (todas as molduras do tjgo): botão laranja "Salvar movimentações (para o Claude)" na moldura que tem a tabela de Movimentações; baixa `movimentacoes-projudi.html` (sem scripts) para eu programar a leitura (item C). Remover depois que a leitura estiver pronta.
+
+**1.0.103 (10/11) — item C feito**: `mov-diag.js` (moldura da tela do processo) lê a tabela real de Movimentações (`#tabListaProcesso tr[movi_codigo]`: nº, tipo em `.filtro_tipo_movimentacao`, complemento, data, usuário, se tem arquivo) e guarda em `chrome.storage.local` `movs:<nº do processo>` (50 mais recentes). `movimentacoes-quadro.js` monta o "[QUADRO DE MOVIMENTAÇÕES DO PROJUDI …]" (inclui movimentos SEM arquivo, ex.: Mov. 34 Término da Suspensão) e `esteira.js` (txt/Turbo) e `pdf-studio.js` (upload no Studio → campo `quadro`, que `PdfUploadZone.tsx` põe antes do texto) o enviam. Só funciona se a tela do processo foi aberta neste navegador. O Studio (`prontidaoDoAto.ts`) trata o quadro como cronologia oficial, não como peça. Teste: `MOVS_HTML=<arquivo> python3 tests/teste_movimentacoes.py` (HTML real tem dados de partes; não versionado). O botão cinza "Salvar movimentações" continua para diagnóstico.

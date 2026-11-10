@@ -1,5 +1,6 @@
 import { todos, atualizar, lerPdf, remover, enfileirar, ROTULO, ATIVOS } from "./esteira-banco.js";
 import { instalarSaude, reportarSaude } from "./saude-fila.js";
+import { quadroDoProcesso } from "./movimentacoes-quadro.js";
 instalarSaude("esteira");
 import { analisarNoStudio, lerMinutaAtual, consultarGigantes, cadastrarNoStudio, lerPromptDoStudio } from "./studio-cliente.js";
 import { executarNaIa, SITES_IA } from "./ia-externa-cliente.js";
@@ -129,7 +130,8 @@ async function analisar(it) {
     if (!it.prompt && (it.modo === "analise" || it.modo === "lupa" || it.modo === "ia")) throw Object.assign(new Error("este processo está sem prompt definido: a esteira não usa o prompt que estiver ativo no Studio (poderia ser de outra matéria). Defina o prompt da serventia no painel e envie de novo."), { semRetry: true });
     const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig");
     const comTexto = it.modo === "turbo" || ((it.modo === "analise" || (it.modo === "lupa" && it.minutaAssessor)) && esteiraConfig.entrada === "txt");      // Turbo: sempre texto; esteira principal: conforme a escolha do usuário (txt ou PDF)
-    const texto = comTexto ? await textoDoPdf(bytes, { simples: true }) : "";
+    let texto = comTexto ? await textoDoPdf(bytes, { simples: true }) : "";
+    if (texto) texto = (await quadroDoProcesso(texto)) + texto;      // movimentações da tela do processo (incluem as sem arquivo)
     if (comTexto && texto.replace(/\[Página \d+(?: de \d+)?[^\]]*\]|\s/g, "").length < 200) throw new Error("não consegui extrair texto do PDF (o OCR pode não ter funcionado)");
     const comAta = it.modo === "mesa" ? !!(await chrome.storage.local.get("pauta_mesa_ata")).pauta_mesa_ata : false;
     const r = await analisarNoStudio(bytes, { retomar: !!it.cotaVezes, comAta, nome: it.pdfNome, prompt: it.prompt, modo: it.modo, tipo: "", processo: it.processo, minuta: it.minutaAssessor, motivoMinuta: it.motivoMinuta, dicas: it.serventia || "", audData: it.audData || "", audHora: it.audHora || "", texto, ate1: it.modo === "analise" });

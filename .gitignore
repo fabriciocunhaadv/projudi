@@ -4,3 +4,4 @@ debug/
 __pycache__/
 *.pyc
 publicacao/ultima-versao.txt
+tests/fixtures_movimentacoes.html

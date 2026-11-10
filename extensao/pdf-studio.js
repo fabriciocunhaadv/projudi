@@ -2,6 +2,7 @@
 // do Projudi por cima) e devolve ao Studio o TEXTO. O PDF chega em partes (mensagens do script do Studio), nada é enviado à internet e nada é gravado.
 import { fazerOcr, descreverErro } from "./ocr-motor.js";
 import { textoDoPdf } from "./pdf-texto.js";
+import { quadroDoProcesso } from "./movimentacoes-quadro.js";
 import { instalarSaude, reportarSaude } from "./saude-fila.js";
 instalarSaude("pdf-studio");
 
@@ -52,7 +53,8 @@ async function processar() {
         await paraOStudio({ acao: "pdf-studio-pdf-parte", n, dados: btoa(b) });
       }
     }
-    await paraOStudio({ acao: "pdf-studio-resultado", ok: true, pdfPartes, vazias: res.vazias || [], texto, paginas: res.total, ocr: res.ocr, paginasOcr: res.paginasOcr || [], puladas: (res.puladas || []).map((x) => (typeof x === "object" ? x.pagina : x)), segundos: Math.round((Date.now() - t0) / 1000) });
+    const quadro = await quadroDoProcesso(texto);      // movimentações lidas da tela do processo (se ela foi aberta neste navegador)
+    await paraOStudio({ acao: "pdf-studio-resultado", ok: true, quadro, pdfPartes, vazias: res.vazias || [], texto, paginas: res.total, ocr: res.ocr, paginasOcr: res.paginasOcr || [], puladas: (res.puladas || []).map((x) => (typeof x === "object" ? x.pagina : x)), segundos: Math.round((Date.now() - t0) / 1000) });
     void reportarSaude("pdf-studio", "info", "PDF tratado para o Studio", { paginas: res.total, ocr: res.ocr, ms: Date.now() - t0 }, true);
     status("Pronto."); setTimeout(() => window.close(), 1500);
   } catch (e) {
