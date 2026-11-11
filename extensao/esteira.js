@@ -109,7 +109,7 @@ async function analisarComVideo(it, valida) {
     if (r.transcricao && !degravacaoPronta) await chrome.storage.local.set({ ["degr_" + chave]: { assin, texto: r.transcricao, em: Date.now() } });      // a degravação (parte cara) fica guardada: 'Tentar de novo' refaz só o motor principal
     await atualizar(it.id, { estado: "erro", erro: r.erro, tentativas: r.semRetry ? 9 : undefined, aviso: "A esteira seguiu para o próximo processo." }); return;
   }
-  await atualizar(it.id, { estado: "concluido", erro: "", minuta: r.minuta, minutaHtml: "", tipo: tipoDaMinuta(r.minuta), cadastroPendente: false, aviso: `Sentença feita com o vídeo da audiência (${videos.length} mídia(s)) e salva no Histórico do Studio.` + (r.aviso ? " ⚠ " + r.aviso : "") });
+  await atualizar(it.id, { estado: "concluido", erro: "", minuta: r.minuta, minutaHtml: "", tipo: tipoDaMinuta(r.minuta), cadastroPendente: false, aviso: `Sentença feita com o vídeo da audiência (${m.meta.length} mídia(s)) e salva no Histórico do Studio.` + (r.aviso ? " ⚠ " + r.aviso : "") });
   if (r.transcricao) await chrome.storage.local.set({ ["degr_" + chave]: { assin, texto: r.transcricao, em: Date.now() } });      // a degravação fica guardada: refazer a sentença não degrava de novo
   void desenharGuardados();
 }
