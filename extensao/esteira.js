@@ -95,7 +95,7 @@ async function analisarComVideo(it, valida) {
   const videos = [];
   for (let i = 0; i < m.meta.length; i++) { const b = await lerMidia(chave, i); if (!b) throw Object.assign(new Error(`o vídeo ${i + 1} (${m.meta[i].nome}) não está mais guardado: envie o processo de novo`), { semRetry: true }); videos.push({ nome: m.meta[i].nome, tipo: m.meta[i].tipo, bytes: b }); }
   const t0 = Date.now();
-  const r = await sentencaComVideoNoStudio({ pdf: { nome: it.pdfNome || `${chave || "autos"}.pdf`, tipo: "application/pdf", bytes }, videos }, { processo: it.processo, promptTitulo: prompt.titulo || it.prompt || "", promptTexto: prompt.texto, andamento, aindaValido: valida });
+  const r = await sentencaComVideoNoStudio({ pdf: { nome: it.pdfNome || `${chave || "autos"}.pdf`, tipo: "application/pdf", bytes }, videos }, { processo: it.processo, serventia: it.serventia || "", promptTitulo: prompt.titulo || it.prompt || "", promptTexto: prompt.texto, andamento, aindaValido: valida });
   if (!(await valida()) || r.cancelado) return;
   reportarSaude("esteira", r.ok ? "info" : "erro", r.ok ? "Sentença com vídeo concluída" : "Sentença com vídeo: " + r.erro, { modo: "video", videos: videos.length, ms: Date.now() - t0 }, true);
   if (!r.ok) { await atualizar(it.id, { estado: "erro", erro: r.erro, tentativas: r.semRetry ? 9 : undefined, aviso: "A esteira seguiu para o próximo processo." }); return; }
