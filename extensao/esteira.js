@@ -319,7 +319,11 @@ async function processarComandos() {
 setInterval(processarComandos, 4000); try { chrome.storage.onChanged.addListener((c, a) => { if (a === "local" && c.filaComandos) void processarComandos(); }); } catch (e) { /* sem ouvinte */ }
 
 
+let redesenharDepois = false;
 async function desenhar() {
+  // enquanto a pessoa escolhe numa lista (prompt), não redesenha a tabela: refazer o HTML fechava a lista sozinha; redesenha assim que ela sair do campo
+  const ativo = document.activeElement;
+  if (ativo && ativo.tagName === "SELECT" && ativo.closest && ativo.closest("#linhas")) { redesenharDepois = true; return; }
   void publicarResumo();
   const lista = await todos();
   $("linhas").innerHTML = lista.length ? lista.map((it, n) => {
@@ -459,3 +463,5 @@ setInterval(conferirAcordado, 60000);
 // Pauta de audiências: abre a pauta (modelo do gabinete) com as audiências concluídas que o usuário marcou
 $("pautaTodos").onclick = async () => { for (const x of (await todos()).filter((i) => i.modo === "mesa" && i.estado === "concluido")) await atualizar(x.id, { pautaSel: true }); desenhar(); };
 $("pautaGerar").onclick = async () => { const ids = (await todos()).filter((i) => i.modo === "mesa" && i.estado === "concluido" && i.pautaSel).map((i) => i.id); if (ids.length) chrome.tabs.create({ url: chrome.runtime.getURL("pauta-doc.html?ids=" + ids.join(",")) }); };
+
+document.addEventListener("focusout", (ev) => { if (redesenharDepois && ev.target && ev.target.tagName === "SELECT") setTimeout(() => { if (document.activeElement?.tagName !== "SELECT") { redesenharDepois = false; void desenhar(); } }, 700); });

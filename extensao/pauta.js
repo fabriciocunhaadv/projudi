@@ -147,10 +147,14 @@ chrome.storage.local.get("pauta_video_prompt").then((o) => { if (o.pauta_video_p
 $("video").onclick = async () => {
   const marcados = pauta.filter((l) => l.marcado && l.url);
   if (!marcados.length) { $("msg").textContent = "Marque ao menos um processo (com link na lista)."; return; }
-  const prompt = $("promptVideo").value.trim(); await chrome.storage.local.set({ pauta_video_prompt: prompt });
+  const manual = $("promptVideo").value.trim(); await chrome.storage.local.set({ pauta_video_prompt: manual });
+  // prompt de cada processo: o campo (se preenchido) vale para todos; senão, o prompt da SERVENTIA (cadastrado no Painel) ou a sugestão pelo nome da serventia
+  const { automacao = {} } = await chrome.storage.sync.get("automacao");
+  const promptDe = (serv) => manual || automacao[serv]?.prompt || (globalThis.Sugestoes ? Sugestoes.prompt(serv) : "") || "";
   const id = "pautavideo" + Date.now();
-  const itens = marcados.map((l) => ({ processo: l.processo, url: l.url, classificador: "pauta", serventia: l.serventiaNome || "", serventiaUrl: l.serventiaUrl || "", situacao: "", audData: l.data || "", audHora: l.hora || "", audPromovente: l.promovente || "", audPromovido: l.promovido || "", audTipo: $("tipo").value ? ($("tipo").selectedOptions[0]?.textContent || "") : "", prompt }));
-  await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/Sentenças com vídeo", opcoes: { studio: { ativo: true, modo: "video", docs: false, prompt } } } });
+  const itens = marcados.map((l) => ({ processo: l.processo, url: l.url, classificador: "pauta", serventia: l.serventiaNome || "", serventiaUrl: l.serventiaUrl || "", situacao: "", audData: l.data || "", audHora: l.hora || "", audPromovente: l.promovente || "", audPromovido: l.promovido || "", audTipo: $("tipo").value ? ($("tipo").selectedOptions[0]?.textContent || "") : "", prompt: promptDe(l.serventiaNome || "") }));
+  const usados = [...new Set(itens.map((i) => i.prompt || "(sem prompt: a esteira vai pedir a escolha)"))];
+  await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/Sentenças com vídeo", opcoes: { studio: { ativo: true, modo: "video", docs: false } } } });
   chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + id), active: false });
-  $("msg").textContent = `${marcados.length} processo(s): baixando o PDF e os vídeos da audiência de cada um. A esteira entrega ao Studio, que degrava e redige a sentença (mantenha a aba do Assessor aberta e logada; acompanhe na esteira).`;
+  $("msg").textContent = `${marcados.length} processo(s): baixando o PDF e os vídeos da audiência de cada um. Prompt(s) usado(s): ${usados.join(" | ")}. A esteira entrega ao Studio, que degrava e redige a sentença (mantenha a aba do Assessor aberta e logada; acompanhe na esteira).`;
 };
