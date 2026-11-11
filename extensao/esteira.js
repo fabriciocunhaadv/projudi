@@ -98,13 +98,17 @@ async function analisarComVideo(it, valida) {
   const assin = m.meta.map((x) => x.nome + ":" + x.tamanho).join("|"), cache = (await chrome.storage.local.get("degr_" + chave))["degr_" + chave];
   const degravacaoPronta = cache?.assin === assin && cache.texto ? cache.texto : "";
   if (degravacaoPronta) await atualizar(it.id, { aviso: "Sentença com vídeo: reaproveitando a degravação já feita (os vídeos não serão enviados de novo)." });
+  const quadro = await quadroDoProcesso(await textoDoPdf(bytes, { simples: true }).catch(() => it.processo));      // o número completo (CNJ) vem do texto do PDF: o da fila pode estar abreviado      // movimentações lidas da tela do processo (todas, inclusive as sem arquivo): sem isto o relatório parava na última movimentação com arquivo
   const videos = [];
   for (let i = 0; i < (degravacaoPronta ? 0 : m.meta.length); i++) { const b = await lerMidia(chave, i); if (!b) throw Object.assign(new Error(`o vídeo ${i + 1} (${m.meta[i].nome}) não está mais guardado: envie o processo de novo`), { semRetry: true }); videos.push({ nome: m.meta[i].nome, tipo: m.meta[i].tipo, bytes: b }); }
   const t0 = Date.now();
-  const r = await sentencaComVideoNoStudio({ pdf: { nome: it.pdfNome || `${chave || "autos"}.pdf`, tipo: "application/pdf", bytes }, videos }, { processo: it.processo, serventia: it.serventia || "", promptTitulo: prompt.titulo || it.prompt || "", promptTexto: prompt.texto, degravacaoPronta, andamento, aindaValido: valida });
+  const r = await sentencaComVideoNoStudio({ pdf: { nome: it.pdfNome || `${chave || "autos"}.pdf`, tipo: "application/pdf", bytes }, videos }, { processo: it.processo, serventia: it.serventia || "", promptTitulo: prompt.titulo || it.prompt || "", promptTexto: prompt.texto, degravacaoPronta, quadro, andamento, aindaValido: valida });
   if (!(await valida()) || r.cancelado) return;
   reportarSaude("esteira", r.ok ? "info" : "erro", r.ok ? "Sentença com vídeo concluída" : "Sentença com vídeo: " + r.erro, { modo: "video", videos: videos.length, ms: Date.now() - t0 }, true);
-  if (!r.ok) { await atualizar(it.id, { estado: "erro", erro: r.erro, tentativas: r.semRetry ? 9 : undefined, aviso: "A esteira seguiu para o próximo processo." }); return; }
+  if (!r.ok) {
+    if (r.transcricao && !degravacaoPronta) await chrome.storage.local.set({ ["degr_" + chave]: { assin, texto: r.transcricao, em: Date.now() } });      // a degravação (parte cara) fica guardada: 'Tentar de novo' refaz só o motor principal
+    await atualizar(it.id, { estado: "erro", erro: r.erro, tentativas: r.semRetry ? 9 : undefined, aviso: "A esteira seguiu para o próximo processo." }); return;
+  }
   await atualizar(it.id, { estado: "concluido", erro: "", minuta: r.minuta, minutaHtml: "", tipo: tipoDaMinuta(r.minuta), cadastroPendente: false, aviso: `Sentença feita com o vídeo da audiência (${videos.length} mídia(s)) e salva no Histórico do Studio.` + (r.aviso ? " ⚠ " + r.aviso : "") });
   if (r.transcricao) await chrome.storage.local.set({ ["degr_" + chave]: { assin, texto: r.transcricao, em: Date.now() } });      // a degravação fica guardada: refazer a sentença não degrava de novo
   void desenharGuardados();

@@ -872,7 +872,7 @@
     if (m.acao === "studio-sv-iniciar") {
       document.documentElement.dataset.assessorAuto = "1";      // o PDF já veio com OCR da extensão: o app não trata de novo
       try { chrome.storage.local.remove("studio_sv_" + m.reqId); } catch (e) { /* ignora */ }
-      window.postMessage({ __projudi: "sv", fase: "iniciar", reqId: m.reqId, processo: m.processo, serventia: m.serventia, pdfIdx: m.pdfIdx, videosIdx: m.videosIdx, promptTitulo: m.promptTitulo, promptTexto: m.promptTexto, promptCategoria: m.promptCategoria, degravacaoPronta: m.degravacaoPronta }, window.location.origin);
+      window.postMessage({ __projudi: "sv", fase: "iniciar", reqId: m.reqId, processo: m.processo, serventia: m.serventia, pdfIdx: m.pdfIdx, videosIdx: m.videosIdx, promptTitulo: m.promptTitulo, promptTexto: m.promptTexto, promptCategoria: m.promptCategoria, degravacaoPronta: m.degravacaoPronta, quadro: m.quadro }, window.location.origin);
       responder({ ok: true }); return;
     }
     if (m.acao === "studio-sv-cancelar") { window.postMessage({ __projudi: "sv", fase: "cancelar", reqId: m.reqId }, window.location.origin); delete document.documentElement.dataset.assessorAuto; responder({ ok: true }); return; }

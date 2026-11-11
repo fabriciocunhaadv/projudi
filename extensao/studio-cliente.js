@@ -135,13 +135,13 @@ export async function sentencaComVideoNoStudio(arquivos, opcoes = {}) {
     // a mídia já foi toda para o app: libera a memória desta cópia
     a.bytes = null;
   }
-  await chrome.tabs.sendMessage(aba.id, { acao: "studio-sv-iniciar", reqId, processo: opcoes.processo || "", serventia: opcoes.serventia || "", pdfIdx: 0, videosIdx: arquivos.videos.map((_, k) => k + 1), promptTitulo: opcoes.promptTitulo || "", promptTexto: opcoes.promptTexto || "", promptCategoria: opcoes.promptCategoria || "", degravacaoPronta: opcoes.degravacaoPronta || "" });
+  await chrome.tabs.sendMessage(aba.id, { acao: "studio-sv-iniciar", reqId, processo: opcoes.processo || "", serventia: opcoes.serventia || "", pdfIdx: 0, videosIdx: arquivos.videos.map((_, k) => k + 1), promptTitulo: opcoes.promptTitulo || "", promptTexto: opcoes.promptTexto || "", promptCategoria: opcoes.promptCategoria || "", degravacaoPronta: opcoes.degravacaoPronta || "", quadro: opcoes.quadro || "" });
   const chave = "studio_sv_" + reqId, t0 = Date.now(); let ultimo = "", ultimoSinal = Date.now();
   for (;;) {
     await dorme(3000);
     if (opcoes.aindaValido && !(await opcoes.aindaValido())) { await chrome.tabs.sendMessage(aba.id, { acao: "studio-sv-cancelar", reqId }).catch(() => {}); return { ok: false, cancelado: true }; }
     const r = (await chrome.storage.local.get(chave))[chave];
-    if (r?.tipo === "resultado") { await chrome.storage.local.remove(chave); return r.ok ? { ok: true, minuta: r.minuta, transcricao: r.transcricao, processo: r.processo, historicoId: r.historicoId, aviso: r.aviso } : { ok: false, erro: r.erro || "o Studio não conseguiu gerar a sentença", semRetry: !!r.semRetry }; }
+    if (r?.tipo === "resultado") { await chrome.storage.local.remove(chave); return r.ok ? { ok: true, minuta: r.minuta, transcricao: r.transcricao, processo: r.processo, historicoId: r.historicoId, aviso: r.aviso } : { ok: false, erro: r.erro || "o Studio não conseguiu gerar a sentença", semRetry: !!r.semRetry, transcricao: r.transcricao || "" }; }
     if (r?.tipo === "andamento" && r.texto !== ultimo) { ultimo = r.texto; ultimoSinal = Date.now(); andamento(r.texto); }
     if (Date.now() - t0 > 90 * 60000) throw new Error("o Studio demorou mais de 90 minutos para devolver a sentença");
     if (Date.now() - ultimoSinal > 20 * 60000 && !r) throw new Error("o Studio não respondeu depois de receber os arquivos (a aba foi fechada ou recarregada?)");

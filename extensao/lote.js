@@ -207,6 +207,8 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
     if (opcoes.studio?.ativo && opcoes.studio.modo === "video") {      // sentença com o vídeo da audiência: baixa os vídeos/áudios ANTES do PDF (se não houver, o processo é pulado com o motivo)
       const meta = await coletarMidiasDoProcesso(tab.id, item.processo, passo);
       passo(`${meta.length} vídeo(s)/áudio(s) baixado(s) (${Math.round(meta.reduce((n, m) => n + m.tamanho, 0) / 1048576)} MB)`);
+      // a tela do processo guarda a tabela de movimentações (mov-diag.js); espera um pouco para o quadro estar pronto antes do PDF
+      for (let k = 0; k < 12; k++) { const g = await chrome.storage.local.get(null); if (Object.keys(g).some((x) => x.startsWith("movs:") && Date.now() - (g[x]?.em || 0) < 120000)) break; await dorme(1000); }
     }
     passo("procurando o botão Gerar PDF");
     await chrome.storage.local.remove(["lote_fim_" + chave, "lote_prog_" + chave, "gerarpdf_pedido"]);
