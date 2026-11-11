@@ -770,8 +770,6 @@
   }
 
   // avisa o app de que é a esteira (e não uma pessoa) que está operando: ele não abre a pergunta de OCR e escolhe o OCR sozinho
-  // Se a pessoa está usando o chat da minuta (ou adaptando a um paradigma) nesta aba, o app sinaliza `data-assessor-ocupado`: a esteira ESPERA (até 15 min) em vez de trocar o processo na tela e atropelar o que ela está fazendo
-  const aguardarLivre = async () => { const t0 = Date.now(); while (document.documentElement.dataset.assessorOcupado === "1" && Date.now() - t0 < 15 * 60_000) await new Promise((r) => setTimeout(r, 2000)); };
   const automatico = (p) => { document.documentElement.dataset.assessorAuto = "1"; return p.finally(() => { delete document.documentElement.dataset.assessorAuto; }); };
   // Quando o app roda dentro de uma moldura (página do AI Studio com o app num iframe *.run.app), a extensão entra nas duas páginas: a de fora
   // (sem o app) fica calada e só a moldura que tem o app responde, para as mensagens não irem para o quadro errado.
@@ -988,10 +986,10 @@
     if (m?.acao === "studio-analisar") { window.__dicasPrompt = m.dicas || ""; window.__promptAproximado = ""; }
     if (m?.acao === "studio-analisar" && m.reqId) {      // análise longa (qualquer modo): responde já e entrega o resultado pelo storage (o canal de mensagem pode cair no meio e a análise não se perde)
       const k = "studio_res_" + m.reqId;
-      aguardarLivre().then(() => automatico(m.modo === "mesa" ? mesa(m) : m.modo === "mesa-ler" ? mesaLer(m) : m.modo === "lupa" ? lupa(m) : m.modo === "turbo" ? turbo(m) : analisar(m))).catch((e) => ({ ok: false, erro: String(e.message || e), opcoes: e.opcoes, semRetry: !!e.semRetry, grande: !!e.grande })).then((r) => chrome.storage.local.set({ [k]: r }));
+      automatico(m.modo === "mesa" ? mesa(m) : m.modo === "mesa-ler" ? mesaLer(m) : m.modo === "lupa" ? lupa(m) : m.modo === "turbo" ? turbo(m) : analisar(m)).catch((e) => ({ ok: false, erro: String(e.message || e), opcoes: e.opcoes, semRetry: !!e.semRetry, grande: !!e.grande })).then((r) => chrome.storage.local.set({ [k]: r }));
       responder({ ok: true, assincrono: true }); return false;
     }
-    if (m?.acao === "studio-analisar") { aguardarLivre().then(() => automatico(m.modo === "lupa" ? lupa(m) : m.modo === "turbo" ? turbo(m) : analisar(m))).then(responder, (e) => responder({ ok: false, erro: String(e.message || e), opcoes: e.opcoes })); return true; }
+    if (m?.acao === "studio-analisar") { automatico(m.modo === "lupa" ? lupa(m) : m.modo === "turbo" ? turbo(m) : analisar(m)).then(responder, (e) => responder({ ok: false, erro: String(e.message || e), opcoes: e.opcoes })); return true; }
     return false;
   });
 
