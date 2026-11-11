@@ -3,7 +3,7 @@
 (() => {
   if (window.__projudiStudioBase) return;
   window.__projudiStudioBase = true;
-  try { document.documentElement.dataset.assessorExtensao = chrome.runtime.getManifest().version; document.documentElement.dataset.assessorExtensaoRecursos = "pdf"; } catch (e) { /* sem manifest */ }      // o app mostra a tarja “instale a extensão” só quando este aviso não existe
+  try { document.documentElement.dataset.assessorExtensao = chrome.runtime.getManifest().version; document.documentElement.dataset.assessorExtensaoRecursos = "pdf,sv"; } catch (e) { /* sem manifest */ }      // o app mostra a tarja “instale a extensão” só quando este aviso não existe
   const dorme = (ms) => new Promise((ok) => setTimeout(ok, ms));
   const visivel = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
   const texto = (e) => (e.textContent || "").replace(/\s+/g, " ").trim();
@@ -851,6 +851,33 @@
     } catch (e) { resp({ tipo: "erro", erro: String(e.message || e) }); }
   });
 
+  // ----- Sentença com o vídeo da audiência (esteira da extensão → app): PDF e vídeos em partes; o app roda a fila e devolve andamento/resultado pelo storage "studio_sv_<id>" -----
+  const svPartes = new Map();      // "reqId:idx:n" -> função que confirma a parte
+  if (window.top === window) window.addEventListener("message", (ev) => {
+    const d = ev.data;
+    if (ev.source !== window || ev.origin !== window.location.origin || !d || d.__projudiResp !== "sv" || typeof d.reqId !== "string") return;
+    if (d.tipo === "parte-ok") { const f = svPartes.get(`${d.reqId}:${d.idx}:${d.n}`); if (f) f(); return; }
+    const { __projudiResp, ...resto } = d;
+    try { chrome.storage.local.set({ ["studio_sv_" + d.reqId]: { ...resto, em: Date.now() } }); } catch (e) { /* extensão recarregada */ }
+    if (d.tipo === "resultado") delete document.documentElement.dataset.assessorAuto;
+  });
+  async function svMensagem(m, responder) {
+    if (m.acao === "studio-sv-ping") { responder({ ok: !!document.documentElement.dataset.assessorSentencaVideo }); return; }
+    if (m.acao === "studio-sv-parte") {
+      const chave = `${m.reqId}:${m.idx}:${m.n}`;
+      const ok = new Promise((res) => { svPartes.set(chave, res); setTimeout(() => res(false), 60000); });
+      window.postMessage({ __projudi: "sv", fase: "parte", reqId: m.reqId, idx: m.idx, n: m.n, dados: m.dados, nome: m.nome, tipo: m.tipo }, window.location.origin);
+      const r = await ok; svPartes.delete(chave); responder({ ok: r !== false }); return;
+    }
+    if (m.acao === "studio-sv-iniciar") {
+      document.documentElement.dataset.assessorAuto = "1";      // o PDF já veio com OCR da extensão: o app não trata de novo
+      try { chrome.storage.local.remove("studio_sv_" + m.reqId); } catch (e) { /* ignora */ }
+      window.postMessage({ __projudi: "sv", fase: "iniciar", reqId: m.reqId, processo: m.processo, pdfIdx: m.pdfIdx, videosIdx: m.videosIdx, promptTitulo: m.promptTitulo, promptTexto: m.promptTexto, promptCategoria: m.promptCategoria }, window.location.origin);
+      responder({ ok: true }); return;
+    }
+    if (m.acao === "studio-sv-cancelar") { window.postMessage({ __projudi: "sv", fase: "cancelar", reqId: m.reqId }, window.location.origin); delete document.documentElement.dataset.assessorAuto; responder({ ok: true }); return; }
+  }
+
   // ----- Comandos do celular: o app entrega (atributo + evento) e a extensão devolve o resultado do mesmo jeito -----
   window.addEventListener("projudi:fila-comandos", async () => {
     try {
@@ -944,6 +971,7 @@
         .then((r) => responder(r || { ok: false, erro: "o app do Studio não respondeu ao pedido do prompt (atualize a aba do Studio)" }));
       return true;
     }
+    if (typeof m?.acao === "string" && m.acao.startsWith("studio-sv-") && window.top === window) { void svMensagem(m, responder); return true; }
     if (m?.acao === "studio-cadastrar-minuta") {      // minuta pronta vinda do Agaia: o app a grava no Histórico (organizada por serventia e prompt) e confirma pelo atributo da página
       const id = "ag" + Date.now() + Math.random().toString(36).slice(2, 5);
       try { delete document.documentElement.dataset.agaiaCadastro; window.dispatchEvent(new CustomEvent("assessor:cadastrar-minuta", { detail: JSON.stringify({ ...m.dados, reqId: id }) })); } catch (e) { responder({ ok: false, erro: String(e.message || e) }); return false; }

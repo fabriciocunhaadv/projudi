@@ -89,8 +89,8 @@ function desenhar() {
         (crim ? celulaEd(celAutor(l)) + celulaEd(celPessoas(l))
               : celulaEd(`<span class="nome">${esc(nomeAutor(l))}</span>`) + celulaEd(`<span class="nome">${esc(nomeReu(l))}</span>`) + celulaEd(avisosCiveis(l))) + `</tr>`).join("") + `</tbody></table></div>`;
   }).join("");
-  document.querySelectorAll(".sel").forEach((c) => (c.onchange = () => { const k = c.closest("tr").dataset.k; pauta.find((l) => chave(l.processo) === k).marcado = c.checked; $("analisar").disabled = $("mesa").disabled = !pauta.some((l) => l.marcado); }));
-  $("analisar").disabled = $("mesa").disabled = !pauta.some((l) => l.marcado);
+  document.querySelectorAll(".sel").forEach((c) => (c.onchange = () => { const k = c.closest("tr").dataset.k; pauta.find((l) => chave(l.processo) === k).marcado = c.checked; $("analisar").disabled = $("mesa").disabled = $("video").disabled = !pauta.some((l) => l.marcado); }));
+  $("analisar").disabled = $("mesa").disabled = $("video").disabled = !pauta.some((l) => l.marcado);
 }
 
 $("gerar").onclick = async () => {
@@ -140,4 +140,17 @@ $("mesa").onclick = async () => {
   await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/Pauta", opcoes: { studio: { ativo: true, modo: "mesa", docs: false } } } });
   chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + id), active: false });
   $("msg").textContent = `${marcados.length} processo(s) em download/OCR. Cada um entra na esteira e vira uma audiência NOVA na Mesa de Audiência do Studio (mantenha a aba do Assessor aberta e logada).`;
+};
+
+// Sentença com o vídeo da audiência: baixa o PDF E os vídeos/áudios de cada processo marcado e a esteira entrega ao Studio, que degrava e redige a sentença (salva no Histórico).
+chrome.storage.local.get("pauta_video_prompt").then((o) => { if (o.pauta_video_prompt) $("promptVideo").value = o.pauta_video_prompt; });
+$("video").onclick = async () => {
+  const marcados = pauta.filter((l) => l.marcado && l.url);
+  if (!marcados.length) { $("msg").textContent = "Marque ao menos um processo (com link na lista)."; return; }
+  const prompt = $("promptVideo").value.trim(); await chrome.storage.local.set({ pauta_video_prompt: prompt });
+  const id = "pautavideo" + Date.now();
+  const itens = marcados.map((l) => ({ processo: l.processo, url: l.url, classificador: "pauta", serventia: l.serventiaNome || "", serventiaUrl: l.serventiaUrl || "", situacao: "", audData: l.data || "", audHora: l.hora || "", audPromovente: l.promovente || "", audPromovido: l.promovido || "", audTipo: $("tipo").value ? ($("tipo").selectedOptions[0]?.textContent || "") : "", prompt }));
+  await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/Sentenças com vídeo", opcoes: { studio: { ativo: true, modo: "video", docs: false, prompt } } } });
+  chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + id), active: false });
+  $("msg").textContent = `${marcados.length} processo(s): baixando o PDF e os vídeos da audiência de cada um. A esteira entrega ao Studio, que degrava e redige a sentença (mantenha a aba do Assessor aberta e logada; acompanhe na esteira).`;
 };

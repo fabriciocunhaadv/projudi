@@ -4,6 +4,7 @@ instalarSaude("lote");
 import { montarPdf, nomePadrao, semBarra, acharServentia } from "./modelos-pdf.js";
 import { enviarBase } from "./studio-cliente.js";
 import { manterAcordado } from "./acordado.js";
+import { coletarMidiasDoProcesso } from "./midias-projudi.js";
 import { abrirAbaProjudi, soltarAbaProjudi, pegarTravaDaAba } from "./projudi-aba.js";
 // Fila: para cada processo selecionado, abre o processo, pede o PDF completo ao Projudi e deixa a página de OCR salvar PDF + texto.
 const BASE = "https://projudi.tjgo.jus.br/";
@@ -202,6 +203,10 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
       if (!nova) throw new Error("o link do processo expirou e não achei o processo na lista da serventia (clique em “Verificar agora” no painel e tente de novo)");
       urlAtual = nova; await irPara(tab.id, nova); await dorme(1500);
       if (await paginaInvalida(tab.id)) throw new Error("o Projudi recusou o link do processo (“Código inválido”)");
+    }
+    if (opcoes.studio?.ativo && opcoes.studio.modo === "video") {      // sentença com o vídeo da audiência: baixa os vídeos/áudios ANTES do PDF (se não houver, o processo é pulado com o motivo)
+      const meta = await coletarMidiasDoProcesso(tab.id, item.processo, passo);
+      passo(`${meta.length} vídeo(s)/áudio(s) baixado(s) (${Math.round(meta.reduce((n, m) => n + m.tamanho, 0) / 1048576)} MB)`);
     }
     passo("procurando o botão Gerar PDF");
     await chrome.storage.local.remove(["lote_fim_" + chave, "lote_prog_" + chave, "gerarpdf_pedido"]);

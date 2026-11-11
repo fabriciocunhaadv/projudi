@@ -13,7 +13,7 @@ with sync_playwright() as p:
         storage: { onChanged: { addListener() {} }, local: { get: async () => ({}), set: async () => {}, remove: async () => {} } } }; }""")
     pg.add_script_tag(path=str(RAIZ / "studio-base.js"))
     pg.wait_for_function("document.documentElement.dataset.assessorExtensaoRecursos", timeout=15000)
-    assert pg.evaluate("document.documentElement.dataset.assessorExtensaoRecursos") == "pdf" and pg.evaluate("document.documentElement.dataset.assessorExtensao") == "1.0.99"
+    assert pg.evaluate("document.documentElement.dataset.assessorExtensaoRecursos") == "pdf,sv" and pg.evaluate("document.documentElement.dataset.assessorExtensao") == "1.0.99"
     post = lambda o: pg.evaluate("(o) => window.postMessage({ __projudi: 'pdf-tratar', id: 'abc', ...o }, window.location.origin)", o)
     tipos = lambda: [r.get("tipo") for r in pg.evaluate("window.__resp")]
     post({"fase": "inicio"}); pg.wait_for_function("window.__resp.some(r => r.tipo === 'pronto')", timeout=15000)

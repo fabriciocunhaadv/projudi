@@ -114,3 +114,36 @@ export async function lerPromptDoStudio(nome) {
   if (!r?.ok || !r.texto) throw Object.assign(new Error(r?.erro || "o Studio não entregou o texto do prompt"), { opcoes: r?.opcoes });
   return r;
 }
+
+// ----- Sentença com o vídeo da audiência: entrega o PDF e os vídeos ao app (em partes) e espera a sentença (o app trabalha em segundo plano; o andamento vem pelo storage) -----
+// arquivos: { pdf: { nome, tipo, bytes }, videos: [{ nome, tipo, bytes }] }; opcoes: { processo, promptTitulo, promptTexto, promptCategoria, andamento(t), aindaValido() }
+export async function sentencaComVideoNoStudio(arquivos, opcoes = {}) {
+  const aba = await acharStudio();
+  const ping = await chrome.tabs.sendMessage(aba.id, { acao: "studio-sv-ping" }).catch(() => null);
+  if (!ping?.ok) throw Object.assign(new Error("a aba do Studio ainda não tem a versão que lê o vídeo da audiência: atualize a página do Studio (F5) e tente de novo"), { semRetry: true });
+  const reqId = "sv" + Date.now() + Math.random().toString(36).slice(2, 6), TAM = 1_500_000, andamento = opcoes.andamento || (() => {});
+  const lista = [{ ...arquivos.pdf }, ...arquivos.videos];
+  for (let idx = 0; idx < lista.length; idx++) {
+    const a = lista[idx], n = Math.max(1, Math.ceil(a.bytes.length / TAM));
+    for (let i = 0; i < n; i++) {
+      if (opcoes.aindaValido && !(await opcoes.aindaValido())) { await chrome.tabs.sendMessage(aba.id, { acao: "studio-sv-cancelar", reqId }).catch(() => {}); return { ok: false, cancelado: true }; }
+      let ok = false;
+      for (let t = 0; t < 3 && !ok; t++) { const r = await chrome.tabs.sendMessage(aba.id, { acao: "studio-sv-parte", reqId, idx, n: i, dados: b64De(a.bytes.subarray(i * TAM, (i + 1) * TAM)), nome: a.nome, tipo: a.tipo }).catch(() => null); ok = !!r?.ok; }
+      if (!ok) throw new Error(`o Studio não recebeu uma parte de "${a.nome}" (a aba pode ter sido recarregada)`);
+      if (i % 8 === 0 || i === n - 1) andamento(`enviando ${idx === 0 ? "o PDF" : "o vídeo " + idx + " de " + (lista.length - 1)}: ${Math.round(((i + 1) / n) * 100)}%`);
+    }
+    // a mídia já foi toda para o app: libera a memória desta cópia
+    a.bytes = null;
+  }
+  await chrome.tabs.sendMessage(aba.id, { acao: "studio-sv-iniciar", reqId, processo: opcoes.processo || "", pdfIdx: 0, videosIdx: arquivos.videos.map((_, k) => k + 1), promptTitulo: opcoes.promptTitulo || "", promptTexto: opcoes.promptTexto || "", promptCategoria: opcoes.promptCategoria || "" });
+  const chave = "studio_sv_" + reqId, t0 = Date.now(); let ultimo = "", ultimoSinal = Date.now();
+  for (;;) {
+    await dorme(3000);
+    if (opcoes.aindaValido && !(await opcoes.aindaValido())) { await chrome.tabs.sendMessage(aba.id, { acao: "studio-sv-cancelar", reqId }).catch(() => {}); return { ok: false, cancelado: true }; }
+    const r = (await chrome.storage.local.get(chave))[chave];
+    if (r?.tipo === "resultado") { await chrome.storage.local.remove(chave); return r.ok ? { ok: true, minuta: r.minuta, transcricao: r.transcricao, processo: r.processo, historicoId: r.historicoId, aviso: r.aviso } : { ok: false, erro: r.erro || "o Studio não conseguiu gerar a sentença", semRetry: !!r.semRetry }; }
+    if (r?.tipo === "andamento" && r.texto !== ultimo) { ultimo = r.texto; ultimoSinal = Date.now(); andamento(r.texto); }
+    if (Date.now() - t0 > 90 * 60000) throw new Error("o Studio demorou mais de 90 minutos para devolver a sentença");
+    if (Date.now() - ultimoSinal > 20 * 60000 && !r) throw new Error("o Studio não respondeu depois de receber os arquivos (a aba foi fechada ou recarregada?)");
+  }
+}

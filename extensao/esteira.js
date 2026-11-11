@@ -1,8 +1,10 @@
 import { todos, atualizar, lerPdf, remover, enfileirar, ROTULO, ATIVOS } from "./esteira-banco.js";
 import { instalarSaude, reportarSaude } from "./saude-fila.js";
 import { quadroDoProcesso } from "./movimentacoes-quadro.js";
+import { lerMidia, apagarMidias } from "./esteira-banco.js";
+import { chaveDoProcesso } from "./midias-projudi.js";
 instalarSaude("esteira");
-import { analisarNoStudio, lerMinutaAtual, consultarGigantes, cadastrarNoStudio, lerPromptDoStudio } from "./studio-cliente.js";
+import { analisarNoStudio, lerMinutaAtual, consultarGigantes, cadastrarNoStudio, lerPromptDoStudio, sentencaComVideoNoStudio } from "./studio-cliente.js";
 import { executarNaIa, SITES_IA } from "./ia-externa-cliente.js";
 import { executarNoAgaia, retomarExecucao } from "./agaia-cliente.js";
 import { criarDocumento, abrirLadoALado, lerDocumento, tipoDaMinuta, nomeDoc } from "./docs-api.js";
@@ -81,6 +83,26 @@ async function analisarNoAgaia(it, valida) {
   await atualizar(it.id, { cadastroPendente: !c.ok, aviso: c.ok ? "Minuta feita no Agaia e entregue ao Studio: ela é gravada no Histórico em segundo plano (veja o selo 🤖 Agaia no Studio)." + (r.aproximado ? " ⚠ " + r.aproximado : "") : "Minuta feita no Agaia e guardada aqui, mas ainda NÃO entregue ao Studio (" + c.erro + "). A esteira tenta de novo sozinha; enquanto isso use “Copiar minuta”." });
 }
 
+// Modo "video": sentença com o vídeo da audiência (qualquer processo que teve audiência de instrução). Os vídeos já foram baixados pela página do lote (IndexedDB); aqui o PDF e os vídeos vão
+// ao Studio, que lê os autos, degrava a audiência e redige a sentença (a mesma base do estúdio principal), salvando no Histórico.
+async function analisarComVideo(it, valida) {
+  const chave = chaveDoProcesso(it.processo), andamento = (t) => atualizar(it.id, { aviso: "Sentença com vídeo: " + t });
+  const bytes = await lerPdf(it.id);
+  if (!bytes) throw new Error("o PDF deste processo não está mais guardado");
+  const { ["midias_" + chave]: m } = await chrome.storage.local.get("midias_" + chave);
+  if (!m?.meta?.length) throw Object.assign(new Error("os vídeos deste processo não estão mais guardados: envie o processo de novo para a esteira"), { semRetry: true });
+  let prompt; try { prompt = await lerPromptDoStudio(it.prompt); } catch (e) { await atualizar(it.id, { estado: "erro", erro: "Prompt: " + e.message, promptOpcoes: e.opcoes?.length ? e.opcoes : undefined }); return; }
+  const videos = [];
+  for (let i = 0; i < m.meta.length; i++) { const b = await lerMidia(chave, i); if (!b) throw Object.assign(new Error(`o vídeo ${i + 1} (${m.meta[i].nome}) não está mais guardado: envie o processo de novo`), { semRetry: true }); videos.push({ nome: m.meta[i].nome, tipo: m.meta[i].tipo, bytes: b }); }
+  const t0 = Date.now();
+  const r = await sentencaComVideoNoStudio({ pdf: { nome: it.pdfNome || `${chave || "autos"}.pdf`, tipo: "application/pdf", bytes }, videos }, { processo: it.processo, promptTitulo: prompt.titulo || it.prompt || "", promptTexto: prompt.texto, andamento, aindaValido: valida });
+  if (!(await valida()) || r.cancelado) return;
+  reportarSaude("esteira", r.ok ? "info" : "erro", r.ok ? "Sentença com vídeo concluída" : "Sentença com vídeo: " + r.erro, { modo: "video", videos: videos.length, ms: Date.now() - t0 }, true);
+  if (!r.ok) { await atualizar(it.id, { estado: "erro", erro: r.erro, tentativas: r.semRetry ? 9 : undefined, aviso: "A esteira seguiu para o próximo processo." }); return; }
+  await atualizar(it.id, { estado: "concluido", erro: "", minuta: r.minuta, minutaHtml: "", tipo: tipoDaMinuta(r.minuta), cadastroPendente: false, aviso: `Sentença feita com o vídeo da audiência (${videos.length} mídia(s)) e salva no Histórico do Studio.` + (r.aviso ? " ⚠ " + r.aviso : "") });
+  void apagarMidias(chave);
+}
+
 // Modo IA externa (ChatGPT/Gemini/Claude): usa o PDF baixado (com OCR), anexa na IA, cola o prompt do Studio, espera a minuta e a lança no Histórico do Studio.
 async function analisarNaIaExterna(it, valida) {
   const nomeIa = SITES_IA[it.iaId]?.nome || "IA externa";
@@ -125,6 +147,7 @@ async function analisar(it) {
   try {
     if (it.modo === "agaia") return await analisarNoAgaia(it, valida);
     if (it.modo === "ia") return await analisarNaIaExterna(it, valida);
+    if (it.modo === "video") return await analisarComVideo(it, valida);
     const bytes = await lerPdf(it.id);
     if (!bytes) throw new Error("o PDF deste processo não está mais guardado");
     if (!it.prompt && (it.modo === "analise" || it.modo === "lupa" || it.modo === "ia")) throw Object.assign(new Error("este processo está sem prompt definido: a esteira não usa o prompt que estiver ativo no Studio (poderia ser de outra matéria). Defina o prompt da serventia no painel e envie de novo."), { semRetry: true });

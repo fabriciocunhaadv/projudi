@@ -14,6 +14,14 @@ export const guardarPdf = (id, bytes) => comBanco("readwrite", (s) => s.put(byte
 export const lerPdf = (id) => comBanco("readonly", (s) => s.get(id));
 export const apagarPdf = (id) => comBanco("readwrite", (s) => s.delete(id));
 
+// vídeos/áudios da audiência (modo "video"): ficam no mesmo banco do navegador, por processo (só dígitos) e número
+export const guardarMidia = (chave, i, bytes) => comBanco("readwrite", (s) => s.put(bytes, `midia:${chave}:${i}`));
+export const lerMidia = (chave, i) => comBanco("readonly", (s) => s.get(`midia:${chave}:${i}`));
+export async function apagarMidias(chave) {
+  const { ["midias_" + chave]: m } = await chrome.storage.local.get("midias_" + chave);
+  for (let i = 0; i < Math.max(12, (m?.meta || []).length); i++) await comBanco("readwrite", (s) => s.delete(`midia:${chave}:${i}`)).catch(() => {});
+  await chrome.storage.local.remove("midias_" + chave);
+}
 export async function enfileirar(item, bytes) {
   const id = "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
   await guardarPdf(id, bytes);
@@ -35,7 +43,7 @@ export function atualizar(id, mudancas) {
     const it = await ler(id); if (!it) return null;
     const contar = mudancas.estado === "concluido" && it.estado !== "concluido" && !it.usoContado;      // processo concluído na esteira: uma contagem por processo
     const novo = { ...it, ...mudancas, ...(contar ? { usoContado: true } : {}) }; await chrome.storage.local.set({ [K(id)]: novo });
-    if (contar) void contarUso("esteira_" + (["analise", "turbo", "lupa", "mesa", "ia", "agaia"].includes(it.modo) ? it.modo : "outro"));
+    if (contar) void contarUso("esteira_" + (["analise", "turbo", "lupa", "mesa", "ia", "agaia", "video"].includes(it.modo) ? it.modo : "outro"));
     if (mudancas.estado === "erro" && mudancas.erro) void reportarSaude(/^Agaia/i.test(mudancas.erro) ? "agaia" : "esteira", "erro", mudancas.erro, { modo: it.modo });      // painel Saúde do sistema
     return novo;
   });
