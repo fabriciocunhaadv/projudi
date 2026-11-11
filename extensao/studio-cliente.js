@@ -135,7 +135,7 @@ export async function sentencaComVideoNoStudio(arquivos, opcoes = {}) {
     // a mídia já foi toda para o app: libera a memória desta cópia
     a.bytes = null;
   }
-  await chrome.tabs.sendMessage(aba.id, { acao: "studio-sv-iniciar", reqId, processo: opcoes.processo || "", serventia: opcoes.serventia || "", pdfIdx: 0, videosIdx: arquivos.videos.map((_, k) => k + 1), promptTitulo: opcoes.promptTitulo || "", promptTexto: opcoes.promptTexto || "", promptCategoria: opcoes.promptCategoria || "" });
+  await chrome.tabs.sendMessage(aba.id, { acao: "studio-sv-iniciar", reqId, processo: opcoes.processo || "", serventia: opcoes.serventia || "", pdfIdx: 0, videosIdx: arquivos.videos.map((_, k) => k + 1), promptTitulo: opcoes.promptTitulo || "", promptTexto: opcoes.promptTexto || "", promptCategoria: opcoes.promptCategoria || "", degravacaoPronta: opcoes.degravacaoPronta || "" });
   const chave = "studio_sv_" + reqId, t0 = Date.now(); let ultimo = "", ultimoSinal = Date.now();
   for (;;) {
     await dorme(3000);

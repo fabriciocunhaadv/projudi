@@ -1,7 +1,7 @@
 import { todos, atualizar, lerPdf, remover, enfileirar, ROTULO, ATIVOS } from "./esteira-banco.js";
 import { instalarSaude, reportarSaude } from "./saude-fila.js";
 import { quadroDoProcesso } from "./movimentacoes-quadro.js";
-import { lerMidia, apagarMidias } from "./esteira-banco.js";
+import { lerMidia, guardarPdfDoVideo, lerPdfDoVideo, apagarGuardadosDoVideo, limparGuardadosAntigos } from "./esteira-banco.js";
 import { chaveDoProcesso } from "./midias-projudi.js";
 instalarSaude("esteira");
 import { analisarNoStudio, lerMinutaAtual, consultarGigantes, cadastrarNoStudio, lerPromptDoStudio, sentencaComVideoNoStudio } from "./studio-cliente.js";
@@ -92,15 +92,22 @@ async function analisarComVideo(it, valida) {
   const { ["midias_" + chave]: m } = await chrome.storage.local.get("midias_" + chave);
   if (!m?.meta?.length) throw Object.assign(new Error("os vídeos deste processo não estão mais guardados: envie o processo de novo para a esteira"), { semRetry: true });
   let prompt; try { prompt = await lerPromptDoStudio(it.prompt); } catch (e) { await atualizar(it.id, { estado: "erro", erro: "Prompt: " + e.message, promptOpcoes: e.opcoes?.length ? e.opcoes : undefined }); return; }
+  void guardarPdfDoVideo(chave, bytes).catch(() => {});      // fica guardado (7 dias) para "Refazer a sentença" sem baixar nem degravar de novo
+  await chrome.storage.local.set({ ["midias_" + chave]: { ...m, processo: it.processo, serventia: it.serventia || "", prompt: it.prompt || "", pdfNome: it.pdfNome || "" } });
+  // degravação já feita para estes MESMOS vídeos: reaproveita (não envia os vídeos nem gasta a IA de novo)
+  const assin = m.meta.map((x) => x.nome + ":" + x.tamanho).join("|"), cache = (await chrome.storage.local.get("degr_" + chave))["degr_" + chave];
+  const degravacaoPronta = cache?.assin === assin && cache.texto ? cache.texto : "";
+  if (degravacaoPronta) await atualizar(it.id, { aviso: "Sentença com vídeo: reaproveitando a degravação já feita (os vídeos não serão enviados de novo)." });
   const videos = [];
-  for (let i = 0; i < m.meta.length; i++) { const b = await lerMidia(chave, i); if (!b) throw Object.assign(new Error(`o vídeo ${i + 1} (${m.meta[i].nome}) não está mais guardado: envie o processo de novo`), { semRetry: true }); videos.push({ nome: m.meta[i].nome, tipo: m.meta[i].tipo, bytes: b }); }
+  for (let i = 0; i < (degravacaoPronta ? 0 : m.meta.length); i++) { const b = await lerMidia(chave, i); if (!b) throw Object.assign(new Error(`o vídeo ${i + 1} (${m.meta[i].nome}) não está mais guardado: envie o processo de novo`), { semRetry: true }); videos.push({ nome: m.meta[i].nome, tipo: m.meta[i].tipo, bytes: b }); }
   const t0 = Date.now();
-  const r = await sentencaComVideoNoStudio({ pdf: { nome: it.pdfNome || `${chave || "autos"}.pdf`, tipo: "application/pdf", bytes }, videos }, { processo: it.processo, serventia: it.serventia || "", promptTitulo: prompt.titulo || it.prompt || "", promptTexto: prompt.texto, andamento, aindaValido: valida });
+  const r = await sentencaComVideoNoStudio({ pdf: { nome: it.pdfNome || `${chave || "autos"}.pdf`, tipo: "application/pdf", bytes }, videos }, { processo: it.processo, serventia: it.serventia || "", promptTitulo: prompt.titulo || it.prompt || "", promptTexto: prompt.texto, degravacaoPronta, andamento, aindaValido: valida });
   if (!(await valida()) || r.cancelado) return;
   reportarSaude("esteira", r.ok ? "info" : "erro", r.ok ? "Sentença com vídeo concluída" : "Sentença com vídeo: " + r.erro, { modo: "video", videos: videos.length, ms: Date.now() - t0 }, true);
   if (!r.ok) { await atualizar(it.id, { estado: "erro", erro: r.erro, tentativas: r.semRetry ? 9 : undefined, aviso: "A esteira seguiu para o próximo processo." }); return; }
   await atualizar(it.id, { estado: "concluido", erro: "", minuta: r.minuta, minutaHtml: "", tipo: tipoDaMinuta(r.minuta), cadastroPendente: false, aviso: `Sentença feita com o vídeo da audiência (${videos.length} mídia(s)) e salva no Histórico do Studio.` + (r.aviso ? " ⚠ " + r.aviso : "") });
-  void apagarMidias(chave);
+  if (r.transcricao) await chrome.storage.local.set({ ["degr_" + chave]: { assin, texto: r.transcricao, em: Date.now() } });      // a degravação fica guardada: refazer a sentença não degrava de novo
+  void desenharGuardados();
 }
 
 // Modo IA externa (ChatGPT/Gemini/Claude): usa o PDF baixado (com OCR), anexa na IA, cola o prompt do Studio, espera a minuta e a lança no Histórico do Studio.
@@ -377,11 +384,18 @@ $("linhas").addEventListener("click", async (ev) => {
 chrome.storage.sync.get("esteiraConfig").then(({ esteiraConfig = {} }) => { $("entrada").value = esteiraConfig.entrada || "pdf"; });
 $("entrada").onchange = async () => { const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig"); chrome.storage.sync.set({ esteiraConfig: { ...esteiraConfig, entrada: $("entrada").value } }); };
 // Recuperação: coloca na fila PDFs "número-OCR.pdf" que já estão no computador (a fila foi perdida ou os PDFs vieram de fora).
-chrome.storage.sync.get("automacao").then(({ automacao = {} }) => {
-  const prompts = [...new Set(Object.values(automacao).map((a) => a.prompt).filter(Boolean))];
-  $("impPrompts").innerHTML = prompts.map((x) => `<option value="${esc(x)}">`).join("");
-  if (prompts.length === 1) $("impPrompt").value = prompts[0];
-});
+// lista de prompts (a mesma do Studio) numa caixa de seleção com seta; se o Studio não responder, usa os prompts cadastrados no Painel
+async function carregarPrompts() {
+  const sel = $("impPrompt"), msg = $("impPromptMsg"), atual = sel.value; msg.textContent = "carregando a lista do Studio…";
+  let lista = [];
+  try { await lerPromptDoStudio(""); } catch (e) { lista = Array.isArray(e.opcoes) ? e.opcoes : []; }
+  if (!lista.length) { const { automacao = {} } = await chrome.storage.sync.get("automacao"); lista = [...new Set(Object.values(automacao).map((a) => a.prompt).filter(Boolean))]; msg.textContent = "(lista do Painel: o Studio não respondeu)"; } else msg.textContent = `${lista.length} prompts`;
+  sel.innerHTML = '<option value="">— o prompt cadastrado para a serventia do processo —</option>' + lista.map((x) => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
+  if (atual && lista.includes(atual)) sel.value = atual; else if (lista.length === 1) sel.value = lista[0];
+}
+$("impPromptRecarregar").onclick = () => void carregarPrompts();
+void carregarPrompts();
+
 $("impArq").onchange = async () => {
   const modo = $("impModo").value, promptDigitado = $("impPrompt").value.trim(), docs = false, arqs = [...$("impArq").files];
   const { estado } = await chrome.storage.local.get("estado"), { automacao = {} } = await chrome.storage.sync.get("automacao");
@@ -465,3 +479,24 @@ $("pautaTodos").onclick = async () => { for (const x of (await todos()).filter((
 $("pautaGerar").onclick = async () => { const ids = (await todos()).filter((i) => i.modo === "mesa" && i.estado === "concluido" && i.pautaSel).map((i) => i.id); if (ids.length) chrome.tabs.create({ url: chrome.runtime.getURL("pauta-doc.html?ids=" + ids.join(",")) }); };
 
 document.addEventListener("focusout", (ev) => { if (redesenharDepois && ev.target && ev.target.tagName === "SELECT") setTimeout(() => { if (document.activeElement?.tagName !== "SELECT") { redesenharDepois = false; void desenhar(); } }, 700); });
+
+// ----- Sentenças com vídeo já preparadas: refazer sem baixar nem degravar de novo -----
+const tam = (n) => (n >= 1048576 ? Math.round(n / 1048576) + " MB" : Math.round(n / 1024) + " KB");
+async function desenharGuardados() {
+  const todosSt = await chrome.storage.local.get(null), lista = Object.entries(todosSt).filter(([k]) => k.startsWith("midias_")).map(([k, v]) => ({ chave: k.slice(7), ...v, degr: todosSt["degr_" + k.slice(7)] })).sort((a, b) => (b.em || 0) - (a.em || 0));
+  $("guardadosN").textContent = lista.length ? `(${lista.length})` : "(nenhuma)";
+  $("guardadosLinhas").innerHTML = lista.length ? lista.map((g) => `<tr><td>${esc(g.processo || g.chave)}</td><td>${(g.meta || []).length} · ${tam((g.meta || []).reduce((n, x) => n + x.tamanho, 0))}</td><td>${g.degr ? "✅ pronta" : "ainda não"}</td><td>${new Date(g.em || 0).toLocaleString("pt-BR")}</td><td><button data-gv-refazer="${esc(g.chave)}">Refazer a sentença</button> <button data-gv-apagar="${esc(g.chave)}">Apagar</button></td></tr>`).join("") : `<tr><td colspan="5">Nada guardado ainda.</td></tr>`;
+}
+$("guardadosLinhas").addEventListener("click", async (ev) => {
+  const r = ev.target.closest("[data-gv-refazer]"), a = ev.target.closest("[data-gv-apagar]");
+  if (a) { if (confirm("Apagar o PDF, os vídeos e a degravação guardados deste processo?")) { await apagarGuardadosDoVideo(a.dataset.gvApagar); desenharGuardados(); } return; }
+  if (!r) return;
+  const chave = r.dataset.gvRefazer, { ["midias_" + chave]: m } = await chrome.storage.local.get("midias_" + chave), bytes = await lerPdfDoVideo(chave).catch(() => null);
+  if (!m || !bytes) { alert("O PDF deste processo não está mais guardado. Envie o processo de novo pela Pauta."); return; }
+  const escolhido = $("impPrompt").value.trim() || m.prompt || "";
+  await enfileirar({ processo: m.processo || chave, modo: "video", serventia: m.serventia || "", prompt: escolhido, pdfNome: m.pdfNome || `${chave}-OCR.pdf`, classificador: "pauta" }, bytes);
+  $("impMsg").textContent = `${m.processo || chave} voltou para a fila (${escolhido ? "prompt: " + escolhido : "prompt da serventia"}); a degravação guardada será reaproveitada.`;
+  desenharGuardados();
+});
+chrome.storage.onChanged.addListener((c, area) => { if (area === "local" && Object.keys(c).some((k) => k.startsWith("midias_") || k.startsWith("degr_"))) desenharGuardados(); });
+void limparGuardadosAntigos(7).then(desenharGuardados);

@@ -143,7 +143,16 @@ $("mesa").onclick = async () => {
 };
 
 // Sentença com o vídeo da audiência: baixa o PDF E os vídeos/áudios de cada processo marcado e a esteira entrega ao Studio, que degrava e redige a sentença (salva no Histórico).
-chrome.storage.local.get("pauta_video_prompt").then((o) => { if (o.pauta_video_prompt) $("promptVideo").value = o.pauta_video_prompt; });
+async function carregarPromptsVideo() {
+  const sel = $("promptVideo"), guardado = (await chrome.storage.local.get("pauta_video_prompt")).pauta_video_prompt || "", atual = sel.value || guardado;
+  let lista = [];
+  try { const { lerPromptDoStudio } = await import("./studio-cliente.js"); await lerPromptDoStudio(""); } catch (e) { lista = Array.isArray(e.opcoes) ? e.opcoes : []; }
+  if (!lista.length) { const { automacao = {} } = await chrome.storage.sync.get("automacao"); lista = [...new Set(Object.values(automacao).map((a) => a.prompt).filter(Boolean))]; }
+  sel.innerHTML = '<option value="">— prompt da serventia —</option>' + lista.map((x) => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
+  if (atual && lista.includes(atual)) sel.value = atual;
+}
+$("promptVideoRec").onclick = () => void carregarPromptsVideo();
+void carregarPromptsVideo();
 $("video").onclick = async () => {
   const marcados = pauta.filter((l) => l.marcado && l.url);
   if (!marcados.length) { $("msg").textContent = "Marque ao menos um processo (com link na lista)."; return; }

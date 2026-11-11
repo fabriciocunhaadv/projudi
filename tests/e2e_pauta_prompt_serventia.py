@@ -12,7 +12,7 @@ with sync_playwright() as p:
     pg = ctx.new_page(); pg.goto(base + "pauta.html")
     pg.evaluate("async () => { await chrome.storage.sync.set({ automacao: { 'Montes Claros de Goiás - Vara das Fazendas Públicas - GO': { ativa: true, prompt: 'Prompt da Fazenda do Gabinete' } } }); await chrome.storage.local.clear(); }")
     def rodar(manual):
-        pg.evaluate("""(m) => { document.getElementById('promptVideo').value = m; window.__pauta.set([
+        pg.evaluate("""(m) => { { const sel = document.getElementById('promptVideo'); if (m && ![...sel.options].some(o => o.value === m)) { const o = document.createElement('option'); o.value = m; o.textContent = m; sel.appendChild(o); } sel.value = m; } window.__pauta.set([
           { processo: '5428441-88.2026.8.09.0166', url: 'BuscaProcesso?x=1', data: '2026-11-09', hora: '14:00', serventiaNome: 'Montes Claros de Goiás - Vara das Fazendas Públicas - GO', marcado: true },
           { processo: '5655940-63.2026.8.09.0166', url: 'BuscaProcesso?x=2', data: '2026-11-09', hora: '14:20', serventiaNome: 'Goiânia - Juizado Especial Cível - GO', marcado: true },
           { processo: '5488341-02.2026.8.09.0166', url: 'BuscaProcesso?x=3', data: '2026-11-09', hora: '14:40', serventiaNome: 'Serventia Sem Area Conhecida', marcado: true }]); document.getElementById('video').disabled = false; document.getElementById('video').click(); }""", manual)

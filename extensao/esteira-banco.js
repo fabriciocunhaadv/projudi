@@ -17,6 +17,15 @@ export const apagarPdf = (id) => comBanco("readwrite", (s) => s.delete(id));
 // vídeos/áudios da audiência (modo "video"): ficam no mesmo banco do navegador, por processo (só dígitos) e número
 export const guardarMidia = (chave, i, bytes) => comBanco("readwrite", (s) => s.put(bytes, `midia:${chave}:${i}`));
 export const lerMidia = (chave, i) => comBanco("readonly", (s) => s.get(`midia:${chave}:${i}`));
+// PDF (com OCR) do processo com vídeo, guardado junto das mídias para "Refazer a sentença" sem baixar nada de novo
+export const guardarPdfDoVideo = (chave, bytes) => comBanco("readwrite", (s) => s.put(bytes, `pdfvideo:${chave}`));
+export const lerPdfDoVideo = (chave) => comBanco("readonly", (s) => s.get(`pdfvideo:${chave}`));
+export async function apagarGuardadosDoVideo(chave) { await apagarMidias(chave); await comBanco("readwrite", (s) => s.delete(`pdfvideo:${chave}`)).catch(() => {}); await chrome.storage.local.remove("degr_" + chave); }
+/** Apaga o que foi guardado há mais de 7 dias (vídeos são grandes). */
+export async function limparGuardadosAntigos(dias = 7) {
+  const todos = await chrome.storage.local.get(null), limite = Date.now() - dias * 86400000;
+  for (const [k, v] of Object.entries(todos)) if (k.startsWith("midias_") && (v?.em || 0) < limite) await apagarGuardadosDoVideo(k.slice(7)).catch(() => {});
+}
 export async function apagarMidias(chave) {
   const { ["midias_" + chave]: m } = await chrome.storage.local.get("midias_" + chave);
   for (let i = 0; i < Math.max(12, (m?.meta || []).length); i++) await comBanco("readwrite", (s) => s.delete(`midia:${chave}:${i}`)).catch(() => {});
