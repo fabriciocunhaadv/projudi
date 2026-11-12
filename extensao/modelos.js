@@ -1,4 +1,5 @@
 import { montarPdf, TIPOS, tipoCanonico, nomePadrao, semBarra } from "./modelos-pdf.js";
+import { acharStudio } from "./studio-cliente.js";
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const sem = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -40,7 +41,7 @@ $("limparSel").onclick = () => { escolhidos.clear(); desenharEscolha(); };
 
 // ---------- modelos cadastrados na extensão ----------
 async function gerarPdf(serv, dados) {
-  const bytes = await montarPdf({ serventia: serv, modelos: dados.modelos.map((m) => ({ ...m, serventia: serv })) });
+  const bytes = await montarPdf({ serventia: serv, modelos: dados.modelos.filter((m) => TIPOS.includes(tipoCanonico(m.tipo))).map((m) => ({ ...m, serventia: serv })) });
   return { nome: semBarra(nomePadrao(serv)) + ".pdf", bytes };
 }
 async function desenhar() {
@@ -103,7 +104,7 @@ $("listar").onclick = async () => {
     escolhidos = new Set(listaProjudi.filter((m) => m.minha && !jaCadastrado(m.id)).map((m) => m.id));      // sugestão: os das suas serventias que ainda não estão cadastrados (o usuário ajusta)
     if (!listaProjudi.some((m) => m.minha)) $("soMinhas").checked = false;
     $("passo2").hidden = false; desenharEscolha();
-    $("progresso").className = "msg ok"; $("progresso").textContent = `${listaProjudi.length} modelo(s) de decisão, despacho e sentença encontrados (de ${r.total} na lista do Projudi). Escolha abaixo quais capturar.`;
+    $("progresso").className = "msg ok"; $("progresso").textContent = `${listaProjudi.length} modelo(s) encontrados (de ${r.total} na lista do Projudi). Escolha abaixo quais capturar.`;
     document.body.dataset.listado = JSON.stringify(r);
   } catch (e) { $("progresso").className = "msg erro"; $("progresso").textContent = e.message; document.body.dataset.erro = e.message; }
   ocupado(false); desenharEscolha();
@@ -121,7 +122,30 @@ $("capturar").onclick = async () => {
     $("mudancas").innerHTML = `Novos: <b>${r.diff.novos.length}</b> · alterados desde a captura anterior: <b>${r.diff.alterados.length}</b>.`;
     document.body.dataset.capturado = JSON.stringify(r);
     await desenhar(); desenharEscolha();
+    enviarAoStudio(true);      // depois de capturar, já deixa o Studio com os modelos novos
   } catch (e) { $("progresso").className = "msg erro"; $("progresso").textContent = e.message; document.body.dataset.erro = e.message; }
   ocupado(false); desenharEscolha();
 };
+
+// ---------- enviar ao Studio: os modelos viram uma lista do gabinete, usada em "Conferir modelos do Projudi" na minuta pronta ----------
+async function enviarAoStudio(silencioso = false) {
+  const { modelos } = await chrome.storage.local.get("modelos");
+  const itens = Object.entries(modelos?.serventias || {}).flatMap(([serv, d]) => d.modelos.filter((m) => !m.erro && (m.texto || "").length > 20).map((m) => ({ projudiId: m.id, nome: m.nome, tipo: m.tipo, serventia: serv, texto: m.texto })));
+  const msg = $("msgStudio"); msg.className = "msg";
+  if (!itens.length) { msg.textContent = "Nenhum modelo cadastrado para enviar."; return; }
+  $("enviarStudio").disabled = true; msg.textContent = `Enviando ${itens.length} modelo(s) ao Studio…`;
+  try {
+    const aba = await acharStudio(); let gravados = 0, iguais = 0;
+    for (let i = 0; i < itens.length; i += 25) {
+      const r = await chrome.tabs.sendMessage(aba.id, { acao: "studio-modelos", itens: itens.slice(i, i + 25) });
+      if (!r?.ok) throw new Error(r?.erro || "o Studio não confirmou o recebimento");
+      gravados += r.gravados || 0; iguais += r.iguais || 0;
+      msg.textContent = `Enviando… ${Math.min(i + 25, itens.length)} de ${itens.length}`;
+    }
+    msg.className = "msg ok"; msg.textContent = `✔ Studio atualizado: ${gravados} modelo(s) novo(s) ou alterado(s), ${iguais} já estavam iguais.`;
+    document.body.dataset.enviado = JSON.stringify({ gravados, iguais });
+  } catch (e) { msg.className = "msg erro"; msg.textContent = (silencioso ? "Não consegui avisar o Studio agora: " : "") + e.message + (silencioso ? ' (use “Enviar ao Studio” depois).' : ""); document.body.dataset.erro = e.message; }
+  $("enviarStudio").disabled = false;
+}
+$("enviarStudio").onclick = () => enviarAoStudio(false);
 desenhar();

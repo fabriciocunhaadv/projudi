@@ -1,7 +1,7 @@
 import { chaveProc } from "./proc-chave.js";
 import { instalarSaude } from "./saude-fila.js";
 instalarSaude("lote");
-import { montarPdf, nomePadrao, semBarra, acharServentia } from "./modelos-pdf.js";
+import { montarPdf, nomePadrao, semBarra, acharServentia, TIPOS, tipoCanonico } from "./modelos-pdf.js";
 import { enviarBase } from "./studio-cliente.js";
 import { manterAcordado } from "./acordado.js";
 import { coletarMidiasDoProcesso } from "./midias-projudi.js";
@@ -295,7 +295,7 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
     $("base").hidden = false;
     for (const v of varas) {
       const li = document.createElement("li"); $("base").append(li);
-      const d = acharServentia(modelos, v.serventia);
+      const d = acharServentia(modelos, v.serventia); if (d) d.modelos = (d.modelos || []).filter((m) => TIPOS.includes(tipoCanonico(m.tipo)));      // a base de conhecimento segue só com decisão, despacho e sentença
       if (!d || !d.modelos?.length) { li.innerHTML = `⚠ ${esc(v.serventia)} — sem modelos capturados do Projudi (pulei a base de conhecimento)`; continue; }
       try {
         li.textContent = `⏳ ${v.serventia} — montando e enviando o PDF de modelos…`;

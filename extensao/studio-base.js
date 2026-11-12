@@ -3,7 +3,7 @@
 (() => {
   if (window.__projudiStudioBase) return;
   window.__projudiStudioBase = true;
-  try { document.documentElement.dataset.assessorExtensao = chrome.runtime.getManifest().version; document.documentElement.dataset.assessorExtensaoRecursos = "pdf,sv"; document.documentElement.dataset.assessorExtensaoId = chrome.runtime.id; } catch (e) { /* sem manifest */ }      // o app mostra a tarja “instale a extensão” só quando este aviso não existe
+  try { document.documentElement.dataset.assessorExtensao = chrome.runtime.getManifest().version; document.documentElement.dataset.assessorExtensaoRecursos = "pdf,sv,modelos"; document.documentElement.dataset.assessorExtensaoId = chrome.runtime.id; } catch (e) { /* sem manifest */ }      // o app mostra a tarja “instale a extensão” só quando este aviso não existe
   const dorme = (ms) => new Promise((ok) => setTimeout(ok, ms));
   const visivel = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
   const texto = (e) => (e.textContent || "").replace(/\s+/g, " ").trim();
@@ -962,6 +962,16 @@
         if (arquivos.size > 3) arquivos.delete(arquivos.keys().next().value);
       }
       responder({ ok: true }); return false;
+    }
+    if (m?.acao === "studio-modelos") {      // entrega ao app os modelos capturados do Projudi (ponte window.postMessage) e devolve quantos ele gravou
+      const reqId = "md" + Date.now() + Math.random().toString(36).slice(2, 6);
+      const fim = new Promise((ok) => {
+        const t = setTimeout(() => { removeEventListener("message", ouvir); ok({ ok: false, erro: "o app não respondeu ao envio dos modelos (atualize a aba do Studio e tente de novo)" }); }, 90000);
+        const ouvir = (ev) => { const d = ev.data; if (ev.source !== window || !d || d.__projudiResp !== "modelos" || d.reqId !== reqId) return; clearTimeout(t); removeEventListener("message", ouvir); ok(d.tipo === "ok" ? { ok: true, gravados: d.gravados, iguais: d.iguais, ignorados: d.ignorados } : { ok: false, erro: d.erro || "o app recusou os modelos" }); };
+        addEventListener("message", ouvir);
+      });
+      window.postMessage({ __projudi: "modelos", fase: "enviar", reqId, itens: m.itens || [] }, window.location.origin);
+      fim.then(responder); return true;
     }
     if (m?.acao === "studio-enviar-base") { enviar(m.nome, m.arquivoId, m.b64, !!m.substituir).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
     if (m?.acao === "studio-prompt-texto") {      // IA externa: o app entrega o TEXTO do prompt da serventia (a esteira o cola na conversa da IA)

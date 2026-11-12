@@ -10,7 +10,7 @@
   button { padding: 6px 12px; cursor: pointer; margin: 6px 6px 0 0; } .ok { color: #1a7a1a; } .erro { color: #b00020; } .msg { margin-top: 6px; font-weight: 600; }
 </style>
 <header class="topo"><div><h1>Modelos do Projudi</h1>
-  <p class="dica">Escolha quais modelos de decisão, despacho e sentença você quer usar. Eles ficam <b>cadastrados nesta extensão</b>, neste computador — nada é enviado ao Studio.</p></div></header>
+  <p class="dica">Escolha quais modelos (decisão, despacho, sentença, citação, intimação, ofício, certidão, mandado…) você quer usar. Eles ficam cadastrados nesta extensão e são enviados ao <b>Studio</b> para a conferência das minutas.</p></div></header>
 
 <section class="card" id="passo1">
   <h2><span class="passo">1</span> Listar os modelos do Projudi</h2>
@@ -33,6 +33,8 @@
 
 <section class="card">
   <h2>Modelos cadastrados na extensão</h2>
+  <p class="dica">Eles também ficam disponíveis no <b>Studio</b> (botão “Conferir modelos do Projudi” na minuta pronta). A captura envia sozinha; use o botão abaixo para reenviar.</p>
+  <button id="enviarStudio" class="primary">Enviar ao Studio</button> <span class="msg" id="msgStudio"></span>
   <p id="vazio" class="dica" hidden>Ainda não há modelos cadastrados. Use o passo 1 e o passo 2 acima.</p>
   <div id="lista"></div>
 </section>

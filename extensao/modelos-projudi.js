@@ -101,7 +101,7 @@
   function relatar(msg) { try { chrome.runtime.sendMessage({ acao: "modelos-progresso", ...msg }); } catch (e) { /* página fechada */ } }
 
   const chaveServ = (x) => sem(x).replace(/\s*-\s*go\s*$/, "").replace(/\s+/g, " ").trim();
-  const tipoOk = (x) => /decis|despach|sentenc/.test(sem(x.tipo));      // só decisão, despacho e sentença (ignora citação, ofício, certidão etc.)
+  const tipoOk = (x) => /decis|despach|sentenc|cita|intima|oficio|certid|mandado|carta|edital|alvara|termo/.test(sem(x.tipo));      // decisão, despacho, sentença e também citação, intimação, ofício, certidão, mandado… (o Studio os usa para conferir a minuta)
 
   // ETAPA 1 — só LISTA os modelos (nome, serventia, tipo), sem ler o texto: o usuário escolhe quais quer cadastrar na extensão.
   async function listar() {
