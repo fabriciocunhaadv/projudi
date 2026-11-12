@@ -75,6 +75,12 @@ def main():
         assert REQS.index("/serventia?s=A") < REQS.index("/proc?id=1") and REQS.index("/serventia?s=B") < REQS.index("/proc?id=2"), REQS
         fins = [sw.evaluate("(k) => chrome.storage.local.get(k)", f"lote_fim_t1:{i}")[f"lote_fim_t1:{i}"] for i in (0, 1)]
         print(fins)
+        # retomada: atualizar a página NÃO refaz o que já ficou pronto (antes recomeçava do processo 1 e repetia o download e a análise)
+        pg.reload(); pg.wait_for_selector("body[data-pronto='1']", timeout=60000)
+        assert len(CORPOS) == 2, CORPOS
+        assert pg.inner_text("#lista").count("já estava pronto") == 2, pg.inner_text("#lista")
+        assert "2 de 2 processo(s) baixado(s)" in pg.inner_text("#status"), pg.inner_text("#status")
+        print("retomada ok")
         pdf = subprocess.run(["pdftotext", "-layout", fins[0]["pdf"], "-"], capture_output=True, text=True).stdout.lower(); pdf = " ".join(pdf.split())
         ctx.close()
     assert "5293296-60.2026.8.09.0166" in pdf and "movimentacao 8 : juntada" in pdf       # carimbo do Projudi preservado
