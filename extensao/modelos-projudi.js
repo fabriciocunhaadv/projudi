@@ -11,13 +11,22 @@
   async function esperar(fn, ms, passo = 200) { const t0 = Date.now(); for (;;) { const v = fn(); if (v) return v; if (Date.now() - t0 > ms) return null; await dorme(passo); } }
   let cancelar = false;
 
+  // Algumas telas do Projudi (ex.: a página inicial da Área do Assessor) NÃO têm o quadro "Principal". Nesse caso a extensão cria o seu próprio quadro,
+  // fora da vista, e abre nele as telas do Cadastro (é onde elas rodam normalmente). Ele é removido ao terminar.
   function navegar(url) {
     return new Promise((ok) => {
-      const f = quadro(), fim = setTimeout(() => ok(false), 30000);
+      let f = quadro(); const novo = !f;
+      if (novo) {
+        f = document.createElement("iframe"); f.id = "Principal"; f.name = "Principal"; f.dataset.criadoPelaExtensao = "1";
+        f.style.cssText = "position:fixed;left:-20000px;top:0;width:1280px;height:900px;border:0;visibility:hidden";
+      }
+      const fim = setTimeout(() => ok(false), 30000);
       f.addEventListener("load", () => { clearTimeout(fim); setTimeout(() => ok(true), 500); }, { once: true });
-      f.contentWindow.location.href = url;
+      if (novo) { f.src = new URL(url, location.href).href; (document.body || document.documentElement).appendChild(f); }
+      else f.contentWindow.location.href = url;
     });
   }
+  const soltarQuadro = () => { const f = quadro(); if (f && f.dataset.criadoPelaExtensao) f.remove(); };
   // A tela Cadastros → Modelo ("Busca de Modelo") fica DENTRO do quadro "Principal": campo "Modelo", botão Consultar, tabela #CorpoTabela
   // (cada linha traz data_id1 = Id, data_desc1 = nome e data_descs = "desc2;Serventia;desc3;Tipo;"), paginação #Paginacao com caixa "Ir".
   const D = () => quadro().contentDocument;
@@ -159,9 +168,9 @@
   chrome.runtime.onMessage.addListener((m, _s, responder) => {
     if (m?.acao === "modelos-ping") { responder({ ok: true }); return false; }
     if (m?.acao === "modelos-cancelar") { cancelar = true; responder({ ok: true }); return false; }
-    if (m?.acao === "modelos-listar") { listar().then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }
+    if (m?.acao === "modelos-listar") { listar().then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })).finally(soltarQuadro); return true; }
     if (m?.acao !== "modelos-capturar") return false;
-    capturar(m.itens).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) }));
+    capturar(m.itens).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })).finally(soltarQuadro);
     return true;
   });
 })();
