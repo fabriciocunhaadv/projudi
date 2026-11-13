@@ -3,7 +3,7 @@
 (() => {
   if (window.__projudiStudioBase) return;
   window.__projudiStudioBase = true;
-  try { document.documentElement.dataset.assessorExtensao = chrome.runtime.getManifest().version; document.documentElement.dataset.assessorExtensaoRecursos = "pdf,sv,modelos"; document.documentElement.dataset.assessorExtensaoId = chrome.runtime.id; } catch (e) { /* sem manifest */ }      // o app mostra a tarja “instale a extensão” só quando este aviso não existe
+  try { document.documentElement.dataset.assessorExtensao = chrome.runtime.getManifest().version; document.documentElement.dataset.assessorExtensaoRecursos = "pdf,sv,modelos,modelos-atualizar"; document.documentElement.dataset.assessorExtensaoId = chrome.runtime.id; } catch (e) { /* sem manifest */ }      // o app mostra a tarja “instale a extensão” só quando este aviso não existe
   const dorme = (ms) => new Promise((ok) => setTimeout(ok, ms));
   const visivel = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
   const texto = (e) => (e.textContent || "").replace(/\s+/g, " ").trim();
@@ -832,6 +832,14 @@
     } catch (e) { /* tenta de novo depois */ } finally { entregandoUso = false; }
   }
   setTimeout(entregarUso, 15000); setInterval(entregarUso, 5 * 60000);
+
+  // ----- Atualizar modelos do Projudi a pedido do app: o app pede (window.postMessage fase "atualizar") um modelo por vez; a extensão relê no Projudi e devolve o texto atual -----
+  addEventListener("message", (ev) => {
+    const d = ev.data; if (ev.source !== window || !d || d.__projudi !== "modelos" || d.fase !== "atualizar") return;
+    const resp = (o) => window.postMessage({ __projudiResp: "modelos", reqId: d.reqId, ...o }, window.location.origin);
+    try { chrome.runtime.sendMessage({ acao: "modelos-atualizar-um", item: d.item }, (r) => { if (chrome.runtime.lastError) return resp({ tipo: "erro", erro: String(chrome.runtime.lastError.message || "a extensão não respondeu") }); resp(r?.ok ? { tipo: "ok-um", item: r.item } : { tipo: "erro", erro: r?.erro || "a extensão não conseguiu ler o modelo" }); }); }
+    catch (e) { resp({ tipo: "erro", erro: String(e?.message || e) }); }
+  });
 
   // ----- Tratamento de PDF pela extensão: o app entrega o PDF em partes (window.postMessage) e a extensão (página pdf-studio) devolve andamento e texto -----
   if (window.top === window) window.addEventListener("message", async (ev) => {

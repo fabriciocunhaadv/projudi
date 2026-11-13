@@ -263,6 +263,23 @@ chrome.runtime.onMessage.addListener((m, s, responder) => {
       .then((t) => responder({ ok: true, tabId: t.id }), (e) => responder({ ok: false, erro: String(e.message || e) }));
     return true;
   }
+  if (m?.acao === "modelos-atualizar-um") {      // o Studio pede para reler UM modelo no Projudi: acha a aba do Projudi, captura de novo e devolve o texto atual
+    (async () => {
+      const it = m.item || {}; if (!it.id) return responder({ ok: false, erro: "modelo sem número do Projudi" });
+      const padroes = chrome.runtime.getManifest().content_scripts.find((c) => c.js.includes("modelos-projudi.js")).matches;
+      let aba = null;
+      for (const a of await chrome.tabs.query({ url: padroes })) { try { if ((await chrome.tabs.sendMessage(a.id, { acao: "modelos-ping" }, { frameId: 0 }))?.ok) { aba = a; break; } } catch (e) { /* aba sem a extensão */ } }
+      if (!aba) return responder({ ok: false, erro: "abra o Projudi e entre com a sua conta numa aba do navegador e tente de novo" });
+      const r = await chrome.tabs.sendMessage(aba.id, { acao: "modelos-capturar", itens: [{ id: String(it.id), nome: it.nome, serventia: it.serventia, tipo: it.tipo }] }, { frameId: 0 });
+      if (!r?.ok) return responder({ ok: false, erro: r?.erro || "a leitura no Projudi não terminou" });
+      if (r.falhas) return responder({ ok: false, erro: (r.erros && r.erros[0]) || "não consegui ler este modelo no Projudi (ele pode ter sido apagado ou renomeado)" });
+      const { modelos } = await chrome.storage.local.get("modelos");
+      const achado = Object.entries(modelos?.serventias || {}).flatMap(([serv, d]) => d.modelos.map((x) => ({ ...x, serv }))).find((x) => String(x.id) === String(it.id));
+      if (!achado || !achado.texto) return responder({ ok: false, erro: "o Projudi não devolveu o texto deste modelo" });
+      responder({ ok: true, item: { projudiId: String(achado.id), nome: achado.nome, tipo: achado.tipo, serventia: achado.serv, texto: achado.texto } });
+    })().catch((e) => responder({ ok: false, erro: String(e?.message || e) }));
+    return true;
+  }
   if (m?.acao === "minha-aba") { responder({ tabId: s.tab ? s.tab.id : null }); return false; }
   if (m?.acao === "esteira-abrir") {       // garante a aba que roda a fila de minutas
     const url = chrome.runtime.getURL("esteira.html");

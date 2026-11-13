@@ -162,7 +162,7 @@
     }
     for (const k of Object.keys(servs)) if (!servs[k].modelos.length) delete servs[k];
     await chrome.storage.local.set({ modelos: { atualizadoEm: Date.now(), serventias: servs, diff } });
-    return { ok: true, total: modelos.length, falhas: modelos.filter((m) => m.erro).length, diff };
+    return { ok: true, total: modelos.length, falhas: modelos.filter((m) => m.erro).length, erros: modelos.filter((m) => m.erro).map((m) => m.erro), diff };
   }
 
   chrome.runtime.onMessage.addListener((m, _s, responder) => {

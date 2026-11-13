@@ -107,6 +107,17 @@ def main():
         assert r2["total"] == 1 and len(r2["diff"]["alterados"]) == 1 and r2["diff"]["novos"] == []
         ms2 = sw.evaluate("() => chrome.storage.local.get('modelos')")["modelos"]["serventias"][SERV]["modelos"]
         assert len(ms2) == 20 and any(m["texto"] == "Texto NOVO do modelo 3." for m in ms2)
+        # 5) o Studio pede para reler UM modelo (mensagem "modelos-atualizar-um", a mesma que o app usa): texto novo, texto igual e modelo que sumiu do Projudi
+        def pedir(item): return pg.evaluate("(it) => chrome.runtime.sendMessage({ acao: 'modelos-atualizar-um', item: it })", item)
+        DADOS["modelos"][2]["texto"] = "<p>Texto ATUALIZADO de novo do modelo 3.</p>"
+        m3 = DADOS["modelos"][2]
+        r = pedir({"id": str(m3["id"]), "nome": m3["nome"], "serventia": SERV, "tipo": m3["tipo"]}); print("atualizar um:", r)
+        assert r["ok"] and r["item"]["texto"] == "Texto ATUALIZADO de novo do modelo 3." and r["item"]["projudiId"] == str(m3["id"]) and r["item"]["serventia"] == SERV, r
+        r = pedir({"id": str(m3["id"]), "nome": m3["nome"], "serventia": SERV, "tipo": m3["tipo"]})
+        assert r["ok"] and r["item"]["texto"] == "Texto ATUALIZADO de novo do modelo 3.", "relido sem mudança devolve o mesmo texto"
+        r = pedir({"id": str(excluido["id"]), "nome": excluido["nome"], "serventia": SERV, "tipo": excluido["tipo"]}); print("modelo que sumiu:", r)
+        assert not r["ok"] and r["erro"], "modelo apagado no Projudi: erro claro, nada é devolvido"
+        r = pedir({}); assert not r["ok"], "pedido sem número do modelo: erro"
         ctx.close()
     print("OK")
 
