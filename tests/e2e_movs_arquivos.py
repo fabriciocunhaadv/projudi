@@ -25,6 +25,7 @@ with sync_playwright() as p:
     r = ext_pg.evaluate("""async (t) => { const m = await import('./movimentacoes-quadro.js'); const res = await m.completarArquivosDoQuadro(t, 20000); const g = (await chrome.storage.local.get('movs:5428441-88.2026.8.09.0166'))['movs:5428441-88.2026.8.09.0166']; const q = await m.quadroDoProcesso('Processo Nº: 5428441-88.2026.8.09.0166'); return { res, movs: g && g.movs, q }; }""", tab_id)
     print(json.dumps(r, ensure_ascii=False)[:900])
     assert r["res"] and r["res"]["ok"] and r["res"]["abertas"] == 2, r["res"]
+    assert r["res"]["comLista"] == 2 and r["res"]["comArquivos"] == 2, "informa quantas movimentações com arquivo têm a lista guardada: " + str(r["res"])
     por_n = {m["n"]: m.get("arquivos") for m in r["movs"]}
     assert por_n[3] == ["audiencia.mp4", "ata de audiencia.html"] and por_n[2] == ["rol de testemunhas.pdf"] and not por_n[1], por_n
     assert "arquivos: 1=audiencia.mp4; 2=ata de audiencia.html" in r["q"] and "arquivos: 1=rol de testemunhas.pdf" in r["q"], r["q"]

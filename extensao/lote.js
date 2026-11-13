@@ -216,7 +216,7 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
     if (opcoes.studio?.ativo) {      // lista oficial de arquivos de cada movimentação (o Studio confere as citações Mov./Arq. com ela); nunca trava nem derruba a fila
       passo("lendo a lista de arquivos de cada movimentação");
       const rl = await limite(completarArquivosDoQuadro(tab.id, 35000), 50000, "a lista de arquivos das movimentações demorou").catch((e) => ({ ok: false, erro: e.message }));
-      passo(rl && rl.ok ? `lista de arquivos lida (${rl.abertas} movimentação(ões) aberta(s)${rl.falhas ? `, ${rl.falhas} sem resposta` : ""}${rl.parcial ? "; parou no limite de tempo, o resto segue pelos carimbos do PDF" : ""})` : "lista de arquivos das movimentações não lida (a análise segue pelos carimbos do PDF)");
+      passo(rl && rl.ok ? `lista de arquivos guardada: ${rl.comLista ?? "?"} de ${rl.comArquivos ?? "?"} movimentações com arquivo (${rl.abertas} aberta(s) agora${rl.falhas ? `, ${rl.falhas} sem resposta` : ""}${rl.parcial ? "; parou no limite de tempo, o resto segue pelos carimbos do PDF" : ""})` : "lista de arquivos das movimentações não lida (a análise segue pelos carimbos do PDF)");
       if (rl && rl.abertas > 20) {      // muitas movimentações abertas deixam a tela pesada e já impediram a janela "Gerar PDF" de abrir: recarrega o processo (a lista já está guardada)
         passo("recarregando o processo para a tela voltar ao normal");
         try {

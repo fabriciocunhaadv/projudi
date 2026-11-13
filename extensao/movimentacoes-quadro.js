@@ -47,7 +47,7 @@ export async function completarArquivosDoQuadro(tabId, limiteMs = 35000) {
     if (r === "corte") { await abortar(); await chrome.tabs.sendMessage(tabId, { tipo: "movs-guardar" }).catch(() => null); return { ok: true, total: 0, abertas: 0, falhas: 0, parcial: true, ms: limiteMs + 8000 }; }
     const res = (r || []).map((x) => x.result).find(Boolean) || null;
     if (!res) return null;
-    await chrome.tabs.sendMessage(tabId, { tipo: "movs-guardar" }).catch(() => null);      // o mov-diag.js guarda a lista completa agora (sem esperar o ciclo de 2,5 s)
-    return res;
+    const g = await chrome.tabs.sendMessage(tabId, { tipo: "movs-guardar" }).catch(() => null);      // o mov-diag.js guarda a lista completa agora (sem esperar o ciclo de 2,5 s)
+    return { ...res, comLista: g && g.comLista, comArquivos: g && g.comArquivos };      // quantas movimentações com arquivo têm a lista guardada
   } catch { await abortar(); return null; }
 }

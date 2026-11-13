@@ -36,7 +36,7 @@
     } catch (e) { /* extensão recarregada ou página carregando */ }
   }
   // Pedido da extensão (movimentacoes-quadro.js, depois de abrir as movimentações com arquivo no mundo MAIN da página): guarda já a lista completa.
-  try { chrome.runtime.onMessage.addListener((msg, _s, resp) => { if (!msg || msg.tipo !== "movs-guardar" || !temTabela()) return false; guardar(true).then(() => resp({ ok: true, movs: ler().movs.filter((m) => m.arquivos).length }), (e) => resp({ ok: false, erro: String(e && e.message || e) })); return true; }); } catch (e) { /* sem runtime */ }
+  try { chrome.runtime.onMessage.addListener((msg, _s, resp) => { if (!msg || msg.tipo !== "movs-guardar" || !temTabela()) return false; guardar(true).then(() => { const l = ler().movs; resp({ ok: true, comLista: l.filter((m) => m.arquivos).length, comArquivos: l.filter((m) => m.comArquivos).length }); }, (e) => resp({ ok: false, erro: String(e && e.message || e) })); return true; }); } catch (e) { /* sem runtime */ }
   let botao = null;
   const criar = () => {
     const host = document.createElement("div"); host.setAttribute("data-projudi-ext", "mov-diag");
