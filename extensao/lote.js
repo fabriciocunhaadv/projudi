@@ -5,6 +5,7 @@ import { montarPdf, nomePadrao, semBarra, acharServentia, TIPOS, tipoCanonico } 
 import { enviarBase } from "./studio-cliente.js";
 import { manterAcordado } from "./acordado.js";
 import { coletarMidiasDoProcesso } from "./midias-projudi.js";
+import { completarArquivosDoQuadro } from "./movimentacoes-quadro.js";
 import { abrirAbaProjudi, soltarAbaProjudi, pegarTravaDaAba } from "./projudi-aba.js";
 // Fila: para cada processo selecionado, abre o processo, pede o PDF completo ao Projudi e deixa a página de OCR salvar PDF + texto.
 const BASE = "https://projudi.tjgo.jus.br/";
@@ -211,6 +212,11 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
       if (!nova) throw new Error("o link do processo expirou e não achei o processo na lista da serventia (clique em “Verificar agora” no painel e tente de novo)");
       urlAtual = nova; await irParaComLimite(tab.id, nova, "o processo (link novo)", passo); await dorme(1500);
       if (await paginaInvalida(tab.id)) throw new Error("o Projudi recusou o link do processo (“Código inválido”)");
+    }
+    if (opcoes.studio?.ativo) {      // lista oficial de arquivos de cada movimentação (o Studio confere as citações Mov./Arq. com ela); nunca trava nem derruba a fila
+      passo("lendo a lista de arquivos de cada movimentação");
+      const rl = await limite(completarArquivosDoQuadro(tab.id, 100000), 115000, "a lista de arquivos das movimentações demorou").catch((e) => ({ ok: false, erro: e.message }));
+      passo(rl && rl.ok ? `lista de arquivos lida (${rl.abertas} movimentação(ões) aberta(s)${rl.falhas ? `, ${rl.falhas} sem resposta` : ""})` : "lista de arquivos das movimentações não lida (a análise segue pelos carimbos do PDF)");
     }
     if (opcoes.studio?.ativo && opcoes.studio.modo === "video") {      // sentença com o vídeo da audiência: baixa os vídeos/áudios ANTES do PDF (se não houver, o processo é pulado com o motivo)
       const meta = await coletarMidiasDoProcesso(tab.id, item.processo, passo);
