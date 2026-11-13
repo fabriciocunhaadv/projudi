@@ -29,6 +29,9 @@
       const ass = proc + "|" + movs.length + "|" + movs[0].n + "|" + movs[0].data + "|" + movs.reduce((n, m) => n + (m.arquivos ? m.arquivos.length : 0), 0); if (!forcar && ass === ultimo) return; ultimo = ass;
       const todos = (await chrome.storage.local.get(null)), chaves = Object.keys(todos).filter((k) => k.startsWith("movs:"));
       if (chaves.length > 60) { chaves.sort((a, b) => (todos[a].em || 0) - (todos[b].em || 0)); await chrome.storage.local.remove(chaves.slice(0, chaves.length - 50)); }      // guarda só os 50 processos mais recentes
+      // a tela recarregada não traz a lista de arquivos (ela só carrega ao clicar): mantém a que já estava guardada para a mesma movimentação
+      const antes = (await chrome.storage.local.get("movs:" + proc))["movs:" + proc];
+      if (antes && Array.isArray(antes.movs)) { const old = new Map(antes.movs.filter((m) => m && m.arquivos).map((m) => [m.n, m.arquivos])); for (const m of movs) if (!m.arquivos && old.has(m.n)) m.arquivos = old.get(m.n); }
       await chrome.storage.local.set({ ["movs:" + proc]: { em: Date.now(), movs } });
     } catch (e) { /* extensão recarregada ou página carregando */ }
   }

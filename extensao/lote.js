@@ -217,6 +217,13 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
       passo("lendo a lista de arquivos de cada movimentação");
       const rl = await limite(completarArquivosDoQuadro(tab.id, 35000), 50000, "a lista de arquivos das movimentações demorou").catch((e) => ({ ok: false, erro: e.message }));
       passo(rl && rl.ok ? `lista de arquivos lida (${rl.abertas} movimentação(ões) aberta(s)${rl.falhas ? `, ${rl.falhas} sem resposta` : ""}${rl.parcial ? "; parou no limite de tempo, o resto segue pelos carimbos do PDF" : ""})` : "lista de arquivos das movimentações não lida (a análise segue pelos carimbos do PDF)");
+      if (rl && rl.abertas > 20) {      // muitas movimentações abertas deixam a tela pesada e já impediram a janela "Gerar PDF" de abrir: recarrega o processo (a lista já está guardada)
+        passo("recarregando o processo para a tela voltar ao normal");
+        try {
+          await irParaComLimite(tab.id, urlAtual, "o processo", passo); await dorme(1500);
+          if (await paginaInvalida(tab.id)) { const nova = await urlFresca(item, tab.id); if (nova) { urlAtual = nova; await irParaComLimite(tab.id, nova, "o processo (link novo)", passo); await dorme(1500); } }
+        } catch (e) { passo("não consegui recarregar o processo: " + e.message); }
+      }
     }
     if (opcoes.studio?.ativo && opcoes.studio.modo === "video") {      // sentença com o vídeo da audiência: baixa os vídeos/áudios ANTES do PDF (se não houver, o processo é pulado com o motivo)
       const meta = await coletarMidiasDoProcesso(tab.id, item.processo, passo);

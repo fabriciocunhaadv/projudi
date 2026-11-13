@@ -32,6 +32,10 @@ with sync_playwright() as p:
     r2 = ext_pg.evaluate("""async (t) => (await import('./movimentacoes-quadro.js')).completarArquivosDoQuadro(t, 20000)""", tab_id)
     assert r2 and r2["ok"] and r2["abertas"] == 0, "segunda vez: nada a abrir"
     assert len(proc.evaluate("window.aberturas")) == 2, "não clica de novo no que já está carregado"
+    # recarregar a tela do processo (sem a lista aberta) NÃO apaga a lista já guardada
+    proc.reload(); proc.wait_for_timeout(3500)
+    dep = ext_pg.evaluate("""async () => (await chrome.storage.local.get('movs:5428441-88.2026.8.09.0166'))['movs:5428441-88.2026.8.09.0166']""")
+    assert {m["n"]: m.get("arquivos") for m in dep["movs"]}[3] == ["audiencia.mp4", "ata de audiencia.html"], "a lista guardada sobrevive ao recarregamento da tela"
     # orçamento: 40 movimentações que demoram a carregar; com limite de 3 s a leitura PARA (parcial) e não deixa nada rodando
     LENTA = PAGINA.replace("{LINHAS}", "")
     linhas = "".join(LINHA(n, 100 + n, "Juntada", "x") for n in range(10, 50))
