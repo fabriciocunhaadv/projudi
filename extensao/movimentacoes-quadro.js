@@ -20,27 +20,34 @@ export async function quadroDoProcesso(texto) {
   } catch { return ""; }
 }
 
-/** Abre, UMA a UMA, as movimentações com arquivo que o Projudi ainda não carregou (o clique no clipe roda no mundo MAIN da página, como o do Projudi) e manda o mov-diag.js guardar a lista completa.
- *  Limite de tempo; devolve {ok,total,abertas,falhas,ms} ou null; nunca lança. */
-export async function completarArquivosDoQuadro(tabId, limiteMs = 100000) {
+/** Abre as movimentações com arquivo que o Projudi ainda não carregou, VÁRIAS POR VEZ (o clique no clipe roda no mundo MAIN da página, como o do Projudi), e manda o mov-diag.js guardar a lista.
+ *  Orçamento curto (padrão 35 s): estourou, para na hora (a página é avisada para abortar) e segue com o que leu; nunca deixa nada rodando na página. Devolve {ok,total,abertas,falhas,ms,parcial} ou null; nunca lança. */
+export async function completarArquivosDoQuadro(tabId, limiteMs = 35000) {
+  const abortar = () => chrome.scripting.executeScript({ target: { tabId, allFrames: true }, world: "MAIN", func: () => { window.__movsAbort = true; } }).catch(() => {});
+  let corte = null;
   try {
-    const r = await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, world: "MAIN", args: [limiteMs], func: async (limite) => {
+    const exec = chrome.scripting.executeScript({ target: { tabId, allFrames: true }, world: "MAIN", args: [limiteMs], func: async (limite) => {
       const linhas = [...document.querySelectorAll("#tabListaProcesso tr[movi_codigo]")]; if (!linhas.length) return null;
-      const dorme = (ms) => new Promise((ok) => setTimeout(ok, ms)), t0 = Date.now(); let abertas = 0, falhas = 0;
+      window.__movsAbort = false;
+      const dorme = (ms) => new Promise((ok) => setTimeout(ok, ms)), t0 = Date.now(); let abertas = 0, falhas = 0, parcial = false;
       const carregado = (tr) => { const f = tr.nextElementSibling; return !!(f && !f.hasAttribute("movi_codigo") && f.querySelector("a[href]")); };
-      for (const tr of linhas) {
-        if (Date.now() - t0 > limite) break;
-        if (carregado(tr)) continue;
-        const ancora = tr.children[4] && tr.children[4].querySelector('a[href*="buscarArquivosMovimentacaoJSON"]'); if (!ancora) continue;
-        try { ancora.click(); } catch (e) { falhas++; continue; }
-        let ok = false; for (let k = 0; k < 24; k++) { await dorme(250); if (carregado(tr)) { ok = true; break; } }
-        if (ok) abertas++; else falhas++;
+      const pendentes = linhas.filter((tr) => !carregado(tr) && tr.children[4] && tr.children[4].querySelector('a[href*="buscarArquivosMovimentacaoJSON"]'));
+      const LOTE = 8;
+      for (let i = 0; i < pendentes.length; i += LOTE) {
+        if (window.__movsAbort || Date.now() - t0 > limite) { parcial = true; break; }
+        const grupo = pendentes.slice(i, i + LOTE);
+        for (const tr of grupo) { try { tr.children[4].querySelector('a[href*="buscarArquivosMovimentacaoJSON"]').click(); } catch (e) { falhas++; } }
+        for (let k = 0; k < 20 && !window.__movsAbort; k++) { await dorme(250); if (grupo.every(carregado)) break; }
+        for (const tr of grupo) { if (carregado(tr)) abertas++; else falhas++; }
       }
-      return { ok: true, total: linhas.length, abertas, falhas, ms: Date.now() - t0 };
+      return { ok: true, total: linhas.length, abertas, falhas, parcial, ms: Date.now() - t0 };
     } }).catch(() => []);
+    const r = await Promise.race([exec, new Promise((ok) => { corte = setTimeout(() => ok("corte"), limiteMs + 8000); })]);
+    clearTimeout(corte);
+    if (r === "corte") { await abortar(); await chrome.tabs.sendMessage(tabId, { tipo: "movs-guardar" }).catch(() => null); return { ok: true, total: 0, abertas: 0, falhas: 0, parcial: true, ms: limiteMs + 8000 }; }
     const res = (r || []).map((x) => x.result).find(Boolean) || null;
     if (!res) return null;
     await chrome.tabs.sendMessage(tabId, { tipo: "movs-guardar" }).catch(() => null);      // o mov-diag.js guarda a lista completa agora (sem esperar o ciclo de 2,5 s)
     return res;
-  } catch { return null; }
+  } catch { await abortar(); return null; }
 }

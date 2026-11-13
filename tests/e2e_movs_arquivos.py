@@ -22,15 +22,25 @@ with sync_playwright() as p:
     tab_id = ext_pg.evaluate("""async () => (await chrome.tabs.query({ url: 'https://projudi.tjgo.jus.br/*' }))[0].id""")
     antes = ext_pg.evaluate("""async () => (await chrome.storage.local.get('movs:5428441-88.2026.8.09.0166'))['movs:5428441-88.2026.8.09.0166']""")
     assert antes and len(antes["movs"]) == 3 and not any(m.get("arquivos") for m in antes["movs"]), "antes: movimentações guardadas, ainda sem lista de arquivos"
-    r = ext_pg.evaluate("""async (t) => { const m = await import('./movimentacoes-quadro.js'); const res = await m.completarArquivosDoQuadro(t, 30000); const g = (await chrome.storage.local.get('movs:5428441-88.2026.8.09.0166'))['movs:5428441-88.2026.8.09.0166']; const q = await m.quadroDoProcesso('Processo Nº: 5428441-88.2026.8.09.0166'); return { res, movs: g && g.movs, q }; }""", tab_id)
+    r = ext_pg.evaluate("""async (t) => { const m = await import('./movimentacoes-quadro.js'); const res = await m.completarArquivosDoQuadro(t, 20000); const g = (await chrome.storage.local.get('movs:5428441-88.2026.8.09.0166'))['movs:5428441-88.2026.8.09.0166']; const q = await m.quadroDoProcesso('Processo Nº: 5428441-88.2026.8.09.0166'); return { res, movs: g && g.movs, q }; }""", tab_id)
     print(json.dumps(r, ensure_ascii=False)[:900])
     assert r["res"] and r["res"]["ok"] and r["res"]["abertas"] == 2, r["res"]
     por_n = {m["n"]: m.get("arquivos") for m in r["movs"]}
     assert por_n[3] == ["audiencia.mp4", "ata de audiencia.html"] and por_n[2] == ["rol de testemunhas.pdf"] and not por_n[1], por_n
     assert "arquivos: 1=audiencia.mp4; 2=ata de audiencia.html" in r["q"] and "arquivos: 1=rol de testemunhas.pdf" in r["q"], r["q"]
     assert sorted(proc.evaluate("window.aberturas")) == ["X2", "X3"], "abre só as movimentações com arquivo (a de sistema, sem clipe, não)"
-    r2 = ext_pg.evaluate("""async (t) => (await import('./movimentacoes-quadro.js')).completarArquivosDoQuadro(t, 30000)""", tab_id)
+    r2 = ext_pg.evaluate("""async (t) => (await import('./movimentacoes-quadro.js')).completarArquivosDoQuadro(t, 20000)""", tab_id)
     assert r2 and r2["ok"] and r2["abertas"] == 0, "segunda vez: nada a abrir"
     assert len(proc.evaluate("window.aberturas")) == 2, "não clica de novo no que já está carregado"
+    # orçamento: 40 movimentações que demoram a carregar; com limite de 3 s a leitura PARA (parcial) e não deixa nada rodando
+    LENTA = PAGINA.replace("{LINHAS}", "")
+    linhas = "".join(LINHA(n, 100 + n, "Juntada", "x") for n in range(10, 50))
+    lenta = PAGINA.replace('</tbody>', linhas + '</tbody>').replace("setTimeout(() => {", "setTimeout(() => {").replace("}, 300); }", "}, 1500); }").replace("DADOS = {", "DADOS = new Proxy({X3: ['a.mp4'], X2: ['b.pdf']}, {get: (o, k) => o[k] || ['x.pdf']}); const DADOS_ = {")
+    p2 = ctx.new_page(); p2.route("https://projudi.tjgo.jus.br/lenta", lambda rr: rr.fulfill(body=lenta, content_type="text/html; charset=utf-8")); p2.goto("https://projudi.tjgo.jus.br/lenta"); p2.wait_for_timeout(3000)
+    t2 = ext_pg.evaluate("""async () => (await chrome.tabs.query({ url: 'https://projudi.tjgo.jus.br/lenta' }))[0].id""")
+    r3 = ext_pg.evaluate("""async (t) => (await import('./movimentacoes-quadro.js')).completarArquivosDoQuadro(t, 3000)""", t2)
+    print(r3); assert r3 and r3["parcial"] and r3["ms"] < 12000, "estourou o orçamento: parou e avisou"
+    n1 = len(p2.evaluate("window.aberturas")); p2.wait_for_timeout(4000); n2 = len(p2.evaluate("window.aberturas"))
+    assert n1 == n2 and n1 < 40, f"nada continua rodando na página depois do corte ({n1} -> {n2})"
     ctx.close()
 print("OK")

@@ -215,8 +215,8 @@ async function processar(item, chave, pasta, etapa = () => {}, opcoes = {}) {
     }
     if (opcoes.studio?.ativo) {      // lista oficial de arquivos de cada movimentação (o Studio confere as citações Mov./Arq. com ela); nunca trava nem derruba a fila
       passo("lendo a lista de arquivos de cada movimentação");
-      const rl = await limite(completarArquivosDoQuadro(tab.id, 100000), 115000, "a lista de arquivos das movimentações demorou").catch((e) => ({ ok: false, erro: e.message }));
-      passo(rl && rl.ok ? `lista de arquivos lida (${rl.abertas} movimentação(ões) aberta(s)${rl.falhas ? `, ${rl.falhas} sem resposta` : ""})` : "lista de arquivos das movimentações não lida (a análise segue pelos carimbos do PDF)");
+      const rl = await limite(completarArquivosDoQuadro(tab.id, 35000), 50000, "a lista de arquivos das movimentações demorou").catch((e) => ({ ok: false, erro: e.message }));
+      passo(rl && rl.ok ? `lista de arquivos lida (${rl.abertas} movimentação(ões) aberta(s)${rl.falhas ? `, ${rl.falhas} sem resposta` : ""}${rl.parcial ? "; parou no limite de tempo, o resto segue pelos carimbos do PDF" : ""})` : "lista de arquivos das movimentações não lida (a análise segue pelos carimbos do PDF)");
     }
     if (opcoes.studio?.ativo && opcoes.studio.modo === "video") {      // sentença com o vídeo da audiência: baixa os vídeos/áudios ANTES do PDF (se não houver, o processo é pulado com o motivo)
       const meta = await coletarMidiasDoProcesso(tab.id, item.processo, passo);
