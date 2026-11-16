@@ -377,6 +377,12 @@
   const fotoTxt = (f) => Object.entries(f).map(([k, v]) => `${k}=[${v.join(",")}]`).join(" ; ") || "(nada no navegador)";
   const temNaFoto = (f, rx) => Object.values(f).some((v) => v.some((n) => rx.test(n)));
 
+  // A Lupa ainda está trabalhando? O sinal confiável é o botão “Auditar Minuta”: enquanto audita, o app o mantém DESABILITADO e troca o texto dele pelo andamento
+  // (processo grande: “Etapa 2 de 3 — conferindo a minuta… (40%)”, sem a palavra “auditando”). Sem reconhecer isso, a extensão dava a auditoria por terminada
+  // cedo demais, ou achava que o botão sumiu (“não achei o botão Auditar Minuta”) e a fila seguia, ou repetia o pedido, sem esperar.
+  const RX_LUPA_OCUPADA = /auditando|analisando|processando|aguarde|carregando|gerando|reauditando|etapa\s*\d+\s*de\s*\d+|lendo e confrontando/i;
+  const lupaOcupada = (modal) => { const x = botaoAuditar(modal); return !!(x && x.disabled); };
+
   async function lupa({ arquivoId, nome, prompt, processo, minuta, motivoMinuta, texto: textoAutosOrig }) {
     if (!minuta || !minuta.trim()) return { ok: true, parcial: true, mensagem: "a Lupa precisa da minuta elaborada pelo assessor: PDF baixado, auditoria não iniciada" + (motivoMinuta ? " — " + motivoMinuta : "") };
     let textoAutos = textoAutosOrig;
@@ -391,6 +397,16 @@
     const achaModal = () => [...document.querySelectorAll("h2")].find((h) => /Lupa do Magistrado/i.test(texto(h)))?.closest("div.fixed");
     let modal = await esperar(achaModal, 20000);
     if (!modal) throw new Error("a janela da Lupa do Magistrado não abriu");
+    // Uma auditoria anterior (processo grande, em partes) pode ainda estar rodando na janela: espera acabar em vez de falhar por “não achei o botão Auditar Minuta” e repetir o pedido por cima dela.
+    if (lupaOcupada(modal)) {
+      const ini = Date.now(); let visto = modal.innerText, desdeMud = Date.now();
+      while (lupaOcupada(modal)) {
+        await dorme(3000);
+        if (modal.innerText !== visto) { visto = modal.innerText; desdeMud = Date.now(); }
+        if (Date.now() - desdeMud > 15 * 60000) throw new Error("a Lupa está ocupada com outra auditoria e não avançou há 15 minutos (esperei; não iniciei esta para não sobrepor)");
+        if (Date.now() - ini > 60 * 60000) throw new Error("a Lupa continuou ocupada com outra auditoria por mais de 1 hora (esperei; não iniciei esta)");
+      }
+    }
     // Leva a janela ao formulário de nova auditoria: depois de uma auditoria ela reabre na tela de resultado (“Bancada”/“Resultado & Análise”).
     // Insiste nos botões que levam ao formulário até aparecer o botão “Auditar Minuta”.
     const noForm = () => (botaoAuditar(modal) || botao(/^Colar Texto$/i, modal)) && [...modal.querySelectorAll("textarea")].filter(visivel).length >= 1;
@@ -456,6 +472,7 @@
     // Espera a auditoria terminar. Sinais: o botão volta ao normal OU a janela deixa de mudar (texto estável por ~12 s, sem “auditando/aguarde”).
     const t0 = Date.now(), texto_ = () => (modal.innerText || "").replace(/\s+/g, " ").trim();
     let ultimo = texto_(), desde = Date.now(), comecou = false, ultimaConf = 0, achouCedo = null;
+    let vistoOcupado = false;      // visto o andamento da auditoria (processo grande): o prazo máximo passa de 8 minutos para 90, enquanto o texto continuar mudando
     const dig0 = String(processo || "").replace(/\D/g, "").slice(0, 9);
     const rxProc0 = dig0 ? new RegExp(dig0.slice(0, 7) + "[.\\-]?" + dig0.slice(7, 9)) : null;
     for (;;) {
@@ -464,7 +481,8 @@
       const x = botaoAuditar(modal), agora = texto_();
       if (!x || x.disabled || texto(x) !== rotulo) comecou = true;
       if (agora !== ultimo) { ultimo = agora; desde = Date.now(); }
-      const ocupado = /auditando|analisando|processando|aguarde|carregando|gerando/i.test(agora.slice(0, 4000));
+      const ocupado = !!(x && x.disabled) || RX_LUPA_OCUPADA.test(agora.slice(0, 4000));
+      if (ocupado) vistoOcupado = true;
       const voltou = comecou && x && !x.disabled && texto(x) === rotulo;
       // O registro aparece em “Processos Auditados” logo que a auditoria termina e some se a janela for para “Resultado & Análise”:
       // por isso confere na lista assim que a tela se acalma, antes de qualquer outra aba.
@@ -475,7 +493,8 @@
         if (rxProc0.test(l0)) { achouCedo = { qtd: (l0.match(/Processos Auditados\s*(\d+)/i) || [])[1] }; botao(/^\s*Nova Auditoria\s*$/i, modal)?.click(); await dorme(500); break; }
       }
       if (voltou || (comecou && !ocupado && Date.now() - desde > 12000) || (!comecou && Date.now() - t0 > 20000)) break;
-      if (Date.now() - t0 > 8 * 60000) throw new Error("a auditoria da Lupa demorou mais de 8 minutos");
+      if (Date.now() - t0 > (vistoOcupado ? 90 : 8) * 60000) throw new Error(`a auditoria da Lupa demorou mais de ${vistoOcupado ? 90 : 8} minutos`);
+      if (ocupado && Date.now() - desde > 15 * 60000) throw new Error("a auditoria da Lupa parou de avançar há 15 minutos (a janela não mudou)");
     }
     const injecaoLupa = lerInjecao(modal);      // a tarja fica no topo do resultado; lida antes de a janela mudar de tela
     const resumo = texto_().replace(/Auditar Minuta com Rigor do Magistrado.*$/i, "").slice(0, 300);
