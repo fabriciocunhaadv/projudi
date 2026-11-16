@@ -522,7 +522,10 @@
     if (rxProc && temNaFoto(foto1, rxProc) && !temNaFoto(foto2, rxProc)) throw new Error(`o botão “Limpar Tudo” apagou ${processo} dos Processos Auditados. Parei para não perder mais registros. ${trilha}`);
     if (antes != null && !jaTinha && qtd != null && Number(qtd) <= antes) throw new Error(`a auditoria de ${processo} substituiu outra em vez de entrar na lista (eram ${antes}, ficaram ${qtd}). Não passei para o próximo`);
     window.__lupaQtd = Number(qtd) || window.__lupaQtd; window.__lupaRx = rxProc;
-    return { ok: true, mensagem: `auditoria gravada em Processos Auditados (${qtd ?? "?"} registro(s); ${processo} ✔) — ${trilha}` + (window.__promptAproximado ? " — " + window.__promptAproximado : "") + (resumo ? " — " + resumo : "") + (avisoPerda ? " — " + avisoPerda : ""), minuta: "", injecao: injecaoLupa };
+    // A trilha completa (todos os números de processo de cada lista) só vai na mensagem quando algo dá errado (acima). No sucesso: só quantos há em cada lista.
+    const contagem = Object.entries(foto2).map(([k, v]) => `${k}: ${v.length}`).join(" · ") || "nada no navegador";
+    try { console.info("[Lupa] " + trilha); } catch { /* sem console */ }
+    return { ok: true, mensagem: `auditoria gravada em Processos Auditados (${qtd ?? "?"} registro(s); ${processo} ✔) — listas no navegador: ${contagem}` + (window.__promptAproximado ? " — " + window.__promptAproximado : "") + (resumo ? " — " + resumo : "") + (avisoPerda ? " — " + avisoPerda : ""), minuta: "", injecao: injecaoLupa };
   }
 
 
