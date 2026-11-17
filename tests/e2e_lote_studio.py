@@ -89,10 +89,10 @@ def main():
     d = ext / "docs-api.js"; d.write_text(d.read_text().replace("https://docs.googleapis.com/v1/documents", "http://127.0.0.1:8777/v1/documents").replace("https://docs.google.com/document/d/", "http://127.0.0.1:8777/d/").replace("const token = () =>", "const token = async () => 'tok-teste'; const _t = () =>").replace("const configurado = () =>", "const configurado = () => true; const _c = () =>"))
     c = ext / "studio-cliente.js"; c.write_text(c.read_text().replace("https://judicial-mysql.assessor.net.br/", "http://127.0.0.1:8774/"))
     (ext / "background.js").write_text((ext / "background.js").read_text().replace('const DOMINIO = "tjgo.jus.br";', 'const DOMINIO = "localhost";'))
-    srv = http.server.HTTPServer(("localhost", 8770), H)
+    srv = http.server.ThreadingHTTPServer(("localhost", 8770), H)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
-    srvd = http.server.HTTPServer(("127.0.0.1", 8777), HD); threading.Thread(target=srvd.serve_forever, daemon=True).start()
-    srv2 = http.server.HTTPServer(("127.0.0.1", 8774), HS)
+    srvd = http.server.ThreadingHTTPServer(("127.0.0.1", 8777), HD); threading.Thread(target=srvd.serve_forever, daemon=True).start()
+    srv2 = http.server.ThreadingHTTPServer(("127.0.0.1", 8774), HS)
     threading.Thread(target=srv2.serve_forever, daemon=True).start()
     exe = os.environ.get("CHROMIUM_PATH") or glob.glob("/opt/pw-browsers/chromium-*/chrome-linux*/chrome")[0]
     with sync_playwright() as p:
