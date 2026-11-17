@@ -346,16 +346,27 @@ async function lancarNoProjudi(m, abaStudio) {
       const svUrl = m.serventiaUrl;
       if (m.serventiaUrl) await chrome.storage.local.set({ lancar_ultima_serventia: new URL(m.serventiaUrl, LP_BASE).href }).catch(() => {});
       if (svUrl) { if (!(await ProjudiQuadro.irPara(tab.id, new URL(svUrl, LP_BASE).href))) return await lpSemMoldura(tab.id, "trocar de serventia"); await lpDorme(1200); }
-      if (!(await ProjudiQuadro.irPara(tab.id, LP_BASE + "PreAnalisarConclusao?PaginaAtual=2&tipo=todas"))) return await lpSemMoldura(tab.id, "abrir a lista de conclusos");
-      await lpDorme(1500);
-      let r = "", visto = 0;
-      for (let k = 0; k < 30 && r !== "clicou" && r !== "sem-botao"; k++) {
-        const rs = await lpScript(tab.id, lpClicarPreAnalisar, [chave]);
-        r = rs.find((x) => x === "clicou" || x === "sem-botao") || rs.find(Boolean) || "";
-        if (/^linhas:/.test(r)) visto = +r.split(":")[1];
-        if (r !== "clicou" && r !== "sem-botao") await lpDorme(1000);
+      // Lançar: a minuta vai para um processo NÃO analisado (lista PaginaAtual=2). Ler: a minuta já foi salva pelo assessor, então o processo está entre os PRÉ-ANALISADOS (PaginaAtual=6, a “Busca de Pré-Análises”); a 2 fica de reserva.
+      const listas = ler ? ["PaginaAtual=6", "PaginaAtual=2"] : ["PaginaAtual=2"];
+      let r = "", visto = 0, ondeFalhou = "";
+      for (const lista of listas) {
+        if (!(await ProjudiQuadro.irPara(tab.id, LP_BASE + `PreAnalisarConclusao?${lista}&tipo=todas`))) return await lpSemMoldura(tab.id, "abrir a lista de conclusos");
+        await lpDorme(1500);
+        r = ""; visto = 0;
+        const tentativas = ler && lista === "PaginaAtual=6" ? 14 : 30;
+        for (let k = 0; k < tentativas && r !== "clicou" && r !== "sem-botao"; k++) {
+          const rs = await lpScript(tab.id, lpClicarPreAnalisar, [chave]);
+          r = rs.find((x) => x === "clicou" || x === "sem-botao") || rs.find(Boolean) || "";
+          if (/^linhas:/.test(r)) visto = +r.split(":")[1];
+          if (r !== "clicou" && r !== "sem-botao") {
+            if (k === 6) await lpScript(tab.id, () => { document.getElementById("formLocalizarBotao")?.click(); return null; }).catch(() => {});      // a lista pode vir vazia até apertar “Consultar”
+            await lpDorme(1000);
+          }
+        }
+        ondeFalhou = lista === "PaginaAtual=6" ? "pré-analisadas" : "não analisadas";
+        if (r === "clicou" || r === "sem-botao") break;
       }
-      if (r !== "clicou") return { ok: false, erro: r === "sem-botao" ? "não achei o botão Pré-Analisar na linha do processo" : `o processo não apareceu na lista de conclusos desta serventia (a lista tinha ${visto} linha(s)); confira se a serventia ativa no Projudi é a do processo` };
+      if (r !== "clicou") return { ok: false, erro: r === "sem-botao" ? "não achei o botão Pré-Analisar/Visualizar na linha do processo" : `o processo não apareceu na lista de conclusos desta serventia (última lista lida: ${ondeFalhou}, ${visto} linha(s)); confira se a serventia ativa no Projudi é a do processo e se ele ainda está nos conclusos` };
       let nela = false; for (let k = 0; k < 40 && !nela; k++) { await lpDorme(1000); nela = (await lpScript(tab.id, lpNaPaginaPreAnalise, [chave])).some(Boolean); }
       if (!nela) return { ok: false, erro: "cliquei em Pré-Analisar, mas a tela de pré-análise não abriu" };
     }

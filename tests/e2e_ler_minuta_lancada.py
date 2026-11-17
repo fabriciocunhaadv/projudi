@@ -1,7 +1,7 @@
 """“Buscar minuta lançada” (modo só leitura de lancarNoProjudi): contra o MESMO Projudi simulado, lê o texto que já está salvo no editor da pré-análise SEM escolher Tipo/Modelo, SEM escrever e SEM apertar Excluir. Derivado do teste de lançar. Lançar no Projudi, de ponta a ponta contra um Projudi SIMULADO (https://projudi.tjgo.jus.br atendido pelo teste): a aba do Projudi já está na pré-análise;
 o Tipo de Arquivo vem por sugestões; o Modelo só pela lupa, que NAVEGA a própria aba para a página “Busca de Modelo” (Consultar → linha → Selecionar) e volta ao formulário;
 a página tem um quadro interno e um botão Excluir que nunca pode ser apertado. Não valida a tela real."""
-import glob, json, os, shutil, tempfile
+import os, glob, json, os, shutil, tempfile
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 from playwright.sync_api import sync_playwright
@@ -44,7 +44,9 @@ def atender(route):
     def ok(body, tipo="text/html; charset=utf-8"): route.fulfill(status=200, headers={"content-type": tipo}, body=body)
     if u.path == "/": ok(MOLDURA)
     elif u.path == "/home": ok("<html><body><h2>Página inicial</h2></body></html>")
-    elif u.path == "/PreAnalisarConclusao": ok(LISTA)
+    elif u.path == "/PreAnalisarConclusao":
+        st.setdefault("listas", []).append(q.get("PaginaAtual", [""])[0])
+        ok(LISTA if ((os.environ.get("SO_PRE") or "") == "" or q.get("PaginaAtual", [""])[0] == os.environ.get("SO_PRE")) else "<html><body><h2>Conclusos</h2><table></table></body></html>")
     elif u.path == "/form": ok(form())
     elif u.path == "/busca-modelo": ok(BUSCA)
     elif u.path == "/api/tipos": ok(json.dumps([t for t in TIPOS if q.get("q", [""])[0].lower() in t.lower()]), "application/json")
