@@ -175,6 +175,17 @@ function lpLerEditor() {
   return null;
 }
 
+/** Leitura da minuta já salva: editor (CKEditor/TinyMCE) ou, na tela “Texto Pré-Análise” aberta pelo Visualizar dos pré-analisados, o HTML fixo #divTextoEditor (não é um editor). */
+function lpLerTexto() {
+  try {
+    const ck = window.CKEDITOR; if (ck && ck.instances) { const n = Object.keys(ck.instances)[0]; if (n) return ck.instances[n].getData(); }
+    if (window.tinymce && window.tinymce.activeEditor) return window.tinymce.activeEditor.getContent();
+    const fixo = document.getElementById("divTextoEditor");
+    if (fixo && fixo.innerText && fixo.innerText.trim().length > 20) return fixo.innerHTML;
+  } catch (e) { /* sem texto neste quadro */ }
+  return null;
+}
+
 /** Texto visível da tela (para diagnóstico quando não acho o editor ou ele vem só com o modelo). */
 function lpTextoDaTela() { try { return ((document.body && document.body.innerText) || "").replace(/\s+/g, " ").trim().slice(0, 1500); } catch (e) { return ""; } }
 
@@ -345,7 +356,14 @@ async function lancarNoProjudi(m, abaStudio) {
       // navega DENTRO do quadro da moldura do Projudi (a aba mantém o cabeçalho e os menus)
       const svUrl = m.serventiaUrl;
       if (m.serventiaUrl) await chrome.storage.local.set({ lancar_ultima_serventia: new URL(m.serventiaUrl, LP_BASE).href }).catch(() => {});
-      if (svUrl) { if (!(await ProjudiQuadro.irPara(tab.id, new URL(svUrl, LP_BASE).href))) return await lpSemMoldura(tab.id, "trocar de serventia"); await lpDorme(1200); }
+      let entrou = false;
+      if (svUrl && !(await ProjudiQuadro.temMoldura(tab.id))) {      // aba solta (ex.: a tela “Serventias Disponíveis”): faz o que o usuário faria, clica na serventia certa (abre a própria serventia), em vez de mandar a aba para o início
+        progresso("entrando na serventia do processo…");
+        await chrome.tabs.update(tab.id, { url: new URL(svUrl, LP_BASE).href }).catch(() => {});
+        for (let k = 0; k < 40 && !entrou; k++) { await lpDorme(500); entrou = await ProjudiQuadro.temMoldura(tab.id); }
+        if (entrou) await lpDorme(1200);
+      }
+      if (svUrl && !entrou) { if (!(await ProjudiQuadro.irPara(tab.id, new URL(svUrl, LP_BASE).href))) return await lpSemMoldura(tab.id, "trocar de serventia"); await lpDorme(1200); }
       // Lançar: a minuta vai para um processo NÃO analisado (lista PaginaAtual=2). Ler: a minuta já foi salva pelo assessor, então o processo está entre os PRÉ-ANALISADOS (PaginaAtual=6, a “Busca de Pré-Análises”); a 2 fica de reserva.
       const listas = ler ? ["PaginaAtual=6", "PaginaAtual=2"] : ["PaginaAtual=2"];
       let r = "", visto = 0, ondeFalhou = "";
@@ -367,7 +385,7 @@ async function lancarNoProjudi(m, abaStudio) {
         if (r === "clicou" || r === "sem-botao") break;
       }
       if (r !== "clicou") return { ok: false, erro: r === "sem-botao" ? "não achei o botão Pré-Analisar/Visualizar na linha do processo" : `o processo não apareceu na lista de conclusos desta serventia (última lista lida: ${ondeFalhou}, ${visto} linha(s)); confira se a serventia ativa no Projudi é a do processo e se ele ainda está nos conclusos` };
-      let nela = false; for (let k = 0; k < 40 && !nela; k++) { await lpDorme(1000); nela = (await lpScript(tab.id, lpNaPaginaPreAnalise, [chave])).some(Boolean); }
+      let nela = ler; for (let k = 0; k < 40 && !nela; k++) { await lpDorme(1000); nela = (await lpScript(tab.id, lpNaPaginaPreAnalise, [chave])).some(Boolean); }
       if (!nela) return { ok: false, erro: "cliquei em Pré-Analisar, mas a tela de pré-análise não abriu" };
     }
     await chrome.tabs.update(tab.id, { active: true }).catch(() => {});
@@ -376,7 +394,7 @@ async function lancarNoProjudi(m, abaStudio) {
       const semTags = (h) => String(h || "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
       let melhor = "";
       for (let k = 0; k < 24; k++) {      // o editor pode demorar a carregar: espera até haver texto de verdade (até ~18 s)
-        const hs = (await lpScript(tab.id, lpLerEditor)).filter((x) => typeof x === "string");
+        const hs = (await lpScript(tab.id, lpLerTexto)).filter((x) => typeof x === "string");
         const h = hs.sort((a, b) => semTags(b).length - semTags(a).length)[0] || "";
         if (semTags(h).length > semTags(melhor).length) melhor = h;
         if (semTags(melhor).length > 200) break;

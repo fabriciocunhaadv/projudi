@@ -9,7 +9,7 @@ from playwright.sync_api import sync_playwright
 RAIZ = Path(__file__).parent.parent / "extensao"
 MODELO = ('<p style="text-align:center"><strong>PODER JUDICIÁRIO</strong></p><p>Processo nº: 5914870-27.2025.8.09.0166</p>'
           '<p style="text-align:center"><strong>DECISÃO</strong></p><p>I.C.</p><p><strong>Atenda-se.</strong></p><p>MCG, data do sistema</p><p>Rafael Machado de Souza</p>')
-st = {"tipo": "", "modelo": "", "excluiu": False, "consultas": 0, "salvo": True}
+st = {"visualizar": False, "raiz": 0, "entrar": 0, "tipo": "", "modelo": "", "excluiu": False, "consultas": 0, "salvo": True}
 SALVO = "<p>DECISÃO</p><p>Texto SALVO pelo assessor: defiro a <b>habilitação</b> dos herdeiros e determino a intimação das partes para manifestação em cinco dias, sob pena de preclusão. " + "Cumpra-se com urgência. " * 8 + "</p><p>MCG, data do sistema</p>"
 TIPOS = ["Decisão", "Despacho", "Sentença", "Decisão Interlocutória"]
 MODELOS = [(11, "Decisão Cível", "Vara Cível", "Decisão"), (12, "Decisão Padrão", "Vara de Família", "Decisão"), (13, "Despacho Padrão", "Vara de Família", "Despacho"), (14, "Sentença Padrão", "Vara de Família", "Sentença")]
@@ -42,7 +42,10 @@ LISTA = """<html><body><h2>Conclusos</h2><table><tr><td><a href="BuscaProcesso?I
 def atender(route):
     u = urlparse(route.request.url); q = parse_qs(u.query)
     def ok(body, tipo="text/html; charset=utf-8"): route.fulfill(status=200, headers={"content-type": tipo}, body=body)
-    if u.path == "/": ok(MOLDURA)
+    if u.path == "/": st["raiz"] += 1; ok(MOLDURA)
+    elif u.path == "/entrar": st["entrar"] += 1; ok(MOLDURA)
+    elif u.path == "/serventias": ok("<html><body><h2>Serventias Disponíveis</h2><a href='/entrar'>Assessor de Juiz Vara</a></body></html>")
+    elif u.path == "/form" and st["visualizar"]: ok("<html><head><meta charset='utf-8'><title>Projudi</title></head><body><h2>Texto Pré-Análise</h2><div id='divTextoEditor'>" + SALVO + "</div><button>Refazer</button><button>Descartar</button></body></html>")
     elif u.path == "/home": ok("<html><body><h2>Página inicial</h2></body></html>")
     elif u.path == "/PreAnalisarConclusao":
         st.setdefault("listas", []).append(q.get("PaginaAtual", [""])[0])
@@ -83,6 +86,14 @@ with sync_playwright() as p:
     assert st["tipo"] == "" and st["modelo"] == "", st
     # D) sem número do processo
     r = sw.evaluate("m => lancarNoProjudi(m, null)", {"somenteLer": True}); assert not r["ok"] and "número do processo" in r["erro"], r
+    # F) a tela que o Visualizar abre nos PRÉ-ANALISADOS é só leitura (“Texto Pré-Análise”, HTML fixo #divTextoEditor, sem editor): a extensão lê esse texto
+    st["salvo"] = True; st["visualizar"] = True; aba.goto("https://projudi.tjgo.jus.br/")
+    r = sw.evaluate("m => lancarNoProjudi(m, null)", LER); print("F", {k: (v[:80] if isinstance(v, str) else v) for k, v in r.items()})
+    assert r["ok"] and "habilitação" in r["html"] and "preclusão" in r["html"], r
+    # G) aba solta na tela “Serventias Disponíveis” (sem cabeçalho/menus): entra pela serventia certa e NÃO manda a aba para o início
+    aba.goto("https://projudi.tjgo.jus.br/serventias"); st["raiz"] = 0; st["entrar"] = 0
+    r = sw.evaluate("m => lancarNoProjudi(m, null)", {**LER, "serventiaUrl": "https://projudi.tjgo.jus.br/entrar"}); print("G", {k: (v[:80] if isinstance(v, str) else v) for k, v in r.items()}, st["raiz"], st["entrar"])
+    assert r["ok"] and st["entrar"] >= 1 and st["raiz"] == 0, (r, st)
     # E) sem aba do Projudi aberta: não cria aba nova
     aba.close(); r2 = sw.evaluate("m => lancarNoProjudi(m, null)", LER)
     assert not r2["ok"] and "não há aba do Projudi" in r2["erro"], r2

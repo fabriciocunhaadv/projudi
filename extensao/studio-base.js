@@ -871,7 +871,14 @@
     try {
       // mesma escolha de serventia do “Lançar no Projudi”: a do processo (que a extensão conhece pela esteira) ou a última usada; se só há uma, ela; senão fica na serventia ativa
       let sv = "";
-      try { const l = await chrome.runtime.sendMessage({ acao: "lancar-serventias", processo: String(d.processo || "") }); sv = l?.sugerida || (l?.serventias?.length === 1 ? l.serventias[0].url : ""); } catch (e) { /* sem lista */ }
+      try {
+        const l = await chrome.runtime.sendMessage({ acao: "lancar-serventias", processo: String(d.processo || "") });
+        // 1º a serventia que o CABEÇALHO da minuta cita (ex.: “Montes Claros de Goiás - Vara de Família e Sucessões”); depois a do processo/última; por fim a única
+        const semAc = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+        const cab = " " + semAc(String(d.cabecalho || "").slice(0, 1500)) + " ";
+        let melhor = null, tam = 0; for (const x of (l?.serventias || [])) { const n = semAc(x.serventia).replace(/ go$/, ""); if (n.length > 8 && n.length > tam && cab.includes(" " + n + " ")) { melhor = x; tam = n.length; } }
+        sv = melhor?.url || l?.sugerida || (l?.serventias?.length === 1 ? l.serventias[0].url : "");
+      } catch (e) { /* sem lista */ }
       chrome.runtime.sendMessage({ acao: "ler-minuta-lancada", processo: String(d.processo || ""), serventiaUrl: sv }, (r) => {
         window.__lerMinutaReqId = null;
         if (chrome.runtime.lastError) return resp({ tipo: "fim", ok: false, erro: String(chrome.runtime.lastError.message || "a extensão não respondeu") });
