@@ -60,10 +60,11 @@ def main():
     m = ext / "manifest.json"; m.write_text(m.read_text().replace("https://*.tjgo.jus.br/*", "http://localhost/*").replace("https://judicial-mysql.assessor.net.br/*", "http://127.0.0.1/*"))
     c = ext / "studio-cliente.js"; c.write_text(c.read_text().replace("https://judicial-mysql.assessor.net.br/", "http://127.0.0.1:8774/"))
     (ext / "background.js").write_text((ext / "background.js").read_text().replace('const DOMINIO = "tjgo.jus.br";', 'const DOMINIO = "localhost";'))
+    bg = ext / "background.js"; t = bg.read_text(); assert r"/^https:\/\/projudi\.tjgo\.jus\.br\//.test(m.serventiaUrl)" in t; bg.write_text(t.replace(r"/^https:\/\/projudi\.tjgo\.jus\.br\//.test(m.serventiaUrl)", r"/^http:\/\/localhost:8770\//.test(m.serventiaUrl)"))      # só na cópia de teste: o Projudi simulado fica em localhost
     (ext / "projudi-aba.js").write_text((ext / "projudi-aba.js").read_text().replace('"https://projudi.tjgo.jus.br/*"', '"http://localhost/*"'))
     r = ext / "refazer.js"; r.write_text(r.read_text().replace('const BASE = "https://projudi.tjgo.jus.br/";', 'const BASE = "http://localhost:8770/";'))
-    srv = http.server.HTTPServer(("localhost", 8770), H); threading.Thread(target=srv.serve_forever, daemon=True).start()
-    srv2 = http.server.HTTPServer(("127.0.0.1", 8774), HS); threading.Thread(target=srv2.serve_forever, daemon=True).start()
+    srv = http.server.ThreadingHTTPServer(("localhost", 8770), H); threading.Thread(target=srv.serve_forever, daemon=True).start()
+    srv2 = http.server.ThreadingHTTPServer(("127.0.0.1", 8774), HS); threading.Thread(target=srv2.serve_forever, daemon=True).start()
     exe = os.environ.get("CHROMIUM_PATH") or glob.glob("/opt/pw-browsers/chromium-*/chrome-linux*/chrome")[0]
     with sync_playwright() as p:
         ctx = p.chromium.launch_persistent_context(str(tmp / "perfil"), executable_path=exe, headless=False,
@@ -110,8 +111,12 @@ def main():
         for v in ("18", "19"): popup.check(f"input[name=chk1][value='{v}']")
         for v in ("102", "103"): popup.check(f"input[name=chk2][value='{v}']")
         verde.click()
-        for _ in range(60):
+        for k in range(60):
             if CORPOS: break
+            if k in (3, 10): print("   (depois de", k, "s) mensagem da janela:", popup.locator("[data-projudi-ext=gerarpdf] >> .m").inner_text()[:300], "| abas:", [x.url[-50:] for x in ctx.pages], flush=True)
+            if k == 10:
+                for x in ctx.pages:
+                    if "ocr.html" in x.url: print("   OCR:", x.inner_text("body")[:700].replace("\n", " / "), flush=True)
             popup.wait_for_timeout(1000)
         ok(len(CORPOS) == 1, "pediu UM PDF ao Projudi")
         corpo = CORPOS[0] if CORPOS else ""
