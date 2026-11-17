@@ -34,6 +34,15 @@
     return { marcadas: n };
   }
 
+  // Faixa das movimentações marcadas: a de cada arquivo marcado (chk2) entra pela movimentação-pai; a marcada direto (chk1) também. O número vem de selecao="nivelN" (o mesmo usado para achar os arquivos).
+  function faixaMarcada() {
+    const nums = new Set(), numDe = (li) => +((li && li.getAttribute("selecao") || "").replace(/\D/g, "")) || 0;
+    for (const c of document.querySelectorAll("input[name=chk1]:checked")) { const n = numDe(c); if (n) nums.add(n); }
+    const arqs = [...document.querySelectorAll("input[name=chk2]:checked")].filter((c) => !c.disabled);
+    for (const c of arqs) { const n = numDe(document.querySelector(`input[name=chk1][value="${c.getAttribute("pai")}"]`)); if (n) nums.add(n); }
+    const lista = [...nums].sort((a, b) => a - b);
+    return { n: lista.length, min: lista[0] || 0, max: lista[lista.length - 1] || 0, arquivos: arqs.length };
+  }
   const valoresMarcados = (nome) => new Set([...document.querySelectorAll(`input[name=${nome}]:checked`)].map((c) => c.value));
   async function executar(pedido) {
     // Seleção do usuário: guardada ANTES de qualquer coisa, para nenhum script da página (nem a escolha do volume) trocá-la por "tudo".
@@ -77,8 +86,8 @@
     const sh = host.attachShadow({ mode: "open" });
     sh.innerHTML = `<style>.w{position:fixed;left:6px;bottom:8px;z-index:2147483647;font:12px system-ui,sans-serif;display:flex;flex-direction:column;gap:4px;align-items:flex-start}
       button{font:12px system-ui;padding:5px 9px;border:1px solid #1a56a0;background:#1a56a0;color:#fff;border-radius:5px;cursor:pointer}button.s{background:#fff;color:#1a56a0}
-      .m{background:#fffbe6;border:1px solid #e0c36a;border-radius:4px;padding:3px 6px;color:#333;display:none}</style>
-      <div class="w"><div class="m"></div><button data-a="todos">⬇ Gerar e baixar tudo (extensão)</button><button data-a="turbo" style="background:#d9780a;border-color:#d9780a">⚡ Gerar e enviar à Análise Turbo</button><button class="s" data-a="diag">Copiar diagnóstico</button></div>`;
+      .m{background:#fffbe6;border:1px solid #e0c36a;border-radius:4px;padding:3px 6px;color:#333;display:none}.r{display:flex;flex-direction:column;gap:4px;align-items:flex-start}.r[hidden]{display:none}.rt{background:#e8f6ec;border:1px solid #16803c;border-radius:4px;padding:4px 7px;color:#14532d;max-width:420px}</style>
+      <div class="w"><div class="m"></div><div class="r" hidden><div class="rt">↩ Refazer a minuta no Studio: marque só as movimentações que quer e aperte o botão verde.</div><button data-a="refazer" style="background:#16803c;border-color:#16803c;font-weight:700">↩ Devolver ao Studio e refazer a minuta</button></div><button data-a="todos">⬇ Gerar e baixar tudo (extensão)</button><button data-a="turbo" style="background:#d9780a;border-color:#d9780a">⚡ Gerar e enviar à Análise Turbo</button><button class="s" data-a="diag">Copiar diagnóstico</button></div>`;
     const msg = (t) => { const m = sh.querySelector(".m"); m.textContent = t; m.style.display = "block"; };
     window.__projudiMsg = msg;
     const botaoTodos = sh.querySelector('[data-a="todos"]');
@@ -122,6 +131,22 @@
       await navigator.clipboard.writeText(JSON.stringify({ url: location.href.replace(/([?&](chave|token|usu)=)[^&]*/g, "$1…"), html: c.outerHTML.replace(/\s+/g, " ").slice(0, 120000) }));
       msg("Diagnóstico copiado. Cole no chat.");
     };
+    // ---- “Refazer a minuta com alguns eventos” (pedido vindo do Studio pela página refazer.js) ----
+    const botaoRefazer = sh.querySelector('[data-a="refazer"]'), blocoRefazer = sh.querySelector(".r");
+    chrome.storage.local.get("refazer_pedido").then(({ refazer_pedido: rp }) => {
+      if (!rp || Date.now() - rp.ts > 3600000) return;
+      blocoRefazer.hidden = false;
+      for (const a of ["todos", "turbo"]) sh.querySelector(`[data-a="${a}"]`).style.display = "none";      // neste caminho só vale devolver ao Studio
+      botaoRefazer.onclick = async () => {
+        const f = faixaMarcada();
+        if (!f.n) { msg("Marque ao menos uma movimentação (ou arquivo) na lista antes de devolver ao Studio."); return; }
+        botaoRefazer.disabled = true;
+        const r = await executar({ marcados: true, processo: rp.processo, studio: { ativo: true, modo: "analise", prompt: rp.prompt, tipo: "", minuta: "", url: rp.url || "", urlPre: "", serventiaUrl: rp.serventiaUrl || "", serventia: rp.serventia || "", docs: false, refazer: { de: rp.de, min: f.min, max: f.max, n: f.n, arquivos: f.arquivos } } });
+        if (r.erro) { botaoRefazer.disabled = false; msg("✖ " + r.erro); return; }
+        await chrome.storage.local.remove("refazer_pedido");
+        msg(`Enviado ao Studio: movimentações ${f.min} a ${f.max} (${f.n} marcada(s), ${f.arquivos} arquivo(s)). A extensão baixa só esses arquivos, faz o OCR e o Studio gera a nova minuta (versão 2). Pode fechar esta janela.`);
+      };
+    }).catch(() => {});
     document.documentElement.appendChild(host);
   }
 

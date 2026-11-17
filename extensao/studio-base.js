@@ -3,7 +3,7 @@
 (() => {
   if (window.__projudiStudioBase) return;
   window.__projudiStudioBase = true;
-  try { document.documentElement.dataset.assessorExtensao = chrome.runtime.getManifest().version; document.documentElement.dataset.assessorExtensaoRecursos = "pdf,sv,modelos,modelos-atualizar,minuta-lancada,minuta-serventia"; document.documentElement.dataset.assessorExtensaoId = chrome.runtime.id; } catch (e) { /* sem manifest */ }      // o app mostra a tarja “instale a extensão” só quando este aviso não existe
+  try { document.documentElement.dataset.assessorExtensao = chrome.runtime.getManifest().version; document.documentElement.dataset.assessorExtensaoRecursos = "pdf,sv,modelos,modelos-atualizar,minuta-lancada,minuta-serventia,refazer-parcial"; document.documentElement.dataset.assessorExtensaoId = chrome.runtime.id; } catch (e) { /* sem manifest */ }      // o app mostra a tarja “instale a extensão” só quando este aviso não existe
   const dorme = (ms) => new Promise((ok) => setTimeout(ok, ms));
   const visivel = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
   const texto = (e) => (e.textContent || "").replace(/\s+/g, " ").trim();
@@ -141,7 +141,15 @@
   const mapasAtivos = () => { try { return JSON.parse(document.documentElement.dataset.mapas || "[]").some((m) => ["planejando", "lendo", "consolidando"].includes(m.status)); } catch { return false; } };
   const novoRelogio = () => { const t0 = Date.now(); let parado = 0, ult = t0; return () => { const n = Date.now(); if (mapasAtivos() && parado < 40 * 60000) parado += n - ult; ult = n; return n - t0 - parado; }; };
   const listaGigantes = () => { try { return JSON.parse(document.documentElement.dataset.gigantes || "[]"); } catch { return []; } };
-  async function analisar({ arquivoId, nome, prompt, tipo, texto: textoAutos, ate1, processo }) {
+  // A análise "refazer" avisa o app (atributo na página) para gravar a minuta como versão ligada à anterior; o atributo some quando a análise termina ou falha.
+  async function analisar(args) {
+    try {
+      if (args.refazer && typeof args.refazer === "object") document.documentElement.dataset.refazerPedido = JSON.stringify({ de: String(args.refazer.de || ""), min: +args.refazer.min || 0, max: +args.refazer.max || 0, n: +args.refazer.n || 0, arquivos: +args.refazer.arquivos || 0, processo: String(args.processo || ""), t: Date.now() });
+      else delete document.documentElement.dataset.refazerPedido;
+      return await analisarInterno(args);
+    } finally { try { delete document.documentElement.dataset.refazerPedido; } catch (e) { /* sem dataset */ } }
+  }
+  async function analisarInterno({ arquivoId, nome, prompt, tipo, texto: textoAutos, ate1, processo }) {
     const inicioAnalise = Date.now();
     const bytes = arquivos.get(arquivoId);
     if (!bytes && !textoAutos) throw new Error("arquivo não recebido");
@@ -894,6 +902,18 @@
     } catch (e) { window.__lerMinutaReqId = null; resp({ tipo: "fim", ok: false, erro: String(e?.message || e) }); }
   });
 
+  // ----- “Refazer só com alguns eventos” (minuta do motor principal): o app pede (fase "iniciar"); a extensão abre o Projudi na serventia/processo e na janela Gerar PDF; o assessor marca e devolve. Andamento e fim voltam por aqui. -----
+  addEventListener("message", (ev) => {
+    const d = ev.data; if (ev.source !== window || ev.origin !== window.location.origin || !d || d.__projudi !== "refazer-parcial" || d.fase !== "iniciar" || typeof d.reqId !== "string") return;
+    const resp = (o) => window.postMessage({ __projudiResp: "refazer-parcial", reqId: d.reqId, ...o }, window.location.origin);
+    window.__refazerReqId = d.reqId;
+    try {
+      chrome.runtime.sendMessage({ acao: "refazer-parcial", reqId: d.reqId, processo: String(d.processo || ""), de: String(d.de || ""), prompt: String(d.prompt || ""), serventiaUrl: typeof d.serventiaUrl === "string" ? d.serventiaUrl : "" }, (r) => {
+        if (chrome.runtime.lastError || !r?.ok) resp({ tipo: "fim", ok: false, erro: String(chrome.runtime.lastError?.message || r?.erro || "a extensão não respondeu") });
+      });
+    } catch (e) { resp({ tipo: "fim", ok: false, erro: String(e?.message || e) }); }
+  });
+
   // ----- Tratamento de PDF pela extensão: o app entrega o PDF em partes (window.postMessage) e a extensão (página pdf-studio) devolve andamento e texto -----
   if (window.top === window) window.addEventListener("message", async (ev) => {
     const d = ev.data;
@@ -1000,6 +1020,10 @@
   };
 
   chrome.runtime.onMessage.addListener((m, _s, responder) => {
+    if ((m?.acao === "refazer-progresso" || m?.acao === "refazer-fim") && window.top === window) {      // andamento/fim da página refazer.js da extensão
+      window.postMessage({ __projudiResp: "refazer-parcial", reqId: String(m.reqId || window.__refazerReqId || ""), tipo: m.acao === "refazer-fim" ? "fim" : "progresso", ok: m.ok, texto: String(m.texto || ""), erro: String(m.erro || ""), precisaServentia: !!m.precisaServentia }, window.location.origin);
+      return false;
+    }
     if (m?.acao === "lancar-progresso" && window.__lerMinutaReqId) window.postMessage({ __projudiResp: "minuta-lancada", reqId: window.__lerMinutaReqId, tipo: "progresso", texto: String(m.texto || "") }, window.location.origin);      // andamento da leitura “Buscar minuta lançada”
     if (m?.acao === "lancar-progresso") { if (btLP.disabled) dizLP(m.texto); return false; }      // andamento do botão “Lançar no Projudi” (definido mais abaixo)
     if (quadroSemApp()) return false;

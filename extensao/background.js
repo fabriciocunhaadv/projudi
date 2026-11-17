@@ -281,6 +281,13 @@ chrome.runtime.onMessage.addListener((m, s, responder) => {
     })().catch((e) => responder({ ok: false, erro: String(e?.message || e) }));
     return true;
   }
+  if (m?.acao === "refazer-parcial") {       // botão “Refazer só com alguns eventos” da minuta do Studio: a página refazer.html abre o Projudi (serventia, processo, janela Gerar PDF)
+    const id = String(Date.now()), sv = typeof m.serventiaUrl === "string" && /^https:\/\/projudi\.tjgo\.jus\.br\//.test(m.serventiaUrl) ? m.serventiaUrl : "";
+    chrome.storage.local.set({ ["refazer_" + id]: { processo: String(m.processo || ""), de: String(m.de || ""), prompt: String(m.prompt || ""), serventiaUrl: sv, reqId: String(m.reqId || ""), abaStudio: s.tab ? s.tab.id : null, ts: Date.now() } })
+      .then(() => chrome.tabs.create({ url: chrome.runtime.getURL("refazer.html?id=" + id), active: false }))
+      .then((aba) => { chrome.tabs.update(aba.id, { autoDiscardable: false }).catch(() => {}); responder({ ok: true }); }, (e) => responder({ ok: false, erro: String(e.message || e) }));
+    return true;
+  }
   if (m?.acao === "minha-aba") { responder({ tabId: s.tab ? s.tab.id : null }); return false; }
   if (m?.acao === "esteira-abrir") {       // garante a aba que roda a fila de minutas
     const url = chrome.runtime.getURL("esteira.html");

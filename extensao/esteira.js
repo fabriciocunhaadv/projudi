@@ -38,7 +38,7 @@ async function abrirNoProjudi(it, url, active = true) {
 
 async function entregar(it, bytes, minuta, mensagem, html = "", injecao = null, aproximado = "") {
   const avisoHist = (String(mensagem).match(/ ⚠ (?:ATENÇÃO: a minuta NÃO foi gravada|O app não confirmou)[^—]*/) || [""])[0];
-  const aviso = (it.modo === "analise" ? "1ª etapa concluída no Studio; a minuta está no histórico do app (use “Prosseguir para 2ª Etapa” lá para a revisão)." + avisoHist : mensagem) + (aproximado && !String(mensagem).includes(aproximado) ? " ⚠ " + aproximado : (it.modo === "analise" && aproximado ? " ⚠ " + aproximado : ""));
+  const aviso = (it.refazer ? `Nova versão da minuta feita só com as movimentações ${it.refazer.min} a ${it.refazer.max} (${it.refazer.n} marcada(s)); está no histórico do Studio, ligada à minuta anterior.` + avisoHist : it.modo === "analise" ? "1ª etapa concluída no Studio; a minuta está no histórico do app (use “Prosseguir para 2ª Etapa” lá para a revisão)." + avisoHist : mensagem) + (aproximado && !String(mensagem).includes(aproximado) ? " ⚠ " + aproximado : (it.modo === "analise" && aproximado ? " ⚠ " + aproximado : ""));
   return atualizar(it.id, { estado: "concluido", minuta: minuta || "", minutaHtml: html, tipo: tipoDaMinuta(minuta), aviso, injecao });
 }
 
@@ -168,7 +168,7 @@ async function analisar(it) {
     if (texto) texto = (await quadroDoProcesso(texto)) + texto;      // movimentações da tela do processo (incluem as sem arquivo)
     if (comTexto && texto.replace(/\[Página \d+(?: de \d+)?[^\]]*\]|\s/g, "").length < 200) throw new Error("não consegui extrair texto do PDF (o OCR pode não ter funcionado)");
     const comAta = it.modo === "mesa" ? !!(await chrome.storage.local.get("pauta_mesa_ata")).pauta_mesa_ata : false;
-    const r = await analisarNoStudio(bytes, { retomar: !!it.cotaVezes, comAta, nome: it.pdfNome, prompt: it.prompt, modo: it.modo, tipo: "", processo: it.processo, minuta: it.minutaAssessor, motivoMinuta: it.motivoMinuta, dicas: it.serventia || "", audData: it.audData || "", audHora: it.audHora || "", texto, ate1: it.modo === "analise" });
+    const r = await analisarNoStudio(bytes, { retomar: !!it.cotaVezes, comAta, nome: it.pdfNome, prompt: it.prompt, modo: it.modo, tipo: "", processo: it.processo, minuta: it.minutaAssessor, motivoMinuta: it.motivoMinuta, dicas: it.serventia || "", audData: it.audData || "", audHora: it.audHora || "", texto, ate1: it.modo === "analise", refazer: it.refazer || null });
     if (!(await valida())) return;
     if (r.gigante) { await atualizar(it.id, { estado: "gigante", erro: "", jobId: r.jobId, aviso: "Processo gigante: o Studio lê os autos em lotes, em segundo plano (pode levar de minutos a horas). A fila segue; a minuta será pega no Histórico quando ficar pronta." }); return; }
     intervaloTurbo();

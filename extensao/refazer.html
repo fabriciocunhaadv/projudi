@@ -1,0 +1,16 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Refazer a minuta com alguns eventos — Conclusões Projudi</title>
+<style>
+  body { font: 14px system-ui, sans-serif; margin: 0; padding: 16px 24px; max-width: 760px; color: #222; }
+  h1 { font-size: 18px; margin: 0 0 4px; } .dica { color: #666; font-size: 12px; }
+  #status { margin: 12px 0; font-weight: 600; } .erro { color: #b00020; }
+  @media (prefers-color-scheme: dark) { body { background: #1c1d21; color: #e6e6e6; } .dica { color: #aaa; } }
+</style>
+<link rel="stylesheet" href="tema.css">
+<h1>Refazer a minuta com alguns eventos</h1>
+<p class="dica">A extensão abre o processo no Projudi e a janela “Gerar PDF”. Lá você marca as movimentações que quer e aperta o botão verde para devolver ao Studio. Pode deixar esta aba aberta.</p>
+<div id="status">Preparando…</div>
+<script src="tabs-retry.js"></script>
+<script src="gerar-util.js"></script>
+<script type="module" src="refazer.js"></script>
