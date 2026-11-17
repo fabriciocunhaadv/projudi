@@ -59,7 +59,8 @@ const celulaSit = (proc) => { const x = sitProc[proc]; return x ? `<span class="
 const selCls = new Set(), selSit = new Set(["naoAnalisadas", "preAnalisadas"]), excluidos = new Set();   // seleção para baixar PDFs
 let opcoes = { atualizarBase: false, studio: false, modo: "analise", docs: false, refazer: false, iaId: "chatgpt" };   // o que fazer depois de baixar
 let entradaStudio = "pdf";
-let automacao = {};   // { serventia: { ativa, prompt } } — guardado na conta do Chrome (sincroniza entre computadores)
+let agaiaAvisoOculto = false;   // o usuário pediu para não mostrar mais a orientação do prompt do Agaia (guardado na conta do Chrome)
+let automacao = {};   // { serventia: { ativa, prompt, promptAgaia, agaiaIgual } } (agaiaIgual: o usuário confirmou que o prompt do Agaia é igual ao do Studio) — guardado na conta do Chrome (sincroniza entre computadores)
 const salvarAuto = () => chrome.storage.sync.set({ automacao });
 // Preenche sozinho (sem sobrescrever o que o usuário escreveu) o prompt e o arquivo de modelos de cada serventia.
 // Não grava mais palpite de prompt/arquivo: esses nomes são de cada usuário (um usuário novo não tem os do gabinete de quem programou a sugestão).
@@ -125,11 +126,11 @@ function desenhar() {
     const fila = cand.filter((p) => !fora(p.processo));
     completarAuto(estado.serventias);
     h += `<h2>Baixar PDFs para análise</h2><div class="baixar"><div><b>1) Serventias em que você trabalha</b> <small>(a extensão só mexe nas marcadas)</small></div>` +
-      `<table class="tp"><thead><tr><th>Automatizar</th><th>Serventia</th><th>Processos</th><th>Prompt no Studio <small>(igual ao da lista “Prompt Ativo”)</small></th><th>Arquivo de modelos na base <small>(PDF único)</small></th><th>Prompt no ExecAgaia <small>(opcional; vazio = igual ao do Studio)</small></th></tr></thead><tbody>` +
+      `<table class="tp"><thead><tr><th>Automatizar</th><th>Serventia</th><th>Processos</th><th>Prompt no Studio <small>(igual ao da lista “Prompt Ativo”)</small></th><th>Arquivo de modelos na base <small>(PDF único)</small></th><th class="th-agaia">Prompt no ExecAgaia <small>(opcional; vazio = igual ao do Studio)</small>${!agaiaAvisoOculto && estado.serventias.some((x) => { const a = automacao[x.serventia] || {}; return a.ativa && !(a.promptAgaia || "").trim() && !a.agaiaIgual; }) ? '<br><span class="alerta-agaia">⚠️ se usar o Agaia: digite o nome IGUAL ao cadastrado no Agaia</span>' : ""}</th></tr></thead><tbody>` +
       estado.serventias.map((s) => `<tr class="tp-linha"><td class="n"><input type="checkbox" data-serv="${esc(s.serventia)}" ${automacao[s.serventia]?.ativa ? "checked" : ""}></td><td>${esc(s.serventia)}</td><td class="n">${todos(s).length}</td>` +
         `<td><input type="text" data-promptia="${esc(s.serventia)}" value="${esc(automacao[s.serventia]?.prompt || "")}" placeholder="${esc(Sugestoes.prompt(s.serventia) ? "sugestão: " + Sugestoes.prompt(s.serventia) : "ex.: Outros Área Judicial - Família e Sucessões")}" size="40"></td>` +
         `<td><input type="text" data-prompt="${esc(s.serventia)}" value="${esc(automacao[s.serventia]?.arquivoModelos || "")}" placeholder="${esc(Sugestoes.arquivo(s.serventia) ? "sugestão: " + Sugestoes.arquivo(s.serventia) : "ex.: Família - Decisões, Despachos e Sentenças")}" size="40"></td>` +
-        `<td><input type="text" data-promptagaia="${esc(s.serventia)}" value="${esc(automacao[s.serventia]?.promptAgaia || "")}" placeholder="ex.: Fabrício Família e Sucessões" size="34"></td></tr>`).join("") + `</tbody></table>`;
+        `<td><input type="text" data-promptagaia="${esc(s.serventia)}" value="${esc(automacao[s.serventia]?.promptAgaia || "")}" placeholder="nome igual ao do Agaia, ex.: Fabrício Família e Sucessões" title="Digite o nome do prompt exatamente como está cadastrado no Agaia (letras, acentos e espaços iguais). Se estiver diferente, a extensão não acha o prompt." size="34"></td></tr>`).join("") + `</tbody></table>`;
     if (clsLista.length) h += `<div><b>2) Só estes classificadores</b> <small>(opcional — sem marcar nenhum, baixa todos)</small><br>` +
       clsLista.map((c) => `<label class="chip"><input type="checkbox" data-cls="${esc(c)}" ${selCls.has(c) ? "checked" : ""}> ${esc(c)} <small>(${todosP.filter((p) => nomeCls(p) === c && automacao[p.serventia]?.ativa).length})</small></label>`).join(" ") + `</div>`;
     h += `<div>Situação: <label><input type="checkbox" data-sit="naoAnalisadas" ${selSit.has("naoAnalisadas") ? "checked" : ""}> Não analisadas</label> <label><input type="checkbox" data-sit="preAnalisadas" ${selSit.has("preAnalisadas") ? "checked" : ""}> Pré-analisadas</label></div>`;
@@ -157,7 +158,17 @@ function desenhar() {
       (opcoes.modo === "ia" ? `<div class="ia-ext"><label>IA: <select data-iaid ${opcoes.studio ? "" : "disabled"}>${Object.entries(SITES_IA).map(([k, v]) => `<option value="${k}" ${opcoes.iaId === k ? "selected" : ""}>${v.nome}</option>`).join("")}</select></label> <button type="button" data-ia-perm>Autorizar este site</button> <button type="button" data-ia-diag>Diagnosticar tela da IA</button> <small id="iaMsg">Entre na conta da IA nessa aba antes. O Studio cuida só do prompt e do Histórico.</small></div>` : "") +
       `<label>Enviar os autos ao Studio como: <select data-entrada ${opcoes.studio ? "" : "disabled"}><option value="pdf" ${entradaStudio === "pdf" ? "selected" : ""}>PDF (arquivo completo)</option><option value="txt" ${entradaStudio === "txt" ? "selected" : ""}>texto extraído do PDF com OCR (mais rápido)</option></select> <small>(o .txt de cada processo também é salvo ao lado do PDF)</small></label></div>`;
     h += `<p><button id="baixarLote" ${fila2.length ? "" : "disabled"}>⬇ Baixar PDFs dos ${fila2.length} processo(s)</button> <small>Ordem da fila: “${esc(Ordenar.MODOS[$("modo").value])}”. Cada processo gera <b>número-OCR.pdf</b>.</small></p></div>` +
-      `<div class="opcoes"><b>ou, sem baixar PDF:</b><br><button id="enviarAgaia" ${fila2.length ? "" : "disabled"} title="O Agaia lê o processo direto do Projudi; a esteira abre cada processo no Agaia, executa o prompt e lança a minuta no Histórico do Studio">🤖 Enviar os ${fila2.length} processo(s) ao Agaia</button> <small>Um de cada vez, na ordem da fila. Quando o Agaia não consegue (arquivado, segredo de justiça…), o motivo fica registrado no processo e a esteira segue para o próximo.</small></div>`;
+      `<div class="opcoes"><b>ou, sem baixar PDF:</b><br>` +
+      (() => {
+        // O aviso só aparece enquanto faltar o nome do prompt do Agaia em alguma serventia da fila e o usuário não tiver confirmado que o prompt é igual ao do Studio (nem escondido o aviso).
+        const faltam = [...new Set(fila2.filter((p) => { const a = automacao[p.serventia] || {}; return !(a.promptAgaia || "").trim() && !a.agaiaIgual; }).map((p) => p.serventia))];
+        if (agaiaAvisoOculto) return faltam.length ? `<p class="agaia-mostrar"><button type="button" class="link-agaia" data-agaia-mostrar data-testid="agaia-mostrar">ℹ️ Mostrar a orientação sobre o nome do prompt do Agaia</button></p>` : "";
+        if (!faltam.length) return "";
+        return `<div class="aviso-agaia" data-testid="aviso-agaia"><b>⚠️ Antes de enviar ao Agaia: o nome do prompt tem de ser IGUAL ao cadastrado no Agaia.</b> Os prompts do Agaia podem ter nomes diferentes dos do Studio. Na tabela de serventias (acima), na coluna <b>“Prompt no ExecAgaia”</b>, digite o nome do prompt <u>exatamente como está cadastrado no Agaia</u> (mesmas letras, acentos e espaços; o ideal é copiar e colar). Se o nome estiver diferente, a extensão não acha o prompt no Agaia e o processo dá erro.` +
+          `<div class="aviso-agaia-faltam" data-testid="aviso-agaia-faltam">Ainda sem o nome do prompt do Agaia em: <b>${faltam.map(esc).join("; ")}</b>. Nessas serventias a extensão vai procurar no Agaia o nome do prompt do <u>Studio</u>.</div>` +
+          `<div class="aviso-agaia-botoes"><button type="button" data-agaia-igual="${esc(JSON.stringify(faltam))}" data-testid="agaia-igual" title="Marca estas serventias como conferidas: o aviso some e a extensão usa o nome do prompt do Studio no Agaia">✔ Meu prompt do Agaia é igual ao do Studio (está correto)</button> <button type="button" data-agaia-ocultar data-testid="agaia-ocultar" title="Esconde esta orientação; dá para mostrá-la de novo">Já entendi, não mostrar mais este aviso</button></div></div>`;
+      })() +
+      `<button id="enviarAgaia" ${fila2.length ? "" : "disabled"} title="O Agaia lê o processo direto do Projudi; a esteira abre cada processo no Agaia, executa o prompt e lança a minuta no Histórico do Studio">🤖 Enviar os ${fila2.length} processo(s) ao Agaia</button> <small>Um de cada vez, na ordem da fila. Quando o Agaia não consegue (arquivado, segredo de justiça…), o motivo fica registrado no processo e a esteira segue para o próximo.</small></div>`;
     window.__candidatos = fila2;
   }
 
@@ -223,6 +234,7 @@ function csv() {
   $("busca").oninput = desenhar;
   RenderProjudi.ligarCopiar($("conteudo"));
   automacao = (await chrome.storage.sync.get("automacao")).automacao || {};
+  agaiaAvisoOculto = !!(await chrome.storage.sync.get("agaiaAvisoOculto")).agaiaAvisoOculto;
   // limpeza única: versões antigas gravaram palpites (e alguns errados, pelo nome da cidade) como se o usuário os tivesse escolhido
   if (!(await chrome.storage.sync.get("palpitesLimpos")).palpitesLimpos) {
     const antigo = (serv) => { const t = String(serv || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); const r = [[/juizado.*fazenda|fazenda.*juizado/, "Juizado Faz.Pub.", "Juizado da Fazenda Pública"], [/juizado.*criminal|criminal.*juizado/, "Juizado Especial Criminal", "Juizado Especial Criminal"], [/juizado.*civel|civel.*juizado/, "Juizado Especial Cível", "Juizado Especial Cível"], [/infracional/, "Infância e Juventude Infracional", "Infância e Juventude Infracional"], [/inf[aâ]ncia|infancia|juventude|inf\.? e juv/, "Infância e Juventude Cível", "Infância e Juventude Cível"], [/familia|sucess/, "Família e Sucessões", "Família"], [/execucao fiscal.*estadual|estadual.*execucao fiscal/, "Execução Fiscal Estadual", "Execução Fiscal"], [/execucao fiscal|exec\.? fiscal/, "Execução Fiscal Municipal", "Execução Fiscal"], [/fazenda/, "Fazenda Pública Comum", "Fazenda Pública"], [/eleitoral/, "Eleitoral", "Eleitoral"], [/criminal|penal/, "Criminal", "Criminal"], [/civel|civil/, "Cível", "Cível"]].find((x) => x[0].test(t)); return r ? { p: "Outros Área Judicial - " + r[1], a: r[2] + " - Decisões, Despachos e Sentenças" } : null; };
@@ -236,7 +248,7 @@ function csv() {
     const t = e.target, dado = t.dataset || {};
     if (dado.entrada !== undefined) { entradaStudio = t.value; chrome.storage.sync.get("esteiraConfig").then(({ esteiraConfig = {} }) => chrome.storage.sync.set({ esteiraConfig: { ...esteiraConfig, entrada: t.value } })); return; }
     if (dado.serv !== undefined) { automacao[dado.serv] = { ...automacao[dado.serv], ativa: t.checked }; salvarAuto(); }
-    else if (dado.promptagaia !== undefined) { automacao[dado.promptagaia] = { ...automacao[dado.promptagaia], promptAgaia: t.value.trim() }; salvarAuto(); return; }
+    else if (dado.promptagaia !== undefined) { automacao[dado.promptagaia] = { ...automacao[dado.promptagaia], promptAgaia: t.value.trim() }; salvarAuto(); desenhar(); return; }
     else if (dado.promptia !== undefined) { automacao[dado.promptia] = { ...automacao[dado.promptia], prompt: t.value.trim() }; salvarAuto(); return; }
     else if (dado.prompt !== undefined) { automacao[dado.prompt] = { ...automacao[dado.prompt], arquivoModelos: t.value.trim() }; salvarAuto(); return; }
     else if (dado.cls !== undefined) { t.checked ? selCls.add(dado.cls) : selCls.delete(dado.cls); }
@@ -274,6 +286,14 @@ function csv() {
     }
     await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/" + hoje, opcoes: { atualizarBase: false, studio: { ativo: opcoes.studio, modo: opcoes.modo, docs: false, iaId: opcoes.iaId } } } });
     chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + id) });
+  });
+  // Aviso do prompt do Agaia: confirmar que o prompt é igual ao do Studio, esconder a orientação ou mostrá-la de novo
+  document.addEventListener("click", (e) => {
+    const t = e.target.closest ? e.target.closest("[data-agaia-igual],[data-agaia-ocultar],[data-agaia-mostrar]") : null; if (!t) return;
+    if (t.dataset.agaiaIgual !== undefined) { let lista = []; try { lista = JSON.parse(t.dataset.agaiaIgual); } catch (err) { /* sem lista */ } for (const sv of lista) automacao[sv] = { ...automacao[sv], agaiaIgual: true }; salvarAuto(); }
+    else if (t.dataset.agaiaOcultar !== undefined) { agaiaAvisoOculto = true; chrome.storage.sync.set({ agaiaAvisoOculto: true }); }
+    else { agaiaAvisoOculto = false; chrome.storage.sync.set({ agaiaAvisoOculto: false }); }
+    desenhar();
   });
   // Esteira → Agaia (sem baixar PDF): cada processo entra na fila da esteira no modo "agaia"; a esteira abre o processo no Agaia, executa o prompt e lança a minuta no Histórico do Studio
   document.addEventListener("click", async (e) => {
