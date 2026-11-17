@@ -3,7 +3,7 @@
 (() => {
   if (window.__projudiStudioBase) return;
   window.__projudiStudioBase = true;
-  try { document.documentElement.dataset.assessorExtensao = chrome.runtime.getManifest().version; document.documentElement.dataset.assessorExtensaoRecursos = "pdf,sv,modelos,modelos-atualizar"; document.documentElement.dataset.assessorExtensaoId = chrome.runtime.id; } catch (e) { /* sem manifest */ }      // o app mostra a tarja “instale a extensão” só quando este aviso não existe
+  try { document.documentElement.dataset.assessorExtensao = chrome.runtime.getManifest().version; document.documentElement.dataset.assessorExtensaoRecursos = "pdf,sv,modelos,modelos-atualizar,minuta-lancada"; document.documentElement.dataset.assessorExtensaoId = chrome.runtime.id; } catch (e) { /* sem manifest */ }      // o app mostra a tarja “instale a extensão” só quando este aviso não existe
   const dorme = (ms) => new Promise((ok) => setTimeout(ok, ms));
   const visivel = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
   const texto = (e) => (e.textContent || "").replace(/\s+/g, " ").trim();
@@ -863,6 +863,21 @@
     catch (e) { resp({ tipo: "erro", erro: String(e?.message || e) }); }
   });
 
+  // ----- “Buscar minuta lançada” (só Super Admin, no Studio): o app pede (window.postMessage fase "ler") o texto que está salvo na pré-análise do processo; a extensão LÊ o editor e devolve. Não escreve nada no Projudi. -----
+  addEventListener("message", async (ev) => {
+    const d = ev.data; if (ev.source !== window || ev.origin !== window.location.origin || !d || d.__projudi !== "minuta-lancada" || d.fase !== "ler" || typeof d.reqId !== "string") return;
+    const resp = (o) => window.postMessage({ __projudiResp: "minuta-lancada", reqId: d.reqId, ...o }, window.location.origin);
+    window.__lerMinutaReqId = d.reqId;
+    try {
+      const sv = ((await chrome.storage.local.get("lancar_ultima_serventia")) || {}).lancar_ultima_serventia || "";
+      chrome.runtime.sendMessage({ acao: "ler-minuta-lancada", processo: String(d.processo || ""), serventiaUrl: sv }, (r) => {
+        window.__lerMinutaReqId = null;
+        if (chrome.runtime.lastError) return resp({ tipo: "fim", ok: false, erro: String(chrome.runtime.lastError.message || "a extensão não respondeu") });
+        resp({ tipo: "fim", ok: !!(r && r.ok), html: r?.html || "", tela: r?.tela || "", erro: r?.erro || "" });
+      });
+    } catch (e) { window.__lerMinutaReqId = null; resp({ tipo: "fim", ok: false, erro: String(e?.message || e) }); }
+  });
+
   // ----- Tratamento de PDF pela extensão: o app entrega o PDF em partes (window.postMessage) e a extensão (página pdf-studio) devolve andamento e texto -----
   if (window.top === window) window.addEventListener("message", async (ev) => {
     const d = ev.data;
@@ -969,6 +984,7 @@
   };
 
   chrome.runtime.onMessage.addListener((m, _s, responder) => {
+    if (m?.acao === "lancar-progresso" && window.__lerMinutaReqId) window.postMessage({ __projudiResp: "minuta-lancada", reqId: window.__lerMinutaReqId, tipo: "progresso", texto: String(m.texto || "") }, window.location.origin);      // andamento da leitura “Buscar minuta lançada”
     if (m?.acao === "lancar-progresso") { if (btLP.disabled) dizLP(m.texto); return false; }      // andamento do botão “Lançar no Projudi” (definido mais abaixo)
     if (quadroSemApp()) return false;
     if ((m?.acao === "pdf-studio-progresso" || m?.acao === "pdf-studio-resultado" || m?.acao === "pdf-studio-pdf-parte") && window.top === window) {      // a página da extensão que trata o PDF avisa o andamento e o resultado: repassa ao app

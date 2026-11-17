@@ -169,6 +169,9 @@ function lpLerEditor() {
   return null;
 }
 
+/** Texto visível da tela (para diagnóstico quando não acho o editor ou ele vem só com o modelo). */
+function lpTextoDaTela() { try { return ((document.body && document.body.innerText) || "").replace(/\s+/g, " ").trim().slice(0, 1500); } catch (e) { return ""; } }
+
 /** Coloca a minuta no editor: depois do título do ato (DESPACHO/DECISÃO/SENTENÇA) do modelo, no lugar do texto-padrão que vai até a linha de assinatura “..., data do sistema”. */
 function lpInserirNoEditor(minutaHtml, minutaTexto) {
   let ed = null, tipo = "";
@@ -313,11 +316,12 @@ async function lpPaginaDeBusca(tab, valor, chave, tipoNome) {
 async function lancarNoProjudi(m, abaStudio) {
   const progresso = (texto) => { if (abaStudio?.id != null) chrome.tabs.sendMessage(abaStudio.id, { acao: "lancar-progresso", texto }).catch(() => {}); };
   const processo = String(m.processo || ""), chave = lpChave(processo);
-  if (!chave) return { ok: false, erro: "não achei o número do processo na minuta aberta no Studio" };
-  if (!m.texto || m.texto.length < 50) return { ok: false, erro: "a minuta está vazia" };
-  const tipoNome = lpTipoDoAto(m.texto, m.tituloAto);
-  if (!tipoNome) return { ok: false, erro: "não consegui identificar se a minuta é despacho, decisão ou sentença (não achei o título do ato); confira o título no alto da minuta" };
-  const modelo = tipoNome + " Padrão";
+  const ler = m.somenteLer === true;      // “Buscar minuta lançada”: só LÊ o editor da pré-análise (não escolhe Tipo nem Modelo, não escreve, não salva)
+  if (!chave) return { ok: false, erro: ler ? "não achei o número do processo" : "não achei o número do processo na minuta aberta no Studio" };
+  if (!ler && (!m.texto || m.texto.length < 50)) return { ok: false, erro: "a minuta está vazia" };
+  const tipoNome = ler ? "" : lpTipoDoAto(m.texto, m.tituloAto);
+  if (!ler && !tipoNome) return { ok: false, erro: "não consegui identificar se a minuta é despacho, decisão ou sentença (não achei o título do ato); confira o título no alto da minuta" };
+  const modelo = tipoNome ? tipoNome + " Padrão" : "";
   // "Lançar no Projudi" tem prioridade sobre o que a extensão estiver fazendo na aba (lote, pré-análise, esteira): toma a vez dessas tarefas em vez de esperar por elas.
   progresso("assumindo a aba do Projudi…");
   const liberar = await new Promise((pronto) => {
@@ -350,6 +354,21 @@ async function lancarNoProjudi(m, abaStudio) {
       if (!nela) return { ok: false, erro: "cliquei em Pré-Analisar, mas a tela de pré-análise não abriu" };
     }
     await chrome.tabs.update(tab.id, { active: true }).catch(() => {});
+    if (ler) {
+      progresso("lendo o texto salvo no editor da pré-análise…");
+      const semTags = (h) => String(h || "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+      let melhor = "";
+      for (let k = 0; k < 24; k++) {      // o editor pode demorar a carregar: espera até haver texto de verdade (até ~18 s)
+        const hs = (await lpScript(tab.id, lpLerEditor)).filter((x) => typeof x === "string");
+        const h = hs.sort((a, b) => semTags(b).length - semTags(a).length)[0] || "";
+        if (semTags(h).length > semTags(melhor).length) melhor = h;
+        if (semTags(melhor).length > 200) break;
+        await lpDorme(750);
+      }
+      const tela = (await lpScript(tab.id, lpTextoDaTela)).filter(Boolean).join(" | ").slice(0, 1500);
+      if (!melhor) return { ok: false, erro: "a tela da pré-análise abriu, mas não achei o editor de texto", tela };
+      return { ok: true, html: melhor, tela };
+    }
     progresso(`escolhendo o Tipo de Arquivo “${tipoNome}”…`);
     const tipo = await lpEscolher(tab, "Tipo de Arquivo", tipoNome, chave, tipoNome);
     if (!tipo.ok) return { ok: false, erro: tipo.motivo || "não consegui escolher o Tipo de Arquivo", passo: "tipo" };

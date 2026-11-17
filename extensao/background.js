@@ -241,6 +241,7 @@ chrome.runtime.onMessage.addListener((m, s, responder) => {
     return true;
   }
   if (m?.acao === "lancar-projudi") { lancarNoProjudi(m, s.tab).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }      // botão “Lançar no Projudi” da minuta do Studio
+  if (m?.acao === "ler-minuta-lancada") { lancarNoProjudi({ processo: m.processo, serventiaUrl: m.serventiaUrl, somenteLer: true }, s.tab).then(responder, (e) => responder({ ok: false, erro: String(e.message || e) })); return true; }      // botão “Buscar minuta lançada” (só Super Admin, no Studio): lê o texto salvo na pré-análise; NÃO escreve nada
   if (m?.acao === "lancar-serventias") {      // lista as serventias NÃO ocultas para o usuário escolher onde lançar a minuta
     (async () => {
       const { estado } = await chrome.storage.local.get("estado"), oc = await getOcultas();
