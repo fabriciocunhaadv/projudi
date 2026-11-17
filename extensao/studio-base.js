@@ -3,7 +3,7 @@
 (() => {
   if (window.__projudiStudioBase) return;
   window.__projudiStudioBase = true;
-  try { document.documentElement.dataset.assessorExtensao = chrome.runtime.getManifest().version; document.documentElement.dataset.assessorExtensaoRecursos = "pdf,sv,modelos,modelos-atualizar,minuta-lancada"; document.documentElement.dataset.assessorExtensaoId = chrome.runtime.id; } catch (e) { /* sem manifest */ }      // o app mostra a tarja “instale a extensão” só quando este aviso não existe
+  try { document.documentElement.dataset.assessorExtensao = chrome.runtime.getManifest().version; document.documentElement.dataset.assessorExtensaoRecursos = "pdf,sv,modelos,modelos-atualizar,minuta-lancada,minuta-serventia"; document.documentElement.dataset.assessorExtensaoId = chrome.runtime.id; } catch (e) { /* sem manifest */ }      // o app mostra a tarja “instale a extensão” só quando este aviso não existe
   const dorme = (ms) => new Promise((ok) => setTimeout(ok, ms));
   const visivel = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
   const texto = (e) => (e.textContent || "").replace(/\s+/g, " ").trim();
@@ -865,13 +865,19 @@
 
   // ----- “Buscar minuta lançada” (só Super Admin, no Studio): o app pede (window.postMessage fase "ler") o texto que está salvo na pré-análise do processo; a extensão LÊ o editor e devolve. Não escreve nada no Projudi. -----
   addEventListener("message", async (ev) => {
-    const d = ev.data; if (ev.source !== window || ev.origin !== window.location.origin || !d || d.__projudi !== "minuta-lancada" || d.fase !== "ler" || typeof d.reqId !== "string") return;
+    const d = ev.data; if (ev.source !== window || ev.origin !== window.location.origin || !d || d.__projudi !== "minuta-lancada" || (d.fase !== "ler" && d.fase !== "serventias") || typeof d.reqId !== "string") return;
     const resp = (o) => window.postMessage({ __projudiResp: "minuta-lancada", reqId: d.reqId, ...o }, window.location.origin);
+    if (d.fase === "serventias") {      // lista das serventias do usuário (as não ocultas), para ele escolher onde procurar o processo
+      try { const l = await chrome.runtime.sendMessage({ acao: "lancar-serventias", processo: String(d.processo || "") }); resp({ tipo: "serventias", serventias: Array.isArray(l?.serventias) ? l.serventias : [], sugerida: l?.sugerida || "" }); }
+      catch (e) { resp({ tipo: "serventias", serventias: [], sugerida: "" }); }
+      return;
+    }
     window.__lerMinutaReqId = d.reqId;
     try {
       // mesma escolha de serventia do “Lançar no Projudi”: a do processo (que a extensão conhece pela esteira) ou a última usada; se só há uma, ela; senão fica na serventia ativa
       let sv = "";
-      try {
+      const escolhida = typeof d.serventiaUrl === "string" && /^https:\/\/projudi\.tjgo\.jus\.br\//.test(d.serventiaUrl) ? d.serventiaUrl : "";      // o usuário indicou a serventia: vale esta, sem adivinhar
+      if (!escolhida) try {
         const l = await chrome.runtime.sendMessage({ acao: "lancar-serventias", processo: String(d.processo || "") });
         // 1º a serventia que o CABEÇALHO da minuta cita (ex.: “Montes Claros de Goiás - Vara de Família e Sucessões”); depois a do processo/última; por fim a única
         const semAc = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -879,6 +885,7 @@
         let melhor = null, tam = 0; for (const x of (l?.serventias || [])) { const n = semAc(x.serventia).replace(/ go$/, ""); if (n.length > 8 && n.length > tam && cab.includes(" " + n + " ")) { melhor = x; tam = n.length; } }
         sv = melhor?.url || l?.sugerida || (l?.serventias?.length === 1 ? l.serventias[0].url : "");
       } catch (e) { /* sem lista */ }
+      if (escolhida) sv = escolhida;
       chrome.runtime.sendMessage({ acao: "ler-minuta-lancada", processo: String(d.processo || ""), serventiaUrl: sv }, (r) => {
         window.__lerMinutaReqId = null;
         if (chrome.runtime.lastError) return resp({ tipo: "fim", ok: false, erro: String(chrome.runtime.lastError.message || "a extensão não respondeu") });

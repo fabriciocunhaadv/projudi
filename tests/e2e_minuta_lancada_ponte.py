@@ -29,5 +29,20 @@ with sync_playwright() as p:
     # pedido sem reqId ou de outra origem é ignorado
     pg.evaluate("() => { window.__pedidos = []; window.postMessage({ __projudi: 'minuta-lancada', fase: 'ler', processo: 'X' }, window.location.origin); }"); pg.wait_for_timeout(300)
     assert pg.evaluate("window.__pedidos.length") == 0, "sem reqId não deve pedir nada"
+    # lista de serventias para o usuário escolher (fase "serventias") e leitura NA serventia escolhida (sem adivinhar)
+    assert "minuta-serventia" in pg.evaluate("document.documentElement.dataset.assessorExtensaoRecursos"), "o recurso de escolher serventia precisa ser anunciado"
+    pg.evaluate("() => { window.__respostas = []; window.postMessage({ __projudi: 'minuta-lancada', fase: 'serventias', reqId: 's1', processo: '5914870-27.2025.8.09.0166' }, window.location.origin); }")
+    pg.wait_for_function("window.__respostas.some(r => r.tipo === 'serventias')", timeout=5000)
+    sv = pg.evaluate("window.__respostas.find(r => r.tipo === 'serventias')")
+    assert sv["reqId"] == "s1" and sv["serventias"][0]["url"] == "https://projudi.tjgo.jus.br/x" and sv["serventias"][0]["serventia"] == "Vara", sv
+    pg.evaluate("() => { window.__pedidos = []; window.__respostas = []; window.postMessage({ __projudi: 'minuta-lancada', fase: 'ler', reqId: 'r3', processo: '5914870-27.2025.8.09.0166', serventiaUrl: 'https://projudi.tjgo.jus.br/ESCOLHIDA' }, window.location.origin); }")
+    pg.wait_for_function("window.__respostas.some(r => r.tipo === 'fim')", timeout=5000)
+    ped3 = pg.evaluate("window.__pedidos.find(p => p.acao === 'ler-minuta-lancada')")
+    assert ped3["serventiaUrl"] == "https://projudi.tjgo.jus.br/ESCOLHIDA", ped3
+    assert not pg.evaluate("window.__pedidos.some(p => p.acao === 'lancar-serventias')"), "serventia escolhida pelo usuário: não adivinha"
+    # serventia de OUTRO site é ignorada (cai na escolha automática)
+    pg.evaluate("() => { window.__pedidos = []; window.__respostas = []; window.postMessage({ __projudi: 'minuta-lancada', fase: 'ler', reqId: 'r4', processo: '5914870-27.2025.8.09.0166', serventiaUrl: 'https://outro.site/x' }, window.location.origin); }")
+    pg.wait_for_function("window.__respostas.some(r => r.tipo === 'fim')", timeout=5000)
+    assert pg.evaluate("window.__pedidos.find(p => p.acao === 'ler-minuta-lancada').serventiaUrl") == "https://projudi.tjgo.jus.br/x", "URL de outro site não vale"
     b.close()
 print("OK")
