@@ -6,6 +6,12 @@
 //   4. coloca a minuta no editor, no lugar do texto-padrão do modelo (cabeçalho e assinatura do modelo ficam).
 // NÃO grava nada no Projudi: o usuário confere e clica em “Salvar Texto Parcial”.
 const LP_BASE = "https://projudi.tjgo.jus.br/";
+/** Texto de erro quando a aba perdeu a moldura, com o passo e o que a aba mostra agora (para diagnóstico: pode ser tela de login, erro do Projudi ou página lenta). */
+async function lpSemMoldura(tabId, passo) {
+  const t = await chrome.tabs.get(tabId).catch(() => null);
+  const onde = t ? ` [passo: ${passo}; aba: “${String(t.title || "").slice(0, 60)}” ${String(t.url || "").slice(0, 120)}]` : ` [passo: ${passo}]`;
+  return { ok: false, erro: SEM_MOLDURA + onde };
+}
 const SEM_MOLDURA = "a aba do Projudi está sem o cabeçalho e os menus (tela solta) e não consegui voltar ao início: clique em “Página Inicial” no Projudi e tente de novo";
 const lpDorme = (ms) => new Promise((ok) => setTimeout(ok, ms));
 const lpSem = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
@@ -339,8 +345,8 @@ async function lancarNoProjudi(m, abaStudio) {
       // navega DENTRO do quadro da moldura do Projudi (a aba mantém o cabeçalho e os menus)
       const svUrl = m.serventiaUrl;
       if (m.serventiaUrl) await chrome.storage.local.set({ lancar_ultima_serventia: new URL(m.serventiaUrl, LP_BASE).href }).catch(() => {});
-      if (svUrl) { if (!(await ProjudiQuadro.irPara(tab.id, new URL(svUrl, LP_BASE).href))) return { ok: false, erro: SEM_MOLDURA }; await lpDorme(1200); }
-      if (!(await ProjudiQuadro.irPara(tab.id, LP_BASE + "PreAnalisarConclusao?PaginaAtual=2&tipo=todas"))) return { ok: false, erro: SEM_MOLDURA };
+      if (svUrl) { if (!(await ProjudiQuadro.irPara(tab.id, new URL(svUrl, LP_BASE).href))) return await lpSemMoldura(tab.id, "trocar de serventia"); await lpDorme(1200); }
+      if (!(await ProjudiQuadro.irPara(tab.id, LP_BASE + "PreAnalisarConclusao?PaginaAtual=2&tipo=todas"))) return await lpSemMoldura(tab.id, "abrir a lista de conclusos");
       await lpDorme(1500);
       let r = "", visto = 0;
       for (let k = 0; k < 30 && r !== "clicou" && r !== "sem-botao"; k++) {

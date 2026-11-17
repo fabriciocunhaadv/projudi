@@ -869,7 +869,9 @@
     const resp = (o) => window.postMessage({ __projudiResp: "minuta-lancada", reqId: d.reqId, ...o }, window.location.origin);
     window.__lerMinutaReqId = d.reqId;
     try {
-      const sv = ((await chrome.storage.local.get("lancar_ultima_serventia")) || {}).lancar_ultima_serventia || "";
+      // mesma escolha de serventia do “Lançar no Projudi”: a do processo (que a extensão conhece pela esteira) ou a última usada; se só há uma, ela; senão fica na serventia ativa
+      let sv = "";
+      try { const l = await chrome.runtime.sendMessage({ acao: "lancar-serventias", processo: String(d.processo || "") }); sv = l?.sugerida || (l?.serventias?.length === 1 ? l.serventias[0].url : ""); } catch (e) { /* sem lista */ }
       chrome.runtime.sendMessage({ acao: "ler-minuta-lancada", processo: String(d.processo || ""), serventiaUrl: sv }, (r) => {
         window.__lerMinutaReqId = null;
         if (chrome.runtime.lastError) return resp({ tipo: "fim", ok: false, erro: String(chrome.runtime.lastError.message || "a extensão não respondeu") });

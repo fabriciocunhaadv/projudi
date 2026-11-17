@@ -8,7 +8,7 @@ with sync_playwright() as p:
     pg.route("https://studio.test/**", lambda r: r.fulfill(status=200, content_type="text/html", body="<html><body>studio</body></html>")); pg.goto("https://studio.test/")
     pg.evaluate("""() => { window.__pedidos = []; window.__respostas = [];
       window.chrome = { runtime: { id: "x", getManifest: () => ({ version: "3.0.6" }), lastError: null, onMessage: { addListener(f) { window.__ouvinte = f } },
-        sendMessage(m, cb) { window.__pedidos.push(m); if (m.acao === "ler-minuta-lancada") setTimeout(() => cb(m.processo === "FALHA" ? { ok: false, erro: "não achei o editor", tela: "Pré-Analisar" } : { ok: true, html: "<p>Texto lançado</p>" }), 50); } },
+        sendMessage(m, cb) { window.__pedidos.push(m); if (m.acao === "lancar-serventias") return Promise.resolve({ ok: true, serventias: [{ serventia: "Vara", url: "https://projudi.tjgo.jus.br/x" }], sugerida: "https://projudi.tjgo.jus.br/x" }); if (m.acao === "ler-minuta-lancada") setTimeout(() => cb(m.processo === "FALHA" ? { ok: false, erro: "não achei o editor", tela: "Pré-Analisar" } : { ok: true, html: "<p>Texto lançado</p>" }), 50); } },
         notifications: null, storage: { local: { set() { return Promise.resolve() }, get(k) { return Promise.resolve({ lancar_ultima_serventia: "https://projudi.tjgo.jus.br/x" }) } } } };
       window.addEventListener("message", (e) => { if (e.data && e.data.__projudiResp === "minuta-lancada") window.__respostas.push(e.data); }); }""")
     pg.add_script_tag(path=str(RAIZ / "studio-base.js"))
@@ -16,7 +16,7 @@ with sync_playwright() as p:
     pg.evaluate("() => window.postMessage({ __projudi: 'minuta-lancada', fase: 'ler', reqId: 'r1', processo: '5914870-27.2025.8.09.0166' }, window.location.origin)")
     pg.wait_for_function("window.__respostas.some(r => r.tipo === 'fim')", timeout=5000)
     fim = pg.evaluate("window.__respostas.find(r => r.tipo === 'fim')")
-    ped = pg.evaluate("window.__pedidos[0]")
+    ped = pg.evaluate("window.__pedidos.find(p => p.acao === 'ler-minuta-lancada')")
     assert fim["ok"] and fim["html"] == "<p>Texto lançado</p>" and fim["reqId"] == "r1", fim
     assert ped["acao"] == "ler-minuta-lancada" and ped["processo"] == "5914870-27.2025.8.09.0166" and ped["serventiaUrl"] == "https://projudi.tjgo.jus.br/x", ped
     # andamento vindo do background é repassado ao app durante a leitura
