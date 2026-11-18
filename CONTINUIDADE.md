@@ -163,3 +163,7 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 ## 4.0.5 — Lupa também para super admin
 - Studio publica `data-assessor-perfil` = "superadmin" | "magistrado" | "assessor"; `iniciar.js` mostra a Lupa para magistrado e super admin (recomendada/padrão só para magistrado).
 - Studio: Histórico mostra "Gabinete ativo / Unidade" e, na busca por processo sem resultado, avisa em qual unidade (e, para super admin, em qual gabinete) o ato está (`GET /api/db/history?numeros=..&tenant=*`, só super admin). Causa do caso 5097642: ato gravado em OUTRO gabinete (gab_dr_jose_cassio_de_sousa) do que o ativo no computador.
+
+## LEMBRETE para a próxima versão da extensão (4.0.6+) — pedido do usuário
+- Tela "Atualizar as leis": tentar o Novo Portal (`portaldalegislacao.presidencia.gov.br/ccivil_03/...`) antes do Planalto (host em `optional_host_permissions`, `ORIGENS_PLANALTO`, `HOSTS_TESTE`, `urlPermitida`).
+- Fontes pendentes: corrigir nomes em `urlsFederais` (`l6404compilada.htm`, `l10.931.htm`, `_ato2004-2006/...`); adicionar CNJ (atos.cnj.jus.br), Casa Civil GO (legisla.casacivil.go.gov.br), TJGO (provimentos); `leisestaduais.com.br` dá HTTP 403.
