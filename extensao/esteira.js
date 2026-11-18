@@ -404,8 +404,8 @@ $("linhas").addEventListener("click", async (ev) => {
     const hoje = new Date().toISOString().slice(0, 10), lote = String(Date.now());
     const limpa = (x, d) => String(x || d).replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60);
     const pasta = `Projudi/${hoje}/${limpa(it.serventia, "Segredo")}/${limpa(it.classificador, "Segredo de justiça")}`;
-    await chrome.storage.local.set({ ["lote_" + lote]: { itens: [{ processo: it.processo, url: it.url, classificador: it.classificador || "", serventia: it.serventia || "", situacao: it.tipo || "", urlPre: it.urlPre || "", serventiaUrl: it.serventiaUrl || "", arquivoModelos: automacao[chaveServ]?.arquivoModelos || "", prompt, pasta }], pasta: "Projudi/" + hoje, opcoes: { atualizarBase: false, studio: { ativo: true, modo: "analise", docs: false } } } });
-    await atualizar(id, { estado: "pulado", sigiloso: false, aviso: `Segredo de justiça: enviado para rodar no Studio com o prompt “${prompt}” (a extensão baixa o PDF, faz o OCR e analisa lá). Acompanhe a nova linha da esteira.` });
+    await chrome.storage.local.set({ ["lote_" + lote]: { itens: [{ processo: it.processo, url: it.url, classificador: it.classificador || "", serventia: it.serventia || "", situacao: it.tipo || "", urlPre: it.urlPre || "", serventiaUrl: it.serventiaUrl || "", arquivoModelos: automacao[chaveServ]?.arquivoModelos || "", prompt, itemId: it.id, pasta }], pasta: "Projudi/" + hoje, opcoes: { atualizarBase: false, studio: { ativo: true, modo: "analise", docs: false } } } });
+    await atualizar(id, { estado: "pausado", sigiloso: false, erro: "", aviso: `Segredo de justiça: baixando o PDF e fazendo o OCR para analisar no Studio com o prompt “${prompt}”. Esta mesma linha segue sozinha quando o PDF ficar pronto.` });
     chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + lote) });
     desenhar(); return;
   }
@@ -419,8 +419,8 @@ $("linhas").addEventListener("click", async (ev) => {
     const hoje = new Date().toISOString().slice(0, 10), lote = String(Date.now());
     const limpa = (x, d) => String(x || d).replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60);
     const pasta = `Projudi/${hoje}/${limpa(it.serventia, "Segredo")}/${limpa(it.classificador, "Segredo de justiça")}`;
-    await chrome.storage.local.set({ ["lote_" + lote]: { itens: [{ processo: it.processo, url: it.url, classificador: it.classificador || "", serventia: it.serventia || "", situacao: it.tipo || "", urlPre: it.urlPre || "", serventiaUrl: it.serventiaUrl || "", arquivoModelos: automacao[chaveServ]?.arquivoModelos || "", prompt: it.prompt, aceiteSigilo: true, pasta }], pasta: "Projudi/" + hoje, opcoes: { atualizarBase: false, studio: { ativo: true, modo: "agaiapdf", docs: false } } } });
-    await atualizar(id, { estado: "pulado", sigiloso: false, aviso: "Segredo de justiça: a extensão está baixando o PDF (sem OCR) para anexar no Agaia. Acompanhe a nova linha da esteira." });
+    await chrome.storage.local.set({ ["lote_" + lote]: { itens: [{ processo: it.processo, url: it.url, classificador: it.classificador || "", serventia: it.serventia || "", situacao: it.tipo || "", urlPre: it.urlPre || "", serventiaUrl: it.serventiaUrl || "", arquivoModelos: automacao[chaveServ]?.arquivoModelos || "", prompt: it.prompt, aceiteSigilo: true, itemId: it.id, pasta }], pasta: "Projudi/" + hoje, opcoes: { atualizarBase: false, studio: { ativo: true, modo: "agaiapdf", docs: false } } } });
+    await atualizar(id, { estado: "pausado", sigiloso: false, erro: "", aviso: "Segredo de justiça: baixando o PDF (sem OCR) para anexar no Agaia. Esta mesma linha segue sozinha quando o PDF ficar pronto." });
     chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + lote) });
     desenhar(); return;
   }

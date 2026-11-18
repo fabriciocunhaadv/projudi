@@ -119,7 +119,9 @@ def main():
         studio = ctx.new_page(); studio.goto("http://127.0.0.1:8774/")
         pg = ctx.new_page(); pg.goto(f"chrome-extension://{ext_id}/lote.html")
         base = {"serventia": SERV, "classificador": "Emilly - minutando", "pasta": "Projudi/2026-10-02/Emilly", "prompt": "Outros Área Judicial - Família e Sucessões", "arquivoModelos": "Família - Decisões, Despachos e Sentenças"}
-        itens = [{**base, "processo": "5293296-60.2026.8.09.0166", "url": "http://localhost:8770/proc?id=1"},
+        # linha que já existia na esteira (ex.: segredo de justiça enviado ao Studio): o lote completa ESTA linha, não cria outra
+        sw.evaluate("() => chrome.storage.local.set({ esteira_ordem: ['mPRE'], esteira_mPRE: { id: 'mPRE', processo: '5293296-60.2026.8.09.0166', estado: 'pausado', modo: 'agaia', prompt: 'x', sigiloso: true, criadoEm: Date.now() } })")
+        itens = [{**base, "processo": "5293296-60.2026.8.09.0166", "url": "http://localhost:8770/proc?id=1", "itemId": "mPRE"},
                  {**base, "processo": "5000001-11.2026.8.09.0166", "url": "http://localhost:8770/proc?id=2"}]
         sw.evaluate("(j) => chrome.storage.local.set({ lote_t1: j })", {"itens": itens, "pasta": "Projudi", "opcoes": {"atualizarBase": True, "studio": {"ativo": True, "modo": "analise", "docs": True}}})
         pg.goto(f"chrome-extension://{ext_id}/lote.html?lote=t1")

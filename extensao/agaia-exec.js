@@ -30,7 +30,7 @@
     const add = (t) => { t = String(t || "").replace(/\s+/g, " ").trim(); if (t && t.length > 3 && !IGNORAR.test(t) && !achados.includes(t)) achados.push(t.slice(0, 600)); };
     document.querySelectorAll("#sistem_message .alert, .alert-danger, .alert-warning, .alert-info, .toast, .swal2-popup, .invalid-feedback, [role=alert]").forEach((e) => { if (visivel(e) && !e.closest("#historicoContent")) add(texto(e)); });
     document.querySelectorAll(".modal.show .modal-body").forEach((e) => add(texto(e)));
-    return achados;
+    return sigiloTolerado ? achados.filter((t) => !/Informamos que o processo [eé] sigiloso|Em processo sigiloso, informe|Responsabilidade em processo sigiloso/i.test(t)) : achados;
   }
   const modalAberto = () => [...document.querySelectorAll(".modal.show")].find(visivel) || null;
   /** Fecha o modal pelo “X” do canto (nunca por “Não, quero ajustar”). */
@@ -40,21 +40,24 @@
   };
   // processo em segredo de justiça: o Agaia pede uma declaração de responsabilidade (“Entendi e desejo continuar”) e depois exige o PDF anonimizado.
   // A declaração é do usuário e o PDF não faz parte deste modo: a esteira NÃO confirma por ele; registra o motivo e segue.
-  const sigilo = () => { const t = [texto(modalAberto()), ...mensagens()].join(" "); return /sigilos|segredo de justi/i.test(t) ? t.replace(/\s+/g, " ").trim().slice(0, 400) : ""; };
+  let sigiloTolerado = false;      // processo sigiloso COM PDF e aceite do usuário: o aviso fixo do Agaia não é erro
+  const sigilo = () => { if (sigiloTolerado) return ""; const t = [texto(modalAberto()), ...mensagens()].join(" "); return /sigilos|segredo de justi/i.test(t) ? t.replace(/\s+/g, " ").trim().slice(0, 400) : ""; };
   const falhaSigilo = (t) => ({ ok: false, sigiloso: true, erro: "Processo em segredo de justiça: o Agaia exige a sua declaração de responsabilidade e o PDF do processo (anexo manual), o que a esteira não faz por você. Faça este processo à mão no Agaia. Texto do Agaia: " + t });
 
   // Processo sigiloso COM PDF: só roda se o usuário aceitou as declarações na esteira (p.aceiteSigilo). A extensão então faz, por ele, os dois cliques que o Agaia exige.
-  async function aceitarSigilo() {
-    for (let t = 0; t < 3; t++) {
-      const modal = await esperar(() => { const m = modalAberto(); return m && /sigilos/i.test(texto(m)) ? m : null; }, 8000);
-      if (!modal) return true;      // não há (mais) janela de responsabilidade
-      const b = [...modal.querySelectorAll("button")].find((x) => /Entendi e desejo continuar/i.test(texto(x)) && visivel(x) && !x.disabled);
-      if (!b) return false;
-      b.click(); await dorme(1200);
-      if (!(await esperar(() => !(modalAberto() && /sigilos/i.test(texto(modalAberto()))), 10000))) continue;
-      return true;
+  /** Clica em TODAS as janelinhas que o Agaia abrir no caminho (declaração “Entendi e desejo continuar”, confirmação “Sim, continuar”, avisos com “OK”), até não sobrar nenhuma. Devolve "captcha" se pedir a conta da imagem (só uma pessoa resolve). */
+  async function fecharAvisos(maxVoltas = 8) {
+    const botao = (m, re) => [...m.querySelectorAll("button")].find((x) => re.test(texto(x)) && visivel(x) && !x.disabled);
+    for (let v = 0; v < maxVoltas; v++) {
+      const m = await esperar(() => modalAberto(), v === 0 ? 2500 : 1200);
+      if (!m) return "";
+      const t = texto(m);
+      if (/Digite o resultado exibido|exibido na imagem|captcha|n[aã]o sou um rob/i.test(t)) return "captcha";
+      const b = botao(m, /Entendi e desejo continuar/i) || (/Confirma[cç][aã]o de execu[cç][aã]o|deseja continuar/i.test(t) ? botao(m, /^\s*(Sim,? continuar|Confirmar|Continuar|Sim)\s*$/i) : null) || botao(m, /^\s*(OK|Fechar|Ciente|Entendi)\s*$/i);
+      if (!b) { fecharModal(m); await dorme(600); continue; }
+      b.click(); await dorme(1000);
     }
-    return false;
+    return "";
   }
   /** Caixa “avaliei a extração realizada pela AGAIA. Concordo com o texto extraído… autorizo seu envio para a IA” (aparece depois do PDF extraído). */
   const caixaConcordo = () => [...document.querySelectorAll("input[type=checkbox]")].find((c) => {      // só o texto do próprio rótulo (um contêiner grande, como o formulário inteiro, também contém a frase)
@@ -93,7 +96,9 @@
       if (naTelaDeLogin()) return falha("O Agaia pediu login (sessão expirada). Entre no Agaia e continue a fila.", { sessao: true });
       if (!form) return falha("O Agaia não abriu o formulário de execução" + (mensagens()[0] ? ": " + mensagens()[0] : "."));
       await dorme(1500);      // o aviso de segredo de justiça aparece logo depois de abrir
-      if (sigilo()) { if (!(p.modoPdf && p.aceiteSigilo)) return falhaSigilo(sigilo()); if (!(await aceitarSigilo())) return falha("não consegui confirmar a janela de responsabilidade do Agaia (processo sigiloso)."); prog("declaração de responsabilidade confirmada"); }
+      sigiloTolerado = !!(p.modoPdf && p.aceiteSigilo);
+      if (sigiloTolerado) { if ((await fecharAvisos()) === "captcha") return falha("O Agaia pediu uma verificação (conta na imagem), que precisa de uma pessoa.", { verificacao: true }); }
+      else if (sigilo()) return falhaSigilo(sigilo());
       const m0 = mensagens().find((t) => /n[aã]o (foi )?encontrad|inexistente|arquivad|sem permiss|n[aã]o autorizad/i.test(t));
       if (m0) return falha(m0);
       await esperar(() => selectPrompt(), 20000);
@@ -115,14 +120,20 @@
         if (!rPdf) return falha("não achei a opção “Através de PDF” no Agaia");
         if (!rPdf.checked) rPdf.click();
         await dorme(800);
-        if (sigilo() && !(await aceitarSigilo())) return falha("não consegui confirmar a janela de responsabilidade do Agaia (processo sigiloso).");
+        if ((await fecharAvisos()) === "captcha") return falha("O Agaia pediu uma verificação (conta na imagem), que precisa de uma pessoa.", { verificacao: true });
         const inp = await esperar(() => campoArquivo(), 30000);
         if (!inp) return falha("não achei o campo para anexar o PDF no Agaia");
         const dt = new DataTransfer(); dt.items.add(new File(arq.partes, p.pdfNome || "processo.pdf", { type: "application/pdf" })); delete window.__agaiaArq[p.arquivoId];
         inp.files = dt.files; inp.dispatchEvent(new Event("input", { bubbles: true })); inp.dispatchEvent(new Event("change", { bubbles: true }));
         prog("PDF anexado; o Agaia está extraindo o texto");
-        const caixa = await esperar(() => caixaConcordo() || mensagens().find((t) => /erro|inv[aá]lid|n[aã]o foi poss[ií]vel|tamanho/i.test(t)) , 15 * 60000, 1000);
-        if (!caixa || typeof caixa === "string") return falha(typeof caixa === "string" ? caixa : "o Agaia não terminou de extrair o texto do PDF");
+        let caixa = null; const tCx = Date.now();
+        while (Date.now() - tCx < 15 * 60000) {
+          caixa = caixaConcordo(); if (caixa) break;
+          if ((await fecharAvisos(3)) === "captcha") return falha("O Agaia pediu uma verificação (conta na imagem), que precisa de uma pessoa.", { verificacao: true });
+          const msg = mensagens().find((t) => /erro|inv[aá]lid|n[aã]o foi poss[ií]vel|tamanho m[aá]ximo|n[aã]o suportad/i.test(t)); if (msg) return falha(msg);
+          await dorme(1000);
+        }
+        if (!caixa) return falha("o Agaia não terminou de extrair o texto do PDF");
         if (!p.aceiteSigilo) return falha("o Agaia pede a sua concordância com o texto extraído (LGPD) e ela não foi autorizada na esteira");
         if (!caixa.checked) caixa.click();
         await dorme(600);
@@ -148,7 +159,7 @@
       if (!botao) return falha("o botão Executar do Agaia não ficou disponível" + (mensagens()[0] ? ": " + mensagens()[0] : ""));
       prog("executando no Agaia");
       botao.click();
-      const t0 = Date.now(); let rodou = false, ultimoAviso = "", estavel = 0, ultimoTam = -1, semSinal = 0; let confirmou = 0;
+      const t0 = Date.now(); let rodou = false, ultimoAviso = "", estavel = 0, ultimoTam = -1, semSinal = 0; let confirmou = 0, recliques = 0, avisoFechado = false;
       while (Date.now() - t0 < p.limiteMs) {
         await dorme(1000);
         const modal = modalAberto();
@@ -162,7 +173,8 @@
             const ainda = modalAberto();
             if (ainda && confirmou >= 2) fecharModal(ainda);
             if (!temResultado()) continue;      // sem resultado ainda: segue esperando; com resultado: cai na entrega abaixo, mesmo com o aviso aberto
-          } else if (!ok) { ultimoAviso = t.slice(0, 500); }
+          } else if (ok && sigiloTolerado) { prog("fechando aviso do Agaia"); ok.click(); avisoFechado = true; await dorme(800); }      // aviso informativo (“OK”): clica e segue até o fim da execução
+          else if (!ok) { ultimoAviso = t.slice(0, 500); }
         }
         if (executando()) { rodou = true; semSinal = 0; prog("o Agaia está processando"); continue; }
         if (temResultado()) {
@@ -176,6 +188,8 @@
           }
           continue;
         }
+        // fechou um aviso e a execução não começou: clica em Executar de novo (no máximo 2 vezes)
+        if (avisoFechado && recliques < 2) { const b2 = document.getElementById("executarIA") || botao; if (b2 && visivel(b2) && !b2.disabled && !modalAberto()) { prog("clicando em Executar de novo"); b2.click(); recliques++; avisoFechado = false; semSinal = 0; continue; } }
         // nada rodando e sem resultado: aviso do Agaia (erro) ou demora para começar
         if (sigilo()) return falhaSigilo(sigilo());
         const ms = mensagens(); if (ms.length) ultimoAviso = ms[0];

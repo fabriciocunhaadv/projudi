@@ -7,7 +7,7 @@ import { textoDoPdf } from "./pdf-texto.js";
 import { extrairPauta } from "./pauta-extrator.js";
 import { chaveProc } from "./proc-chave.js";
 import { analisarNoStudio } from "./studio-cliente.js";
-import { enfileirar } from "./esteira-banco.js";
+import { enfileirar, guardarPdf, atualizar as atualizarItem, ler as lerItem } from "./esteira-banco.js";
 
 const $ = (id) => document.getElementById(id);
 let arquivos = [], cancelado = false, rodando = false;
@@ -183,7 +183,11 @@ async function interceptado(idJob) {
     let studio = null;      // minuta no app de IA: entra na esteira (um processo por vez); o download não espera por ela
     if (job.studio && job.studio.ativo) {
       try {
-        await enfileirar({ processo: job.nome, url: job.studio.url || "", urlPre: job.studio.urlPre || "", serventiaUrl: job.studio.serventiaUrl || "", serventia: job.studio.serventia || "", audData: job.studio.audData || "", audHora: job.studio.audHora || "", audPromovente: job.studio.audPromovente || "", audPromovido: job.studio.audPromovido || "", audTipo: job.studio.audTipo || "", prompt: job.studio.prompt, modo: job.studio.modo, iaId: job.studio.iaId || "", docs: !!job.studio.docs, minutaAssessor: job.studio.minuta || "", motivoMinuta: job.studio.motivoMinuta || "", refazer: job.studio.refazer || null, pdfNome: num + (semOcr ? ".pdf" : "-OCR.pdf"), pdf: arqPdf, aceiteSigilo: !!job.studio.aceiteSigilo }, res.bytes);
+        const dadosItem = { processo: job.nome, url: job.studio.url || "", urlPre: job.studio.urlPre || "", serventiaUrl: job.studio.serventiaUrl || "", serventia: job.studio.serventia || "", audData: job.studio.audData || "", audHora: job.studio.audHora || "", audPromovente: job.studio.audPromovente || "", audPromovido: job.studio.audPromovido || "", audTipo: job.studio.audTipo || "", prompt: job.studio.prompt, modo: job.studio.modo, iaId: job.studio.iaId || "", docs: !!job.studio.docs, minutaAssessor: job.studio.minuta || "", motivoMinuta: job.studio.motivoMinuta || "", refazer: job.studio.refazer || null, pdfNome: num + (semOcr ? ".pdf" : "-OCR.pdf"), pdf: arqPdf, aceiteSigilo: !!job.studio.aceiteSigilo };
+        if (job.studio.itemId && await lerItem(job.studio.itemId)) {      // veio de uma linha da esteira (ex.: segredo de justiça): NÃO cria outra linha, completa a mesma
+          await guardarPdf(job.studio.itemId, res.bytes);
+          await atualizarItem(job.studio.itemId, { ...dadosItem, estado: "aguardando", erro: "", agaiaErro: "", sigiloso: false, agaiaPedido: null, tentativas: 0, rodada: 0, aviso: "PDF baixado; seguindo na esteira." });
+        } else await enfileirar(dadosItem, res.bytes);
         await chrome.runtime.sendMessage({ acao: "esteira-abrir" });
         studio = { ok: true, fila: true, mensagem: "na esteira de minutas" };
       } catch (e) { studio = { ok: false, erro: descreverErro(e) }; log("✖ esteira: " + descreverErro(e)); }

@@ -28,7 +28,10 @@ PAGINA = """<html><head><meta charset="utf-8"><title>Gerência de Prompts - AGAI
 const CENARIO = "%(cenario)s";
 function modal(corpo, botoes) { const m = document.getElementById('mdl'); document.getElementById('mdl-corpo').innerHTML = corpo; document.getElementById('mdl-botoes').innerHTML = botoes; m.style.display = 'block'; m.classList.add('show'); }
 function fechar() { const m = document.getElementById('mdl'); m.style.display = 'none'; m.classList.remove('show'); }
-if (CENARIO === 'sigilopdf') modal('<b>Atenção: Responsabilidade em processo sigiloso</b> É sua responsabilidade garantir que os documentos enviados estejam devidamente anonimizados.', '<button>Não prosseguir</button><button id="entendi" onclick="fechar()">Entendi e desejo continuar</button>');
+if (CENARIO === 'sigilopdf') {
+  document.getElementById('sistem_message').innerHTML = '<div class="alert alert-danger">Informamos que o processo é sigiloso. Nesta etapa, o sistema utilizará apenas o conteúdo textual extraído/anonimizado do documento.</div>';
+  modal('<b>Atenção: Responsabilidade em processo sigiloso</b> É sua responsabilidade garantir que os documentos enviados estejam devidamente anonimizados.', '<button>Não prosseguir</button><button id="entendi" onclick="fechar(); modal(\\'<b>Notificação</b> Em processo sigiloso, informe o conteúdo textual do documento para execução.\\', \\'<button id=ok onclick=fechar()>OK</button>\\')">Entendi e desejo continuar</button>');
+}
 function arquivoOk() {
   window.__arq = document.getElementById('arq').files[0] ? document.getElementById('arq').files[0].name + ':' + document.getElementById('arq').files[0].size : '';
   setTimeout(() => { document.getElementById('selecao_upload_dados').innerHTML = `<div><textarea>PODER JUDICIÁRIO DO ESTADO DE GOIÁS</textarea><label><input type="checkbox" id="concordo" onchange="document.getElementById('executarIA').style.display = this.checked ? 'inline-block' : 'none'"> No conteúdo do documento acima, avaliei a extração realizada pela AGAIA. Concordo com o texto extraído, não identifiquei inconformidades com a LGPD e autorizo seu envio para a IA.</label></div>`; }, 600);
@@ -43,6 +46,7 @@ function carregarMov() {
 window.marcadosOrdem = [];
 function atualizar() { window.marcadosOrdem.push(document.querySelectorAll('.check_movimento:checked').length); }
 function executar() {
+  if (CENARIO === 'sigilopdf' && !window.__avisou) { window.__avisou = true; modal('<b>Notificação</b> Em processo sigiloso, informe o conteúdo textual do documento para execução.', '<button onclick="fechar()">OK</button>'); return; }
   if (CENARIO === 'captcha') { modal('Aviso: Dependendo do tamanho do processo... Digite o resultado exibido na imagem. 10 - 2 <input id="resp">', '<button>Confirmar</button>'); return; }
   modal('O conteúdo do prompt menciona jurisprudência/ementa, mas não há vínculo em JurisAGAIA. Deseja continuar a execução mesmo sem JurisAGAIA?', '<button id="nao">Não, quero ajustar</button><button id="sim" onclick="confirmou()">Sim, continuar</button>' + (CENARIO === 'teimoso' ? '<button class="btn-close" aria-label="Close" onclick="fechar()">×</button>' : ''));
 }
