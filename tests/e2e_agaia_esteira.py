@@ -15,6 +15,7 @@ PAGINA = """<html><head><meta charset="utf-8"><title>Gerência de Prompts - AGAI
  <select id="e_5d0e" name="f_8374"><option value="">-- Selecione um prompt --</option>
   <option value="630">Outros Área Judicial - Sentença </option><option value="15426">Outros Área Judicial - Fabrício Juizado Especial Civel</option><option value="15429">Outros Área Judicial - Fabrício Juizado Faz.Pub. </option></select>
  <input type="radio" id="tipo_pdf" name="tipo" value="pdf"><input type="radio" id="tipo_movimentos" name="tipo" value="movimentos" onclick="carregarMov()">
+ <input type="file" id="arq" accept="application/pdf" style="display:none" onchange="arquivoOk()">
  <div id="selecao_upload_dados"></div>
 </form>
 <button id="executarIA" style="display:none" onclick="executar()">Executar</button>
@@ -27,6 +28,11 @@ PAGINA = """<html><head><meta charset="utf-8"><title>Gerência de Prompts - AGAI
 const CENARIO = "%(cenario)s";
 function modal(corpo, botoes) { const m = document.getElementById('mdl'); document.getElementById('mdl-corpo').innerHTML = corpo; document.getElementById('mdl-botoes').innerHTML = botoes; m.style.display = 'block'; m.classList.add('show'); }
 function fechar() { const m = document.getElementById('mdl'); m.style.display = 'none'; m.classList.remove('show'); }
+if (CENARIO === 'sigilopdf') modal('<b>Atenção: Responsabilidade em processo sigiloso</b> É sua responsabilidade garantir que os documentos enviados estejam devidamente anonimizados.', '<button>Não prosseguir</button><button id="entendi" onclick="fechar()">Entendi e desejo continuar</button>');
+function arquivoOk() {
+  window.__arq = document.getElementById('arq').files[0] ? document.getElementById('arq').files[0].name + ':' + document.getElementById('arq').files[0].size : '';
+  setTimeout(() => { document.getElementById('selecao_upload_dados').innerHTML = `<div><textarea>PODER JUDICIÁRIO DO ESTADO DE GOIÁS</textarea><label><input type="checkbox" id="concordo" onchange="document.getElementById('executarIA').style.display = this.checked ? 'inline-block' : 'none'"> No conteúdo do documento acima, avaliei a extração realizada pela AGAIA. Concordo com o texto extraído, não identifiquei inconformidades com a LGPD e autorizo seu envio para a IA.</label></div>`; }, 600);
+}
 function carregarMov() {
   if (CENARIO === 'sigiloso') { modal('<b>Atenção: Responsabilidade em processo sigiloso</b> É sua responsabilidade garantir que os documentos enviados estejam devidamente anonimizados.', '<button>Não prosseguir</button><button id="entendi">Entendi e desejo continuar</button>'); return; }
   if (CENARIO === 'arquivado') { document.getElementById('sistem_message').innerHTML = '<div class="alert alert-danger">Processo arquivado: o Agaia não executa prompts em processos arquivados.</div>'; return; }
@@ -110,6 +116,22 @@ def main():
         print("sigiloso:", r6); assert not r6["ok"] and r6.get("sigiloso") and "segredo de justiça" in r6["erro"], r6
         pag2 = [x for x in ctx.pages if "/agaia/" in x.url][0]
         assert pag2.evaluate("document.getElementById('mdl').classList.contains('show')"), "a declaração de responsabilidade não pode ser confirmada pela extensão (o aviso deve continuar na tela)"
+        # segredo de justiça COM PDF e aceite do usuário: confirma a janela, escolhe PDF, anexa, marca a caixa de concordância, executa e devolve a minuta
+        estado["cenarios"]["5285470.80.2025"] = "sigilopdf"
+        r8 = ver.evaluate("""async () => { const ag = await import('./agaia-cliente.js'); const bytes = new Uint8Array(3000); bytes.set([37, 80, 68, 70, 45]); const and = [];
+          const r = await ag.executarNoAgaia({ processo: '5285470-80.2025.8.09.0166', prompt: 'Outros Área Judicial - Fabrício Juizado Especial Civel' }, { limiteMs: 60000, pdf: { bytes, nome: '5285470.pdf' }, aceiteSigilo: true, aoAndamento: (t) => and.push(t) });
+          return { ...r, minutaHtml: (r.minutaHtml || '').length, and }; }""")
+        print("sigilo com PDF:", {k: v for k, v in r8.items() if k != "and"}, r8.get("and"))
+        assert r8["ok"] and "DECISÃO INTERLOCUTÓRIA" in r8["minutaTexto"], r8
+        pag3 = [x for x in ctx.pages if "/agaia/" in x.url][0]
+        assert pag3.evaluate("window.__arq") == "5285470.pdf:3000", pag3.evaluate("window.__arq")
+        assert pag3.evaluate("document.getElementById('concordo').checked"), "a caixa de concordância deveria estar marcada (usuário aceitou)"
+        assert not pag3.evaluate("document.getElementById('mdl').classList.contains('show') && /sigilos/i.test(document.getElementById('mdl-corpo').innerText)"), "a janela de responsabilidade deveria estar confirmada"
+        # sem o aceite do usuário: NÃO confirma nada
+        estado["cenarios"]["5285471.81.2025"] = "sigilopdf"
+        r9 = ver.evaluate("""async () => { const ag = await import('./agaia-cliente.js'); const bytes = new Uint8Array(3000); bytes.set([37, 80, 68, 70, 45]);
+          return await ag.executarNoAgaia({ processo: '5285471-81.2025.8.09.0166', prompt: 'Outros Área Judicial - Fabrício Juizado Especial Civel' }, { limiteMs: 60000, pdf: { bytes, nome: 'x.pdf' }, aceiteSigilo: false }); }""")
+        print("sigilo com PDF sem aceite:", r9); assert not r9["ok"] and r9.get("sigiloso"), r9
         # número sem ano
         r5 = ver.evaluate("async () => { const ag = await import('./agaia-cliente.js'); return await ag.executarNoAgaia({ processo: '5285460.70', prompt: 'x' }); }")
         print("sem ano:", r5); assert not r5["ok"] and "ano" in r5["erro"], r5

@@ -34,7 +34,17 @@ async function pronta(tabId, tentativas) {
 }
 
 /** Executa o processo no Agaia. Devolve { ok, minutaHtml, minutaTexto, aproximado } ou { ok:false, erro, sessao?, verificacao? } com o texto que o Agaia mostrou. */
-export async function executarNoAgaia(item, { aoAndamento = () => {}, limiteMs = 25 * 60000, aindaValido = async () => true, aoIniciar = () => {} } = {}) {
+const b64De = (bytes) => { let t = ""; for (let i = 0; i < bytes.length; i += 0x8000) t += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(t); };
+/** O PDF vai à aba do Agaia em partes (limite de mensagem); devolve o id com que o script da página o conhece. */
+async function enviarPdfAoAgaia(tabId, bytes) {
+  const id = "pdf" + Date.now() + Math.random().toString(36).slice(2, 6), TAM = 6 * 1024 * 1024, n = Math.max(1, Math.ceil(bytes.length / TAM));
+  for (let i = 0; i < n; i++) {
+    const r = await chrome.tabs.sendMessage(tabId, { acao: "agaia-parte", id, i, n, b64: b64De(bytes.subarray(i * TAM, (i + 1) * TAM)) });
+    if (!r?.ok) throw new Error(r?.erro || "o Agaia não recebeu o PDF");
+  }
+  return id;
+}
+export async function executarNoAgaia(item, { aoAndamento = () => {}, limiteMs = 25 * 60000, aindaValido = async () => true, aoIniciar = () => {}, pdf = null, aceiteSigilo = false } = {}) {
   const numero = numeroAgaia(item.processo);
   if (!numero) return { ok: false, erro: `o número ${item.processo} não tem o ano; o Agaia só abre o processo com o número completo (ex.: 5285460-70.2025.8.09.0166)` };
   const url = urlDoProcesso(numero);
@@ -46,7 +56,9 @@ export async function executarNoAgaia(item, { aoAndamento = () => {}, limiteMs =
   if (!r0) return { ok: false, erro: "a aba do Agaia não respondeu (confira se você está logado no Agaia)" };
   const reqId = "a" + Date.now() + Math.random().toString(36).slice(2, 6);
   let r;
-  try { r = await chrome.tabs.sendMessage(aba.id, { acao: "agaia-executar", reqId, numero, prompt: item.prompt || "", limiteMs }); }
+  let arquivoId = "";
+  if (pdf?.bytes) { try { aoAndamento("enviando o PDF do processo ao Agaia"); arquivoId = await enviarPdfAoAgaia(aba.id, pdf.bytes); } catch (e) { return { ok: false, erro: "não consegui entregar o PDF ao Agaia (" + e.message + ")" }; } }
+  try { r = await chrome.tabs.sendMessage(aba.id, { acao: "agaia-executar", reqId, numero, prompt: item.prompt || "", limiteMs, modoPdf: !!arquivoId, arquivoId, pdfNome: pdf?.nome || "processo.pdf", aceiteSigilo: !!aceiteSigilo }); }
   catch (e) { return { ok: false, erro: "o Agaia não recebeu o pedido (" + e.message + ")" }; }
   if (!r?.ok) return { ok: false, erro: r?.erro || "o Agaia não confirmou o pedido" };
   aoIniciar({ reqId, tabId: aba.id });

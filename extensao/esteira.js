@@ -67,6 +67,11 @@ async function cadastrarAgaia(it, r) {
 async function analisarNoAgaia(it, valida) {
   const andamento = (t) => atualizar(it.id, { aviso: "Agaia: " + t });
   const opcoes = { aoAndamento: andamento, aindaValido: valida };
+  if (it.modo === "agaiapdf") {      // processo em segredo de justiça: o PDF baixado do Projudi (sem OCR) é anexado no Agaia
+    const bytes = await lerPdf(it.id);
+    if (!bytes || bytes.length < 1000) { await atualizar(it.id, { estado: "erro", erro: "Agaia: o PDF deste processo não está guardado; use “Rodar no Agaia com PDF” de novo.", aviso: "A esteira seguiu para o próximo processo." }); return; }
+    opcoes.pdf = { bytes, nome: it.pdfNome || "processo.pdf" }; opcoes.aceiteSigilo = !!it.aceiteSigilo;
+  }
   // a esteira recarregou ou o computador voltou no meio: se a execução anterior terminou (ou ainda roda) na aba do Agaia, aproveita em vez de rodar de novo
   let r = it.agaiaPedido ? await retomarExecucao(it.agaiaPedido, opcoes).catch(() => null) : null;
   if (!r) r = await executarNoAgaia(it, { ...opcoes, aoIniciar: (ped) => atualizar(it.id, { agaiaPedido: ped }) }).catch((err) => ({ ok: false, erro: String(err.message || err) }));
@@ -140,7 +145,7 @@ async function analisarNaIaExterna(it, valida) {
 }
 let ultimaTentativaCadastro = 0;
 async function cadastrosPendentes(lista) {      // o Studio estava fechado/ocupado quando a minuta chegou: tenta lançar de novo (no máximo a cada 60 s)
-  const pend = lista.filter((i) => (i.modo === "agaia" || i.modo === "ia") && i.estado === "concluido" && i.cadastroPendente && i.minuta);
+  const pend = lista.filter((i) => (i.modo === "agaia" || i.modo === "agaiapdf" || i.modo === "ia") && i.estado === "concluido" && i.cadastroPendente && i.minuta);
   if (!pend.length || Date.now() - ultimaTentativaCadastro < 60000) return;
   ultimaTentativaCadastro = Date.now();
   for (const it of pend) {
@@ -156,7 +161,7 @@ async function analisar(it) {
   await atualizar(it.id, { estado: "analisando", erro: "", rodada });
   const valida = async () => (await todos()).find((x) => x.id === it.id)?.rodada === rodada;      // o usuário pode ter escolhido outro caminho no meio
   try {
-    if (it.modo === "agaia") return await analisarNoAgaia(it, valida);
+    if (it.modo === "agaia" || it.modo === "agaiapdf") return await analisarNoAgaia(it, valida);
     if (it.modo === "ia") return await analisarNaIaExterna(it, valida);
     if (it.modo === "video") return await analisarComVideo(it, valida);
     const bytes = await lerPdf(it.id);
@@ -342,6 +347,7 @@ async function desenhar() {
     if (it.estado === "aguardando") b.push(`<button data-a="pular" data-id="${it.id}">Pular</button>`);
     if (["aguardando", "pausado", "erro", "analisando"].includes(it.estado)) b.push(`<button data-a="usar" data-id="${it.id}" title="A extensão procura o número do processo no Histórico Local do Studio, carrega a minuta e a leva ao Google Docs, sem analisar de novo">Usar a minuta do Studio (busca no Histórico)</button>`);
     if (it.sigiloso && it.estado === "erro") b.push(`<button data-a="sigilo-studio" data-id="${it.id}" style="background:#b45309;color:#fff;font-weight:700;padding:6px 10px;border:2px solid #78350f;border-radius:8px;cursor:pointer" title="O Agaia não roda processo em segredo de justiça. A extensão procura este processo na unidade, baixa o PDF, faz o OCR e extrai o texto, e a análise roda no Studio.">🔒 Segredo de justiça — Rodar no Studio</button>`);
+    if (it.sigiloso && it.estado === "erro") b.push(`<button data-a="sigilo-agaia" data-id="${it.id}" style="background:#7c2d12;color:#fff;font-weight:700;padding:6px 10px;border:2px solid #431407;border-radius:8px;cursor:pointer" title="A extensão baixa o PDF deste processo no Projudi (sem OCR), volta ao Agaia, confirma as declarações que VOCÊ autorizar, anexa o PDF, executa e recolhe a minuta.">🔒 Segredo de justiça — Rodar no Agaia com PDF</button>`);
     if (["pausado", "erro", "analisando"].includes(it.estado)) b.push(`<button data-a="repetir" data-id="${it.id}">${it.estado === "erro" ? "Tentar de novo" : "Analisar de novo"}</button>`);
     if (it.estado === "conferindo") { if (it.docUrl) b.push(`<a href="${esc(it.docUrl)}" target="_blank">Abrir Docs</a>`); b.push(`<button data-a="conferido" data-id="${it.id}">✔ Terminei a conferência — cadastrar no Projudi</button>`); }
     if (it.estado === "cadastrando") { b.push(`<button data-a="projudi" data-id="${it.id}">Abrir o processo</button>`, `<button data-a="concluir" data-id="${it.id}">✔ Lancei no Projudi — próximo processo</button>`); }
@@ -350,7 +356,7 @@ async function desenhar() {
     if (it.modo === "mesa" && it.estado === "concluido") b.push(`<label title="Inclui esta audiência na pauta (formato do modelo do gabinete)"><input type="checkbox" data-pauta="${it.id}" ${it.pautaSel ? "checked" : ""}> incluir na pauta</label>`);
     if (it.estado === "concluido" && (it.minuta || "").length > 200) b.push(`<button data-a="copiar" data-id="${it.id}" title="Copia a minuta que a extensão recebeu do Studio (garantia caso ela não apareça no Histórico do app)">📋 Copiar minuta</button>`);
     b.push(`<button data-a="excluir" data-id="${it.id}" title="Tira este processo da fila e apaga o PDF guardado (não mexe no Projudi nem nos arquivos já baixados)">🗑 Excluir</button>`);
-    return `<tr><td>${n + 1}</td><td>${esc(it.processo)}<br><small>${esc(it.tipo || "")}</small></td><td class="e-${it.estado}">${esc(it.modo === "agaia" && it.estado === "analisando" ? "rodando no Agaia…" : it.modo === "ia" && it.estado === "analisando" ? `rodando no ${SITES_IA[it.iaId]?.nome || "IA externa"}…` : it.modo === "ia" && it.estado === "concluido" ? `concluído (${SITES_IA[it.iaId]?.nome || "IA externa"})` : it.modo === "agaia" && it.estado === "concluido" ? "concluído (Agaia)" : ROTULO[it.estado] || it.estado)}${it.erro ? "<br>" + esc(it.erro) : ""}${it.aviso ? `<br><small>${esc(it.aviso)}</small>` : ""}${it.injecao ? (it.injecao.estado === "vermelha" ? `<br><small class="inj-v">🚨 Prompt injection nos autos: ${esc(it.injecao.texto || "confira a tarja vermelha no app")}</small>` : `<br><small class="inj-ok">✅ Prompt injection: nada encontrado</small>`) : ""}</td><td>${b.join(" ")}</td></tr>`;
+    return `<tr><td>${n + 1}</td><td>${esc(it.processo)}<br><small>${esc(it.tipo || "")}</small></td><td class="e-${it.estado}">${esc((it.modo === "agaia" || it.modo === "agaiapdf") && it.estado === "analisando" ? (it.modo === "agaiapdf" ? "rodando no Agaia (com o PDF)…" : "rodando no Agaia…") : it.modo === "ia" && it.estado === "analisando" ? `rodando no ${SITES_IA[it.iaId]?.nome || "IA externa"}…` : it.modo === "ia" && it.estado === "concluido" ? `concluído (${SITES_IA[it.iaId]?.nome || "IA externa"})` : (it.modo === "agaia" || it.modo === "agaiapdf") && it.estado === "concluido" ? "concluído (Agaia)" : ROTULO[it.estado] || it.estado)}${it.erro ? "<br>" + esc(it.erro) : ""}${it.aviso ? `<br><small>${esc(it.aviso)}</small>` : ""}${it.injecao ? (it.injecao.estado === "vermelha" ? `<br><small class="inj-v">🚨 Prompt injection nos autos: ${esc(it.injecao.texto || "confira a tarja vermelha no app")}</small>` : `<br><small class="inj-ok">✅ Prompt injection: nada encontrado</small>`) : ""}</td><td>${b.join(" ")}</td></tr>`;
   }).join("") : '<tr><td colspan="4">Fila vazia.</td></tr>';
   const conc = lista.filter((x) => x.modo === "mesa" && x.estado === "concluido"), marc = conc.filter((x) => x.pautaSel);
   $("pautaBarra").style.display = conc.length ? "" : "none"; $("pautaN").textContent = marc.length; $("pautaGerar").disabled = !marc.length;
@@ -403,6 +409,21 @@ $("linhas").addEventListener("click", async (ev) => {
     chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + lote) });
     desenhar(); return;
   }
+  if (a === "sigilo-agaia") {
+    const it = (await todos()).find((x) => x.id === id); if (!it) return;
+    if (!it.url) { alert("Esta linha não guardou o endereço do processo no Projudi. Envie o processo de novo pelo Painel."); return; }
+    if (!it.prompt) { alert("Esta linha está sem o nome do prompt no Agaia. Defina “Prompt no Agaia” na tabela de serventias do Painel."); return; }
+    if (!(await confirmarDeclaracoes(it))) return;      // as declarações do Agaia são do usuário: só segue com o aceite dele
+    const { automacao = {} } = await chrome.storage.sync.get("automacao");
+    const chaveServ = Object.keys(automacao).find((x) => String(x).trim().toLowerCase() === String(it.serventia || "").trim().toLowerCase());
+    const hoje = new Date().toISOString().slice(0, 10), lote = String(Date.now());
+    const limpa = (x, d) => String(x || d).replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60);
+    const pasta = `Projudi/${hoje}/${limpa(it.serventia, "Segredo")}/${limpa(it.classificador, "Segredo de justiça")}`;
+    await chrome.storage.local.set({ ["lote_" + lote]: { itens: [{ processo: it.processo, url: it.url, classificador: it.classificador || "", serventia: it.serventia || "", situacao: it.tipo || "", urlPre: it.urlPre || "", serventiaUrl: it.serventiaUrl || "", arquivoModelos: automacao[chaveServ]?.arquivoModelos || "", prompt: it.prompt, aceiteSigilo: true, pasta }], pasta: "Projudi/" + hoje, opcoes: { atualizarBase: false, studio: { ativo: true, modo: "agaiapdf", docs: false } } } });
+    await atualizar(id, { estado: "pulado", sigiloso: false, aviso: "Segredo de justiça: a extensão está baixando o PDF (sem OCR) para anexar no Agaia. Acompanhe a nova linha da esteira." });
+    chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + lote) });
+    desenhar(); return;
+  }
   if (a === "usar") { usarMinutaDoStudio((await todos()).find((x) => x.id === id)); return; }
   if (a === "conferido") await atualizar(id, { estado: "conferido" });
   if (a === "concluir") { await fecharAbas((await todos()).find((x) => x.id === id)); await atualizar(id, { estado: "concluido" }); }
@@ -412,6 +433,20 @@ $("linhas").addEventListener("click", async (ev) => {
 chrome.storage.sync.get("esteiraConfig").then(({ esteiraConfig = {} }) => { $("entrada").value = esteiraConfig.entrada || "pdf"; });
 $("entrada").onchange = async () => { const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig"); chrome.storage.sync.set({ esteiraConfig: { ...esteiraConfig, entrada: $("entrada").value } }); };
 // Recuperação: coloca na fila PDFs "número-OCR.pdf" que já estão no computador (a fila foi perdida ou os PDFs vieram de fora).
+// Declarações exigidas pelo Agaia em processo sigiloso. São do USUÁRIO: a extensão só as marca depois que ele as aceita aqui (uma vez para este processo).
+function confirmarDeclaracoes(it) {
+  return new Promise((ok) => {
+    const fundo = document.createElement("div");
+    fundo.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:99999";
+    fundo.innerHTML = `<div style="background:#fff;color:#111;border-radius:12px;padding:18px;max-width:600px;width:94%;font:14px system-ui"><b>Processo em segredo de justiça — Agaia</b><p style="margin:8px 0">Processo <b>${esc(it.processo)}</b>. Para rodar no Agaia, a extensão vai marcar, <b>em seu nome</b>, o que o Agaia exige:</p><ol style="margin:6px 0 10px 18px"><li>Na janela de responsabilidade: <i>“Entendi e desejo continuar”</i> — é sua responsabilidade garantir que os documentos estejam anonimizados e não contenham informações sensíveis que não devam ser processadas pelo sistema.</li><li>Depois que o Agaia extrair o texto do PDF: a caixa <i>“avaliei a extração realizada pela AGAIA. Concordo com o texto extraído, não identifiquei inconformidades com a LGPD e autorizo seu envio para a IA”</i>.</li></ol><p style="margin:6px 0;color:#7c2d12"><b>Atenção:</b> a segunda declaração diz que você avaliou o texto extraído. A extensão não o lê por você; revise a minuta e o processo depois.</p><label style="display:flex;gap:8px;align-items:flex-start;margin:10px 0"><input type="checkbox" id="declOk" style="margin-top:3px"> <span>Li e assumo, como responsável, estas declarações para este processo.</span></label><div style="display:flex;gap:8px;justify-content:flex-end"><button id="declCancelar">Cancelar</button><button id="declOkBtn" disabled style="background:#7c2d12;color:#fff;font-weight:700">Rodar no Agaia com PDF</button></div></div>`;
+    document.body.appendChild(fundo);
+    const caixa = fundo.querySelector("#declOk"), btn = fundo.querySelector("#declOkBtn");
+    caixa.onchange = () => { btn.disabled = !caixa.checked; };
+    fundo.querySelector("#declCancelar").onclick = () => { fundo.remove(); ok(false); };
+    btn.onclick = () => { fundo.remove(); ok(true); };
+  });
+}
+
 // Janelinha para escolher o prompt do Studio quando nenhum corresponde à serventia do processo. Devolve o prompt escolhido ou "" se o usuário cancelar.
 function escolherPrompt(it, opcoes) {
   return new Promise((ok) => {

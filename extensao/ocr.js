@@ -154,7 +154,8 @@ async function interceptado(idJob) {
     if (!r.ok || !ehPdf(bytes)) throw new Error(`o Projudi não devolveu um PDF (HTTP ${r.status}). Use o botão Gerar normal da janela: o OCR automático cuida do arquivo baixado.`);
     log(`PDF recebido do Projudi: ${(bytes.length / 1048576).toFixed(1)} MB`);
     const num = (job.nome || "").replace(/[^\w.\-]+/g, "_") || "processo", pasta = job.pasta ? job.pasta.replace(/[<>:"|?*\\]+/g, "_").split("/").map((x) => x.replace(/[\s.]+$/g, "").replace(/^\s+/, "")).filter(Boolean).join("/") + "/" : "";      // cada pasta sem espaço/ponto no fim (o Chrome recusa: “Invalid filename”)
-    const res = await processar(new File([bytes], num + ".pdf", { type: "application/pdf" }), { escala: +$("escala").value, paralelo: +$("paralelo").value, forcar: false });
+    const semOcr = !!(job.studio?.ativo && job.studio.modo === "agaiapdf");      // Agaia (processo sigiloso): o próprio Agaia extrai o texto; o PDF vai como veio do Projudi, sem OCR
+    const res = semOcr ? { bytes, ocr: 0, total: 0, puladas: [] } : await processar(new File([bytes], num + ".pdf", { type: "application/pdf" }), { escala: +$("escala").value, paralelo: +$("paralelo").value, forcar: false });
     const salvar = async (blob, nome) => {
       const url = URL.createObjectURL(blob);
       const id = await chrome.downloads.download({ url, filename: pasta + nome, conflictAction: "uniquify", saveAs: false });
@@ -164,10 +165,10 @@ async function interceptado(idJob) {
       return item.filename;
     };
     $("status").textContent = "Salvando o PDF…";
-    const arqPdf = await salvar(new Blob([res.bytes], { type: "application/pdf" }), num + "-OCR.pdf");
-    void contarUso("ocr_processo");
+    const arqPdf = await salvar(new Blob([res.bytes], { type: "application/pdf" }), num + (semOcr ? ".pdf" : "-OCR.pdf"));
+    if (!semOcr) void contarUso("ocr_processo");
     let semAcesso = [];      // páginas “Não será possível mostrar o Arquivo da movimentação … nível de acesso insuficiente” (arquivo sigiloso/restrito): ficam FORA da análise
-    try { const txtPdf = await textoDoPdf(res.bytes); semAcesso = [...new Set([...txtPdf.matchAll(/Movimenta[cç][aã]o\s*(\d+)\s*:\s*([^\n]{0,70})[\s\S]{0,260}?n[ií]vel de acesso/gi)].map((m) => `Mov. ${m[1]}${m[2] ? " (" + m[2].trim() + ")" : ""}`))]; if (semAcesso.length) log("⚠ " + semAcesso.length + " arquivo(s) sem acesso (nível insuficiente): " + semAcesso.join("; ") + " — não entram na análise"); } catch (e) { /* sem texto */ }
+    if (!semOcr) try { const txtPdf = await textoDoPdf(res.bytes); semAcesso = [...new Set([...txtPdf.matchAll(/Movimenta[cç][aã]o\s*(\d+)\s*:\s*([^\n]{0,70})[\s\S]{0,260}?n[ií]vel de acesso/gi)].map((m) => `Mov. ${m[1]}${m[2] ? " (" + m[2].trim() + ")" : ""}`))]; if (semAcesso.length) log("⚠ " + semAcesso.length + " arquivo(s) sem acesso (nível insuficiente): " + semAcesso.join("; ") + " — não entram na análise"); } catch (e) { /* sem texto */ }
     // Pauta de audiências: com a pauta ativa, extrai do texto os dados da audiência e guarda para a página da pauta
     try {
       if (job.lote && (await chrome.storage.local.get("pauta_ativa")).pauta_ativa) {
@@ -175,14 +176,14 @@ async function interceptado(idJob) {
         await chrome.storage.local.set({ ["pauta_res_" + chaveProc(job.nome)]: { dados, ts: Date.now(), pdf: arqPdf } });
       }
     } catch (e) { log("⚠ pauta: " + descreverErro(e)); }
-    try { await salvar(new Blob([await textoDoPdf(res.bytes)], { type: "text/plain;charset=utf-8" }), num + "-OCR.txt"); log("Texto do PDF salvo: " + num + "-OCR.txt"); } catch (e) { log("⚠ não consegui salvar o .txt: " + descreverErro(e)); }      // o texto de cada processo baixado fica ao lado do PDF
+    if (!semOcr) try { await salvar(new Blob([await textoDoPdf(res.bytes)], { type: "text/plain;charset=utf-8" }), num + "-OCR.txt"); log("Texto do PDF salvo: " + num + "-OCR.txt"); } catch (e) { log("⚠ não consegui salvar o .txt: " + descreverErro(e)); }      // o texto de cada processo baixado fica ao lado do PDF
     $("status").textContent = `Pronto: ${arqPdf}`;
     document.body.dataset.salvo = arqPdf;
     avisar("PDF do processo pronto", `${num}-OCR.pdf salvo (${res.ocr} de ${res.total} páginas com OCR${res.puladas && res.puladas.length ? `; ${res.puladas.length} página(s) sem OCR: ${res.puladas.map((x) => x.pagina).join(", ")}` : ""}).`);
     let studio = null;      // minuta no app de IA: entra na esteira (um processo por vez); o download não espera por ela
     if (job.studio && job.studio.ativo) {
       try {
-        await enfileirar({ processo: job.nome, url: job.studio.url || "", urlPre: job.studio.urlPre || "", serventiaUrl: job.studio.serventiaUrl || "", serventia: job.studio.serventia || "", audData: job.studio.audData || "", audHora: job.studio.audHora || "", audPromovente: job.studio.audPromovente || "", audPromovido: job.studio.audPromovido || "", audTipo: job.studio.audTipo || "", prompt: job.studio.prompt, modo: job.studio.modo, iaId: job.studio.iaId || "", docs: !!job.studio.docs, minutaAssessor: job.studio.minuta || "", motivoMinuta: job.studio.motivoMinuta || "", refazer: job.studio.refazer || null, pdfNome: num + "-OCR.pdf", pdf: arqPdf }, res.bytes);
+        await enfileirar({ processo: job.nome, url: job.studio.url || "", urlPre: job.studio.urlPre || "", serventiaUrl: job.studio.serventiaUrl || "", serventia: job.studio.serventia || "", audData: job.studio.audData || "", audHora: job.studio.audHora || "", audPromovente: job.studio.audPromovente || "", audPromovido: job.studio.audPromovido || "", audTipo: job.studio.audTipo || "", prompt: job.studio.prompt, modo: job.studio.modo, iaId: job.studio.iaId || "", docs: !!job.studio.docs, minutaAssessor: job.studio.minuta || "", motivoMinuta: job.studio.motivoMinuta || "", refazer: job.studio.refazer || null, pdfNome: num + (semOcr ? ".pdf" : "-OCR.pdf"), pdf: arqPdf, aceiteSigilo: !!job.studio.aceiteSigilo }, res.bytes);
         await chrome.runtime.sendMessage({ acao: "esteira-abrir" });
         studio = { ok: true, fila: true, mensagem: "na esteira de minutas" };
       } catch (e) { studio = { ok: false, erro: descreverErro(e) }; log("✖ esteira: " + descreverErro(e)); }

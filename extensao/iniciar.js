@@ -37,6 +37,8 @@ const visiveis = () => (estado?.serventias || []).filter((s) => !ocultas.servs.i
 const procsDe = (s) => ["naoAnalisadas", "preAnalisadas"].flatMap((tipo) => (s.processos?.[tipo] || []).map((p) => ({ ...p, tipo, serventia: s.serventia, serventiaUrl: s.url || "" })));
 const ativa = (s) => !!automacao[s.serventia]?.ativa;
 const promptDe = (serv) => automacao[serv]?.prompt || (globalThis.Sugestoes ? Sugestoes.prompt(serv) : "") || "";
+const contar = (arr) => ({ na: arr.filter((p) => p.tipo === "naoAnalisadas").length, pre: arr.filter((p) => p.tipo === "preAnalisadas").length });      // dois totais (não analisados × pré-analisados): um total geral dá a falsa impressão de que falta tudo
+const rotCont = (c) => `${c.na} não analisado${c.na === 1 ? "" : "s"} · ${c.pre} pré-analisado${c.pre === 1 ? "" : "s"}`;
 function todosCand() {      // todos os processos das serventias ligadas, na ordem de trabalho (cada processo uma vez)
   const vistos = new Set();
   return visiveis().filter(ativa).flatMap(procsDe).filter((p) => p.url).sort(Ordenar.comparador("trabalho"))
@@ -93,24 +95,24 @@ function telaPasso1() {
     return moldura("Passo 1 de 6 · Verificar seus processos", "Primeiro, a extensão precisa consultar o Projudi para saber quais processos estão esperando por você.",
       `${emAndamento}<div class="emp"><div class="ic">${msg[0]}</div><p><b>${msg[1]}</b><br>${msg[2]}</p><button class="btn g big" data-acao="verificar" ${verificando ? "disabled" : ""} data-testid="iniciar-verificar">${verificando ? "Verificando…" : "🔍 Verificar agora"}</button>${verificando ? "" : '<p style="font-size:13.5px;margin-top:14px">Leva cerca de 1 minuto. Deixe o Projudi aberto e logado.</p>'}</div>`, { voltar: false, pode: false });
   }
-  const vs = visiveis(), total = vs.reduce((n, s) => n + procsDe(s).length, 0), urg = vs.reduce((n, s) => n + procsDe(s).filter((p) => p.urgencia && p.urgencia < 3).length, 0);
+  const vs = visiveis(), total = vs.reduce((n, s) => n + procsDe(s).length, 0), totNa = vs.reduce((n, s) => n + contar(procsDe(s)).na, 0), totPre = total - totNa, urg = vs.reduce((n, s) => n + procsDe(s).filter((p) => p.urgencia && p.urgencia < 3).length, 0);
   const lista = [...vs].sort((a, b) => procsDe(b).length - procsDe(a).length), mostrar = verTodas ? lista : lista.slice(0, 4);
   return moldura("Passo 1 de 6 · Verificar seus processos", "A listagem já está pronta. Se chegaram processos novos, é só atualizar.",
     `${emAndamento}<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px"><span class="chip" data-testid="iniciar-pronta">✔ Listagem pronta</span><span style="color:var(--mut)">Última verificação: <b style="color:var(--fg)" data-testid="iniciar-quando">${quandoTxt(estado.quando)}</b> (${haQuanto(estado.quando)})</span></div>` +
     `<div class="tipw" style="margin-bottom:16px"><button class="btn" data-acao="verificar" data-testid="iniciar-atualizar">↻ Atualizar a listagem</button><span class="tip">Consulta o Projudi de novo. Use quando achar que chegaram processos novos desde a última verificação.</span></div>` +
-    `<div class="kp"><div><b>${dig(total)}</b><span>processos esperando</span></div><div><b>${vs.length}</b><span>serventias</span></div><div><b>${dig(urg)}</b><span>urgentes</span></div></div>` +
-    `<div class="mini">${mostrar.map((s) => `<div class="r"><span>${esc(curto(s.serventia))}</span><b>${procsDe(s).length}</b></div>`).join("")}${lista.length > 4 ? `<div class="r" style="color:var(--mut)"><span>${verTodas ? "" : `+ ${lista.length - 4} outras serventias`}</span><button class="link" data-acao="vertodas">${verTodas ? "mostrar menos" : "ver todas"}</button></div>` : ""}</div>`,
+    `<div class="kp"><div data-testid="iniciar-total-na"><b>${dig(totNa)}</b><span>não analisados</span></div><div data-testid="iniciar-total-pre"><b>${dig(totPre)}</b><span>pré-analisados</span></div><div><b>${vs.length}</b><span>serventias</span></div><div><b>${dig(urg)}</b><span>urgentes</span></div></div>` +
+    `<div class="mini">${mostrar.map((s) => `<div class="r"><span>${esc(curto(s.serventia))}</span><b>${rotCont(contar(procsDe(s)))}</b></div>`).join("")}${lista.length > 4 ? `<div class="r" style="color:var(--mut)"><span>${verTodas ? "" : `+ ${lista.length - 4} outras serventias`}</span><button class="link" data-acao="vertodas">${verTodas ? "mostrar menos" : "ver todas"}</button></div>` : ""}</div>`,
     { voltar: false, pode: total > 0 });
 }
 
 function telaPasso2() {
   const vs = visiveis().sort((a, b) => Number(ativa(b)) - Number(ativa(a)) || procsDe(b).length - procsDe(a).length);
-  const lig = vs.filter((s) => ativa(s) && procsDe(s).length), n = lig.reduce((t, s) => t + procsDe(s).length, 0);
-  const linhas = vs.map((s) => { const q = procsDe(s).length, on = ativa(s); return `<div class="row ${on ? "" : "off"}"><button class="sw ${on ? "on" : ""}" data-serv="${esc(s.serventia)}" aria-label="Ligar ou desligar ${esc(curto(s.serventia))}" aria-pressed="${on}"></button><div class="nm"><b>${esc(curto(s.serventia))}</b><small>${esc(cidade(s.serventia))}${on ? "" : " · desligada"}</small></div><span class="badge ${on && q ? "" : "z"}">${q} processo${q === 1 ? "" : "s"}</span><button class="hide" data-ocultar="${esc(s.serventia)}" title="Esconde esta serventia do painel e da contagem (dá para mostrar de novo)">Ocultar</button></div>`; }).join("");
+  const lig = vs.filter((s) => ativa(s) && procsDe(s).length), cLig = contar(lig.flatMap((s) => procsDe(s))), n = cLig.na + cLig.pre;
+  const linhas = vs.map((s) => { const c = contar(procsDe(s)), q = c.na + c.pre, on = ativa(s); return `<div class="row ${on ? "" : "off"}"><button class="sw ${on ? "on" : ""}" data-serv="${esc(s.serventia)}" aria-label="Ligar ou desligar ${esc(curto(s.serventia))}" aria-pressed="${on}"></button><div class="nm"><b>${esc(curto(s.serventia))}</b><small>${esc(cidade(s.serventia))}${on ? "" : " · desligada"}</small></div><span class="badge ${on && q ? "" : "z"}" data-testid="iniciar-badge">${q ? rotCont(c) : "0 processos"}</span><button class="hide" data-ocultar="${esc(s.serventia)}" title="Esconde esta serventia do painel e da contagem (dá para mostrar de novo)">Ocultar</button></div>`; }).join("");
   const oc = ocultas.servs;
   const blocoOc = oc.length ? `<div style="margin-top:10px"><button class="link" data-acao="veroc">${verOcultas ? "Esconder" : "Mostrar"} ${oc.length} serventia${oc.length === 1 ? "" : "s"} oculta${oc.length === 1 ? "" : "s"}</button>${verOcultas ? oc.map((x) => `<div class="row"><div class="nm"><b>${esc(curto(x))}</b><small>oculta</small></div><button class="hide" data-reativar="${esc(x)}">Reativar</button></div>`).join("") + '<small style="color:var(--mut)">Depois de reativar, volte ao passo 1 e atualize a listagem.</small>' : ""}</div>` : "";
   return moldura("Passo 2 de 6 · Onde você trabalha?", "Deixe ligadas só as serventias em que você trabalha. Se uma delas nunca é sua, use <b>Ocultar</b>.",
-    `${linhas || '<div class="row">Nenhuma serventia na listagem.</div>'}<div class="line" data-testid="iniciar-resumo2">${lig.length ? `✅ <span><b>${lig.length} serventia${lig.length === 1 ? "" : "s"} ligada${lig.length === 1 ? "" : "s"}</b> · ${dig(n)} processos serão processados</span>` : "👆 <span>Ligue ao menos uma serventia para continuar.</span>"}</div>${blocoOc}`, { pode: lig.length > 0 });
+    `${linhas || '<div class="row">Nenhuma serventia na listagem.</div>'}<div class="line" data-testid="iniciar-resumo2">${lig.length ? `✅ <span><b>${lig.length} serventia${lig.length === 1 ? "" : "s"} ligada${lig.length === 1 ? "" : "s"}</b> · ${dig(cLig.na)} não analisados e ${dig(cLig.pre)} pré-analisados serão processados</span>` : "👆 <span>Ligue ao menos uma serventia para continuar.</span>"}</div>${blocoOc}`, { pode: lig.length > 0 });
 }
 
 function telaPasso3() {      // escolher QUAIS processos serão enviados (pré-analisados e não analisados)
