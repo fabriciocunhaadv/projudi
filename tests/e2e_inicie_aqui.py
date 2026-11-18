@@ -128,6 +128,11 @@ with sync_playwright() as p:
     pg = abrir("iniciar.html"); pg.click("[data-acao=continuar]"); pg.click("[data-acao=continuar]"); pg.click("[data-acao=continuar]")
     ok(pg.locator("[data-testid=iniciar-modo-lupa]").count() == 0 and pg.locator("[data-testid=iniciar-modo-studio].sel").count() == 1, "assessor: a Lupa não aparece")
     pg.close()
+    # ---- super admin: vê a Lupa também (sem ser a opção padrão) ----
+    sw.evaluate("() => chrome.storage.local.set({ studio_perfil: { perfil: 'superadmin', ts: Date.now() } })"); sw.evaluate("() => chrome.storage.local.remove(['iniciar_job','iniciar_modo'])")
+    pg = abrir("iniciar.html"); pg.click("[data-acao=continuar]"); pg.click("[data-acao=continuar]"); pg.click("[data-acao=continuar]")
+    ok(pg.locator("[data-testid=iniciar-modo-lupa]").count() == 1 and pg.locator("[data-testid=iniciar-modo-studio].sel").count() == 1, "super admin: a Lupa aparece e a Análise principal continua a escolha padrão")
+    pg.close()
     # ---- painel completo intacto ----
     pg = abrir("painel.html", spy=False); pg.wait_for_selector("#enviarAgaia", timeout=15000); ok(pg.locator("#baixarLote").count() == 1 and "Resumo por serventia" in pg.inner_text("#conteudo"), "o painel completo continua igual")
     ctx.close()

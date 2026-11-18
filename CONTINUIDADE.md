@@ -159,3 +159,7 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 
 ## Histórico (Studio, commits locais; publicar com "Pode publicar")
 - Busca por nº de processo sem resultado → pergunta ao banco, recupera e libera marca de exclusão local; se achar em OUTRA unidade, avisa qual. Rota `GET /api/db/history?unit=*` (todas as unidades do gabinete). Investigação do ato 5097642 (gigante) ainda aberta: mesmo assim não apareceu; pedir ao usuário o resultado do botão "Abrir o Histórico" (painel Gigantes).
+
+## 4.0.5 — Lupa também para super admin
+- Studio publica `data-assessor-perfil` = "superadmin" | "magistrado" | "assessor"; `iniciar.js` mostra a Lupa para magistrado e super admin (recomendada/padrão só para magistrado).
+- Studio: Histórico mostra "Gabinete ativo / Unidade" e, na busca por processo sem resultado, avisa em qual unidade (e, para super admin, em qual gabinete) o ato está (`GET /api/db/history?numeros=..&tenant=*`, só super admin). Causa do caso 5097642: ato gravado em OUTRO gabinete (gab_dr_jose_cassio_de_sousa) do que o ativo no computador.

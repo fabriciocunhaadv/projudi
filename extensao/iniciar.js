@@ -11,6 +11,7 @@ const chaveProc = (p) => String(p).replace(/\D/g, "").slice(0, 13) || p;
 const dig = (n) => Number(n || 0).toLocaleString("pt-BR");
 
 let estado = null, ocultas = { servs: [], cargos: [] }, automacao = {}, sit = {}, job = null, perfilStudio = "";      // perfilStudio: "magistrado" | "assessor" | "" (o Studio informa quando é aberto)
+const podeLupa = () => perfilStudio === "magistrado" || perfilStudio === "superadmin";      // o super admin vê tudo
 let passo = 1, modo = "studio", verTodas = false, verOcultas = false, aviso = "", ocupado = false;
 // passo 3 (escolher os processos): o que o usuário desmarcou, filtros e opções do passo 4
 let excl = new Set(), incluirFeitos = false, filtroTexto = "", selSit = { naoAnalisadas: true, preAnalisadas: true }, iaId = "chatgpt", entrada = "pdf";
@@ -59,7 +60,7 @@ async function carregar() {
   estado = deduplicar((await chrome.storage.local.get("estado")).estado);
   perfilStudio = (await chrome.storage.local.get("studio_perfil")).studio_perfil?.perfil || "";
   const guardado = (await chrome.storage.local.get("iniciar_modo")).iniciar_modo;
-  modo = guardado === "lupa" && perfilStudio !== "magistrado" ? "studio" : [...MODOS_STUDIO, "agaia", "pdf"].includes(guardado) ? guardado : (perfilStudio === "magistrado" ? "lupa" : "studio");      // a Lupa só existe para magistrado (perfil do Studio)
+  modo = guardado === "lupa" && !podeLupa() ? "studio" : [...MODOS_STUDIO, "agaia", "pdf"].includes(guardado) ? guardado : (perfilStudio === "magistrado" ? "lupa" : "studio");      // a Lupa só existe para magistrado (perfil do Studio)
   entrada = ((await chrome.storage.sync.get("esteiraConfig")).esteiraConfig || {}).entrada || "pdf";
   await carregarSituacao();
 }
@@ -149,7 +150,7 @@ function telaPasso4() {      // o que fazer com eles, e PARA ONDE vai
   const mag = perfilStudio === "magistrado", sel = escolhidos(), nPre = sel.filter((p) => p.tipo === "preAnalisadas").length;
   const card = ([k, ic, t, d, rec, off, motivo]) => `<button class="opt ${modo === k ? "sel" : ""} ${off ? "off" : ""}" data-modo="${k}" data-testid="iniciar-modo-${k}" ${off ? "disabled" : ""}>${rec ? '<span class="rec">Recomendado</span>' : ""}<div class="ic">${ic}</div><b>${t}</b><p>${d}</p>${off ? `<p class="mot">${motivo}</p>` : ""}</button>`;
   const noStudio = [
-    ...(mag ? [["lupa", "🔎", "Lupa do Magistrado", "Confere a minuta que o assessor já escreveu contra os autos.", true, nPre === 0, "Marque ao menos um processo pré-analisado no passo anterior."]] : []),
+    ...(podeLupa() ? [["lupa", "🔎", "Lupa do Magistrado", "Confere a minuta que o assessor já escreveu contra os autos.", mag, nPre === 0, "Marque ao menos um processo pré-analisado no passo anterior."]] : []),
     ["studio", "✨", "Análise principal", "Baixa o PDF com OCR e o Studio escreve a minuta (Gerar Minuta Judicial).", !mag, false, ""],
     ["turbo", "⚡", "Análise Turbo", "Módulo Turbo independente: anexa o PDF com OCR, detecta o tipo sozinho e gera.", false, false, ""],
     ["ia", "🌐", "IA externa", "Usa o ChatGPT, Gemini, Claude ou IA do Jusbrasil: a extensão anexa o PDF, cola o prompt e traz a minuta.", false, false, ""]];
@@ -277,7 +278,7 @@ document.addEventListener("input", (e) => {      // filtro de texto do passo 3: 
   chrome.storage.onChanged.addListener(async (c, area) => {
     if (area === "local" && c.estado) { estado = deduplicar(c.estado.newValue); desenhar(); }
     if (area === "local" && Object.keys(c).some((k) => k === "baixados" || k === "iniciar_job" || k.startsWith("esteira_"))) { await carregarSituacao(); if (passo === 6 || passo === 1) desenhar(); }
-    if (area === "local" && c.studio_perfil) { perfilStudio = c.studio_perfil.newValue?.perfil || ""; if (perfilStudio !== "magistrado" && modo === "lupa") modo = "studio"; desenhar(); }
+    if (area === "local" && c.studio_perfil) { perfilStudio = c.studio_perfil.newValue?.perfil || ""; if (!podeLupa() && modo === "lupa") modo = "studio"; desenhar(); }
     if (area === "sync" && (c.ocultas || c.automacao)) { await carregar(); if (!document.activeElement || document.activeElement.tagName !== "INPUT") desenhar(); }
   });
   setInterval(() => { if (passo === 1 && estado?.status === "ok") desenhar(); }, 60000);      // "há X min" se atualiza sozinho

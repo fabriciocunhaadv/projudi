@@ -8,7 +8,7 @@
   // Só grava quando o app informa um perfil (não apaga ao sair da conta nem enquanto a página ainda carrega).
   try {
     if (window.top === window) {
-      const guardarPerfil = () => { const p = document.documentElement.dataset.assessorPerfil; if (p === "magistrado" || p === "assessor") chrome.storage.local.set({ studio_perfil: { perfil: p, ts: Date.now() } }); };
+      const guardarPerfil = () => { const p = document.documentElement.dataset.assessorPerfil; if (p === "magistrado" || p === "assessor" || p === "superadmin") chrome.storage.local.set({ studio_perfil: { perfil: p, ts: Date.now() } }); };
       guardarPerfil();
       new MutationObserver(guardarPerfil).observe(document.documentElement, { attributes: true, attributeFilter: ["data-assessor-perfil"] });
     }
