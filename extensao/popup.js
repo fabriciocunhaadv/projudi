@@ -1,7 +1,9 @@
 // Janelinha da extensão: só os atalhos e a situação da última atualização do painel (sem serventias, comarcas ou listas de processos).
 const $ = (id) => document.getElementById(id);
 const abrir = (arq) => { chrome.tabs.create({ url: chrome.runtime.getURL(arq) }); window.close(); };
+$("inicie").onclick = () => abrir("iniciar.html");
 $("painel").onclick = () => abrir("painel.html");
+$("esteira").onclick = () => abrir("esteira.html");
 $("ferramentas").onclick = () => abrir("ferramentas.html");
 $("ocr").onclick = () => abrir("ocr.html");
 $("texto").onclick = () => abrir("texto.html");
