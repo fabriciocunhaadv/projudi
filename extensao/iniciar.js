@@ -10,7 +10,7 @@ const cidade = (s) => { const p = String(s || "").split(/\s+-\s+/); return p.len
 const chaveProc = (p) => String(p).replace(/\D/g, "").slice(0, 13) || p;
 const dig = (n) => Number(n || 0).toLocaleString("pt-BR");
 
-let estado = null, ocultas = { servs: [], cargos: [] }, automacao = {}, sit = {}, job = null;
+let estado = null, ocultas = { servs: [], cargos: [] }, automacao = {}, sit = {}, job = null, perfilStudio = "";      // perfilStudio: "magistrado" | "assessor" | "" (o Studio informa quando é aberto)
 let passo = 1, modo = "studio", verTodas = false, verOcultas = false, aviso = "", ocupado = false;
 
 // ---------- dados ----------
@@ -32,7 +32,7 @@ const ativa = (s) => !!automacao[s.serventia]?.ativa;
 const promptDe = (serv) => automacao[serv]?.prompt || (globalThis.Sugestoes ? Sugestoes.prompt(serv) : "") || "";
 function candidatos() {      // processos das serventias ligadas, na ordem de trabalho, sem os que já foram baixados/estão na esteira
   const vistos = new Set();
-  return visiveis().filter(ativa).flatMap(procsDe).filter((p) => p.url).sort(Ordenar.comparador("trabalho"))
+  return visiveis().filter(ativa).flatMap(procsDe).filter((p) => p.url && (modo !== "lupa" || p.tipo === "preAnalisadas")).sort(Ordenar.comparador("trabalho"))      // a Lupa audita a minuta do assessor: só os pré-analisados
     .filter((p) => { const k = chaveProc(p.processo); if (vistos.has(k) || sit[p.processo]?.feito) return false; vistos.add(k); return true; });
 }
 async function carregarSituacao() {
@@ -45,7 +45,9 @@ async function carregar() {
   ocultas = { servs: [], cargos: [], ...((await chrome.storage.sync.get({ ocultas: {} })).ocultas) };
   automacao = (await chrome.storage.sync.get("automacao")).automacao || {};
   estado = deduplicar((await chrome.storage.local.get("estado")).estado);
-  modo = (await chrome.storage.local.get("iniciar_modo")).iniciar_modo || "studio";
+  perfilStudio = (await chrome.storage.local.get("studio_perfil")).studio_perfil?.perfil || "";
+  const guardado = (await chrome.storage.local.get("iniciar_modo")).iniciar_modo;
+  modo = guardado === "lupa" && perfilStudio !== "magistrado" ? "studio" : guardado || (perfilStudio === "magistrado" ? "lupa" : "studio");      // a Lupa só existe para magistrado (perfil do Studio)
   await carregarSituacao();
 }
 const salvarAuto = () => chrome.storage.sync.set({ automacao });
@@ -98,28 +100,31 @@ function telaPasso2() {
 }
 
 function telaPasso3() {
-  const lig = visiveis().filter((s) => ativa(s) && procsDe(s).length), cards = [
-    ["studio", "✨", "Analisar no Studio", "Baixa os autos, lê o PDF e o Studio escreve a minuta. Você acompanha pelo Histórico.", true],
+  const mag = perfilStudio === "magistrado", lig = visiveis().filter((s) => ativa(s) && procsDe(s).length), cards = [
+    ...(mag ? [["lupa", "🔎", "Lupa do Magistrado", "Confere a minuta que o assessor já escreveu na pré-análise contra os autos.", true]] : []),
+    ["studio", "✨", "Analisar no Studio", "Baixa os autos, lê o PDF e o Studio escreve a minuta. Você acompanha pelo Histórico.", !mag],
     ["agaia", "🤖", "Enviar ao Agaia", "Para quem usa o Agaia. Você informa o nome do prompt do Agaia.", false],
     ["pdf", "⬇", "Só baixar os PDFs", "Baixa cada processo em PDF com OCR, sem analisar.", false]];
-  const campos = lig.map((s) => `<div><label>${esc(curto(s.serventia))} — ${modo === "agaia" ? "nome do prompt no Agaia" : "prompt no Studio"}</label>` +
+  const campos = lig.map((s) => `<div><label>${esc(curto(s.serventia))} — ${modo === "agaia" ? "nome do prompt no Agaia" : modo === "lupa" ? "prompt da Lupa" : "prompt no Studio"}</label>` +
     (modo === "agaia" ? `<input data-promptagaia="${esc(s.serventia)}" value="${esc(automacao[s.serventia]?.promptAgaia || "")}" placeholder="nome IGUAL ao cadastrado no Agaia">` : `<input data-prompt="${esc(s.serventia)}" value="${esc(automacao[s.serventia]?.prompt || "")}" placeholder="${esc(Sugestoes.prompt(s.serventia) ? "sugerido: " + Sugestoes.prompt(s.serventia) : "ex.: Outros Área Judicial - Família e Sucessões")}">`) + "</div>").join("");
   const agaiaAviso = modo === "agaia" ? '<div class="line w" data-testid="iniciar-aviso-agaia">⚠️ <span><b>O nome do prompt tem de ser IGUAL ao cadastrado no Agaia</b> (mesmas letras, acentos e espaços; o ideal é copiar e colar). Se estiver diferente, a extensão não acha o prompt lá e o processo dá erro. Em branco, ela usa o nome do prompt do Studio.</span></div>' : "";
+  const nPre = lig.reduce((n, s) => n + procsDe(s).filter((p) => p.tipo === "preAnalisadas" && p.url && !sit[p.processo]?.feito).length, 0);
+  const lupaAviso = modo === "lupa" ? `<div class="line ${nPre ? "" : "w"}" data-testid="iniciar-aviso-lupa">🔎 <span>${nPre ? `A Lupa usa só os processos <b>pré-analisados</b> (os que já têm a minuta do assessor): <b>${dig(nPre)}</b> nas serventias ligadas.` : "Não há processos <b>pré-analisados</b> nas serventias ligadas, e é neles que a Lupa trabalha. Volte ao passo 2 ou atualize a listagem."}</span></div>` : "";
   return moldura("Passo 3 de 5 · O que a extensão deve fazer?", "Escolha uma opção. Dá para mudar depois.",
-    `<div class="opts">${cards.map(([k, ic, t, d, rec]) => `<button class="opt ${modo === k ? "sel" : ""}" data-modo="${k}" data-testid="iniciar-modo-${k}">${rec ? '<span class="rec">Recomendado</span>' : ""}<div class="ic">${ic}</div><b>${t}</b><p>${d}</p></button>`).join("")}</div>${agaiaAviso}` +
+    `<div class="opts">${cards.map(([k, ic, t, d, rec]) => `<button class="opt ${modo === k ? "sel" : ""}" data-modo="${k}" data-testid="iniciar-modo-${k}">${rec ? '<span class="rec">Recomendado</span>' : ""}<div class="ic">${ic}</div><b>${t}</b><p>${d}</p></button>`).join("")}</div>${agaiaAviso}${lupaAviso}` +
     (modo !== "pdf" ? `<div class="pr">${campos}</div><p style="font-size:13px;color:var(--mut)">${modo === "agaia" ? "Em branco, vale o prompt do Studio." : "Já vem o prompt sugerido para cada serventia. Só mude se precisar."}</p>` : ""));
 }
 
 function telaPasso4() {
   const fila = candidatos(), lig = visiveis().filter((s) => ativa(s) && procsDe(s).length), jaFeitos = lig.reduce((n, s) => n + procsDe(s).filter((p) => p.url && sit[p.processo]?.feito).length, 0);
-  const oQue = { studio: "✨ Analisar no Studio", agaia: "🤖 Enviar ao Agaia", pdf: "⬇ Só baixar os PDFs" }[modo];
+  const oQue = { lupa: "🔎 Lupa do Magistrado", studio: "✨ Analisar no Studio", agaia: "🤖 Enviar ao Agaia", pdf: "⬇ Só baixar os PDFs" }[modo];
   const prompts = [...new Set(lig.map((s) => (modo === "agaia" ? automacao[s.serventia]?.promptAgaia || promptDe(s.serventia) : promptDe(s.serventia)) || "(sem prompt)"))];
   return moldura("Passo 4 de 5 · Conferir e processar", "Está tudo certo? Confira o resumo e clique em Processar.",
     `<div class="rw"><span class="k">Serventias</span><span class="v">${lig.map((s) => esc(curto(s.serventia))).join(", ")}</span><button class="link" data-passo="2">Alterar</button></div>` +
     `<div class="rw"><span class="k">Processos</span><span class="v" data-testid="iniciar-qtd">${dig(fila.length)} (os mais urgentes primeiro)${jaFeitos ? ` · ${dig(jaFeitos)} já feito(s) ficam de fora` : ""}</span></div>` +
     `<div class="rw"><span class="k">O que fazer</span><span class="v">${oQue}</span><button class="link" data-passo="3">Alterar</button></div>` +
     (modo !== "pdf" ? `<div class="rw"><span class="k">Prompt</span><span class="v">${prompts.map(esc).join(" · ")}</span><button class="link" data-passo="3">Alterar</button></div>` : "") +
-    '<div class="line">ℹ️ <span>Um processo de cada vez. Deixe o Chrome aberto e logado no Projudi. As minutas vão aparecendo no Histórico do Studio.</span></div>',
+    '<div class="line">ℹ️ <span>Um processo de cada vez. Deixe o Chrome aberto e logado no Projudi. ${modo === "lupa" ? "Os resultados vão aparecendo na lista de auditorias da Lupa, no Studio." : "As minutas vão aparecendo no Histórico do Studio."}</span></div>',
     { continuar: `▶ Processar ${dig(fila.length)} processo${fila.length === 1 ? "" : "s"}`, pode: fila.length > 0 && !ocupado });
 }
 
@@ -128,7 +133,7 @@ function telaPasso5() {
   const ESTADOS = { concluido: ["ok", "✔ Minuta pronta"], erro: ["e", "✖ Erro"], pulado: ["", "↷ Pulado"], analisando: ["run", "● Analisando…"], aguardando: ["", "Na fila"], baixado: ["ok", "✔ PDF baixado"], pausado: ["run", "⏸ Pausado"] };
   const lista = job.processos.map((p) => ({ p, e: sit[p]?.estado || "", erro: sit[p]?.erro || "" }));
   const fim = lista.filter((x) => ["concluido", "erro", "pulado", "baixado"].includes(x.e)).length, pct = lista.length ? Math.round((fim / lista.length) * 100) : 0;
-  const rot = { studio: "Enviando seus processos para o Studio…", agaia: "Enviando seus processos ao Agaia…", pdf: "Baixando os PDFs dos processos…" }[job.tipo];
+  const rot = { lupa: "Enviando as minutas à Lupa do Magistrado…", studio: "Enviando seus processos para o Studio…", agaia: "Enviando seus processos ao Agaia…", pdf: "Baixando os PDFs dos processos…" }[job.tipo];
   const ordem = [...lista].sort((a, b) => ({ analisando: 0, pausado: 1, aguardando: 2, "": 3 }[a.e] ?? 4) - ({ analisando: 0, pausado: 1, aguardando: 2, "": 3 }[b.e] ?? 4)).slice(0, 7);
   return moldura(`⏳ ${rot}`, "Um de cada vez, na ordem de urgência. Você já pode abrir o Studio e ir lendo as minutas conforme ficam prontas.",
     `<div class="pb"><i style="width:${pct}%"></i></div><div style="display:flex;justify-content:space-between;color:var(--mut);font-size:13.5px"><span><b style="color:var(--fg)" data-testid="iniciar-feitos">${fim} de ${lista.length}</b> processos prontos</span><span>${job.tipo === "pdf" ? "os PDFs ficam salvos em Downloads" : ""}</span></div>` +
@@ -145,7 +150,7 @@ function desenhar() {
 // ---------- ações ----------
 function validarPasso3() {
   const lig = visiveis().filter((s) => ativa(s) && procsDe(s).length);
-  if (modo === "studio") { const sem = lig.filter((s) => !promptDe(s.serventia)).map((s) => curto(s.serventia)); if (sem.length) return `Defina o prompt do Studio destas serventias antes de continuar: <b>${sem.map(esc).join(", ")}</b>.`; }
+  if (modo === "studio" || modo === "lupa") { const sem = lig.filter((s) => !promptDe(s.serventia)).map((s) => curto(s.serventia)); if (sem.length) return `Defina o prompt do Studio destas serventias antes de continuar: <b>${sem.map(esc).join(", ")}</b>.`; }
   return "";
 }
 async function processar() {
@@ -160,7 +165,7 @@ async function processar() {
     } else {
       const itens = fila.map((p) => ({ processo: p.processo, url: p.url, classificador: p.classificador || "(sem classificador)", serventia: p.serventia, situacao: p.tipo, urlPre: p.urlPre || "", serventiaUrl: p.serventiaUrl || "", arquivoModelos: automacao[p.serventia]?.arquivoModelos || "", prompt: promptDe(p.serventia),
         pasta: `Projudi/${hoje}/${[p.serventia, p.classificador || "(sem classificador)"].map((x) => String(x).replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60).replace(/[\s.]+$/g, "")).join("/")}` }));
-      await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/" + hoje, opcoes: { atualizarBase: false, studio: { ativo: modo === "studio", modo: "analise", docs: false, iaId: "chatgpt" } } } });
+      await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/" + hoje, opcoes: { atualizarBase: false, studio: { ativo: modo === "studio" || modo === "lupa", modo: modo === "lupa" ? "lupa" : "analise", docs: false, iaId: "chatgpt" } } } });
       await chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + id), active: false });
     }
     await chrome.storage.local.set({ iniciar_job: novoJob }); job = novoJob; passo = 5;
@@ -201,6 +206,7 @@ document.addEventListener("change", (e) => {      // os prompts digitados valem 
   chrome.storage.onChanged.addListener(async (c, area) => {
     if (area === "local" && c.estado) { estado = deduplicar(c.estado.newValue); desenhar(); }
     if (area === "local" && Object.keys(c).some((k) => k === "baixados" || k === "iniciar_job" || k.startsWith("esteira_"))) { await carregarSituacao(); if (passo === 5 || passo === 1) desenhar(); }
+    if (area === "local" && c.studio_perfil) { perfilStudio = c.studio_perfil.newValue?.perfil || ""; if (perfilStudio !== "magistrado" && modo === "lupa") modo = "studio"; desenhar(); }
     if (area === "sync" && (c.ocultas || c.automacao)) { await carregar(); if (!document.activeElement || document.activeElement.tagName !== "INPUT") desenhar(); }
   });
   setInterval(() => { if (passo === 1 && estado?.status === "ok") desenhar(); }, 60000);      // "há X min" se atualiza sozinho

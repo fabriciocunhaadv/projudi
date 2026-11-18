@@ -27,7 +27,7 @@
   .nm { flex:1; min-width:0; } .nm b { display:block; font-weight:600; } .nm small { color:var(--mut); } .row.off .nm b { color:var(--mut); }
   .badge { font-size:13px; font-weight:700; padding:3px 10px; border-radius:999px; background:var(--ac2); color:var(--ac); } .badge.z { background:var(--line); color:var(--mut); font-weight:500; }
   .hide { color:var(--mut); font-size:13px; border:1px solid var(--line); border-radius:8px; padding:4px 9px; background:var(--card); cursor:pointer; font-family:inherit; }
-  .opts { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; } .opt { border:2px solid var(--line); border-radius:14px; padding:14px; background:var(--card); position:relative; cursor:pointer; text-align:left; font:inherit; color:inherit; }
+  .opts { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; } .opt { border:2px solid var(--line); border-radius:14px; padding:14px; background:var(--card); position:relative; cursor:pointer; text-align:left; font:inherit; color:inherit; }
   .opt.sel { border-color:var(--ac); background:var(--ac2); } .opt .ic { font-size:26px; } .opt b { display:block; margin:4px 0 2px; font-size:16px; } .opt p { margin:0; color:var(--mut); font-size:13.5px; }
   .rec { position:absolute; right:10px; top:10px; font-size:11.5px; font-weight:700; background:var(--ok2); color:var(--ok); border-radius:999px; padding:2px 9px; }
   .line { display:flex; align-items:center; gap:10px; margin-top:14px; padding:10px 12px; border-radius:10px; background:var(--bg); border:1px dashed var(--line); font-size:14px; } .line.w { background:var(--warn2); color:var(--warn); border:2px solid #e0a800; }
