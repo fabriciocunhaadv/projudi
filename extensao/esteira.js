@@ -382,15 +382,24 @@ $("linhas").addEventListener("click", async (ev) => {
   if (a === "normal") await atualizar(id, { modo: "analise", estado: "aguardando", erro: "", grande: false, cotaVezes: 0, tentativas: 0, rodada: 0, aviso: "refeito na análise normal" });
   if (a === "sigilo-studio") {
     const it = (await todos()).find((x) => x.id === id); if (!it) return;
+    if (!it.url) { alert("Esta linha não guardou o endereço do processo no Projudi. Envie o processo de novo pelo Painel."); return; }
     const { automacao = {} } = await chrome.storage.sync.get("automacao");
     const chaveServ = Object.keys(automacao).find((x) => String(x).trim().toLowerCase() === String(it.serventia || "").trim().toLowerCase());
-    const prompt = (chaveServ && automacao[chaveServ]?.prompt) || (globalThis.Sugestoes ? Sugestoes.prompt(it.serventia) : "") || "";
-    if (!prompt) { alert("Defina o “Prompt no Studio” desta serventia no Painel antes de rodar no Studio:\n\n" + (it.serventia || "(serventia não identificada)")); return; }
-    if (!it.url) { alert("Esta linha não guardou o endereço do processo no Projudi. Envie o processo de novo pelo Painel."); return; }
+    // 1º o prompt cadastrado para a serventia (Painel/sugestão); só vale se o Studio realmente o tem. 2º um prompt do Studio com o nome da serventia. 3º janelinha para o usuário escolher.
+    const candidatos = [...new Set([automacao[chaveServ]?.prompt, globalThis.Sugestoes ? Sugestoes.prompt(it.serventia) : "", it.serventia].map((x) => String(x || "").trim()).filter(Boolean))];
+    let prompt = "", opcoes = [];
+    for (const c of candidatos) { try { await lerPromptDoStudio(c); prompt = c; break; } catch (e) { if (Array.isArray(e.opcoes) && e.opcoes.length) opcoes = e.opcoes; } }
+    if (!prompt) {
+      if (!opcoes.length) { try { await lerPromptDoStudio(""); } catch (e) { opcoes = Array.isArray(e.opcoes) ? e.opcoes : []; } }
+      if (!opcoes.length) opcoes = [...new Set(Object.values(automacao).map((x) => x.prompt).filter(Boolean))];
+      prompt = await escolherPrompt(it, opcoes);
+      if (!prompt) return;      // o usuário desistiu
+    }
     const hoje = new Date().toISOString().slice(0, 10), lote = String(Date.now());
-    const pasta = `Projudi/${hoje}/${String(it.serventia || "Segredo").replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60)}/${String(it.classificador || "Segredo de justiça").replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60)}`;
+    const limpa = (x, d) => String(x || d).replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60);
+    const pasta = `Projudi/${hoje}/${limpa(it.serventia, "Segredo")}/${limpa(it.classificador, "Segredo de justiça")}`;
     await chrome.storage.local.set({ ["lote_" + lote]: { itens: [{ processo: it.processo, url: it.url, classificador: it.classificador || "", serventia: it.serventia || "", situacao: it.tipo || "", urlPre: it.urlPre || "", serventiaUrl: it.serventiaUrl || "", arquivoModelos: automacao[chaveServ]?.arquivoModelos || "", prompt, pasta }], pasta: "Projudi/" + hoje, opcoes: { atualizarBase: false, studio: { ativo: true, modo: "analise", docs: false } } } });
-    await atualizar(id, { estado: "pulado", sigiloso: false, aviso: "Segredo de justiça: enviado para rodar no Studio (a extensão baixa o PDF, faz o OCR e analisa lá). Acompanhe a nova linha da esteira." });
+    await atualizar(id, { estado: "pulado", sigiloso: false, aviso: `Segredo de justiça: enviado para rodar no Studio com o prompt “${prompt}” (a extensão baixa o PDF, faz o OCR e analisa lá). Acompanhe a nova linha da esteira.` });
     chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + lote) });
     desenhar(); return;
   }
@@ -403,6 +412,19 @@ $("linhas").addEventListener("click", async (ev) => {
 chrome.storage.sync.get("esteiraConfig").then(({ esteiraConfig = {} }) => { $("entrada").value = esteiraConfig.entrada || "pdf"; });
 $("entrada").onchange = async () => { const { esteiraConfig = {} } = await chrome.storage.sync.get("esteiraConfig"); chrome.storage.sync.set({ esteiraConfig: { ...esteiraConfig, entrada: $("entrada").value } }); };
 // Recuperação: coloca na fila PDFs "número-OCR.pdf" que já estão no computador (a fila foi perdida ou os PDFs vieram de fora).
+// Janelinha para escolher o prompt do Studio quando nenhum corresponde à serventia do processo. Devolve o prompt escolhido ou "" se o usuário cancelar.
+function escolherPrompt(it, opcoes) {
+  return new Promise((ok) => {
+    const fundo = document.createElement("div");
+    fundo.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:99999";
+    fundo.innerHTML = `<div style="background:#fff;color:#111;border-radius:12px;padding:18px;max-width:520px;width:92%;font:14px system-ui"><b>Escolha o prompt do Studio</b><p style="margin:8px 0">Não encontrei no Studio um prompt para a serventia <b>${esc(it.serventia || "(não identificada)")}</b>. Selecione qual usar neste processo em segredo de justiça (<small>${esc(it.processo)}</small>):</p>${opcoes.length ? `<select id="escPrompt" style="width:100%;padding:6px"><option value="">— escolha o prompt —</option>${opcoes.map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join("")}</select>` : `<p style="color:#b91c1c">Não consegui ler a lista de prompts do Studio (abra o Studio e tente de novo).</p>`}<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button id="escCancelar">Cancelar</button><button id="escOk" ${opcoes.length ? "" : "disabled"} style="background:#b45309;color:#fff;font-weight:700">Rodar no Studio</button></div></div>`;
+    const fim = (v) => { fundo.remove(); ok(v); };
+    document.body.appendChild(fundo);
+    fundo.querySelector("#escCancelar").onclick = () => fim("");
+    fundo.querySelector("#escOk").onclick = () => { const v = fundo.querySelector("#escPrompt")?.value || ""; if (!v) { alert("Escolha um prompt da lista."); return; } fim(v); };
+  });
+}
+
 // lista de prompts (a mesma do Studio) numa caixa de seleção com seta; se o Studio não responder, usa os prompts cadastrados no Painel
 async function carregarPrompts() {
   const sel = $("impPrompt"), msg = $("impPromptMsg"), atual = sel.value; msg.textContent = "carregando a lista do Studio…";
