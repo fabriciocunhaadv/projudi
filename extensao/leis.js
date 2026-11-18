@@ -1,5 +1,5 @@
 // Página da extensão que busca as leis do Planalto no navegador do Super Admin e as entrega ao app (Central de fontes oficiais).
-import { ORIGENS_PLANALTO, MAX_BYTES, leisValidas, motivoDeRecusa, nomeDoArquivo, sitesValidos, origensDosSites, analisarResposta, urlsFederais, paginaTemOAto, analisarListagem, acharArquivoNaPagina, sitesParaFonte, itensValidos, origensDosSitesDeFonte, urlDeFontePermitida } from "./leis-core.js";
+import { ORIGENS_PLANALTO, noPortal, MAX_BYTES, leisValidas, motivoDeRecusa, nomeDoArquivo, sitesValidos, origensDosSites, analisarResposta, urlsFederais, paginaTemOAto, analisarListagem, acharArquivoNaPagina, sitesParaFonte, itensValidos, origensDosSitesDeFonte, urlDeFontePermitida } from "./leis-core.js";
 import { reportarSaude, instalarSaude } from "./saude-fila.js";
 instalarSaude("leis");
 const $ = (id) => document.getElementById(id), dorme = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -122,10 +122,14 @@ $("iniciar").onclick = async () => {
     marca(l.id, "espera", "buscando…");
     let motivo = null, bytes = null;
     try {
-      const r = await fetch(l.url, { credentials: "omit", cache: "no-store", redirect: "follow" });
-      bytes = new Uint8Array(await r.arrayBuffer());
-      motivo = motivoDeRecusa(r.status, bytes);
-      if (!motivo && bytes.length > MAX_BYTES) motivo = "arquivo grande demais";
+      // Novo Portal da Legislação primeiro (fonte principal); se não servir (erro, bloqueio, página sem a lei), o Planalto
+      for (const alvo of [...new Set([noPortal(l.url), l.url])]) {
+        let r; try { r = await fetch(alvo, { credentials: "omit", cache: "no-store", redirect: "follow" }); } catch (e) { motivo = "falha de rede: " + (e?.message || e); bytes = null; continue; }
+        bytes = new Uint8Array(await r.arrayBuffer());
+        motivo = motivoDeRecusa(r.status, bytes);
+        if (!motivo && bytes.length > MAX_BYTES) motivo = "arquivo grande demais";
+        if (!motivo) break;
+      }
     } catch (e) { motivo = "falha de rede: " + (e?.message || e); }
     if (motivo) {
       falhas++; marca(l.id, "erro", motivo);

@@ -22,7 +22,7 @@ class Planalto(http.server.BaseHTTPRequestHandler):
 def main():
     tmp = Path(tempfile.mkdtemp()); ext = tmp / "ext"; shutil.copytree(RAIZ, ext)
     m = ext / "manifest.json"; m.write_text(m.read_text().replace("https://judicial-mysql.assessor.net.br/*", "http://127.0.0.1/*").replace("https://*.tjgo.jus.br/*", "http://localhost/*").replace("https://docs.google.com/document/*", "http://localhost/*"))
-    c = ext / "leis-core.js"; c.write_text(c.read_text().replace('"https://www.planalto.gov.br/ccivil_03/"', f'"http://127.0.0.1:{PL}/ccivil_03/"').replace('["https://www.planalto.gov.br/*", "https://planalto.gov.br/*"]', '["http://127.0.0.1/*"]').replace('x.protocol === "https:"', 'true'))      # só no teste: o Planalto simulado é http
+    c = ext / "leis-core.js"; c.write_text(c.read_text().replace('"https://www.planalto.gov.br/ccivil_03/"', f'"http://127.0.0.1:{PL}/ccivil_03/"').replace('["https://www.planalto.gov.br/*", "https://planalto.gov.br/*"]', '["http://127.0.0.1/*"]').replace('["https://portaldalegislacao.presidencia.gov.br/*", "https://www.planalto.gov.br/*", "https://planalto.gov.br/*"]', '["http://127.0.0.1/*"]').replace('"https://portaldalegislacao.presidencia.gov.br/ccivil_03/"', f'"http://127.0.0.1:{PL}/ccivil_03/"').replace('x.protocol === "https:"', 'true'))      # só no teste: o Planalto simulado é http
     for porta, h in ((PS, Studio), (PL, Planalto)): threading.Thread(target=http.server.HTTPServer(("127.0.0.1", porta), h).serve_forever, daemon=True).start()
     exe = os.environ.get("CHROMIUM_PATH") or glob.glob("/opt/pw-browsers/chromium-*/chrome-linux*/chrome")[0]
     with sync_playwright() as p:

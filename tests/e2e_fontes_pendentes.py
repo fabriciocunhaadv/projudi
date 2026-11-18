@@ -37,7 +37,7 @@ def main():
     tmp = Path(tempfile.mkdtemp()); ext = tmp / "ext"; shutil.copytree(RAIZ, ext)
     m = ext / "manifest.json"; m.write_text(m.read_text().replace("https://judicial-mysql.assessor.net.br/*", "http://127.0.0.1/*").replace("https://*.tjgo.jus.br/*", "http://localhost/*").replace("https://docs.google.com/document/*", "http://localhost/*"))
     c = ext / "leis-core.js"; t = c.read_text()
-    t = re.sub(r'export const HOSTS_TESTE = \[[^\]]*\];', 'export const HOSTS_TESTE = ["127.0.0.1"];', t).replace('export const PROTOCOLO_TESTE = "https:";', 'export const PROTOCOLO_TESTE = "http:";').replace('"https://www.planalto.gov.br/ccivil_03/"', f'"http://127.0.0.1:{PL}/ccivil_03/"').replace('x.protocol === "https:"', 'true')      # só no teste: sites simulados em http local
+    t = re.sub(r'export const HOSTS_TESTE = \[[^\]]*\];', 'export const HOSTS_TESTE = ["127.0.0.1"];', t).replace('export const PROTOCOLO_TESTE = "https:";', 'export const PROTOCOLO_TESTE = "http:";').replace('"https://www.planalto.gov.br/ccivil_03/"', f'"http://127.0.0.1:{PL}/ccivil_03/"').replace('x.protocol === "https:"', 'true').replace('"https://portaldalegislacao.presidencia.gov.br/ccivil_03/"', f'"http://127.0.0.1:{PL}/ccivil_03/"').replace('export const urlDeFontePermitida = (u) => {', 'export const urlDeFontePermitida = (u) => urlDeTestePermitida(u);\nconst _urlGenerica = (u) => {')      # só no teste: sites simulados em http local
     c.write_text(t)
     for porta, h in ((PS, Studio), (PL, Planalto), (PC, Camara)): threading.Thread(target=http.server.HTTPServer(("127.0.0.1", porta), h).serve_forever, daemon=True).start()
     exe = os.environ.get("CHROMIUM_PATH") or glob.glob("/opt/pw-browsers/chromium-*/chrome-linux*/chrome")[0]

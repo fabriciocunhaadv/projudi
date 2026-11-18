@@ -1,10 +1,13 @@
 // Regras PURAS da busca de leis pela extensão (sem rede): o que pode ser baixado e como reconhecer a página de bloqueio do Planalto.
 export const PREFIXO_PLANALTO = "https://www.planalto.gov.br/ccivil_03/";
-export const ORIGENS_PLANALTO = ["https://www.planalto.gov.br/*", "https://planalto.gov.br/*"];
+export const PREFIXO_PORTAL = "https://portaldalegislacao.presidencia.gov.br/ccivil_03/";      // Novo Portal da Legislação: mesmos caminhos do Planalto, fonte principal
+export const ORIGENS_PLANALTO = ["https://portaldalegislacao.presidencia.gov.br/*", "https://www.planalto.gov.br/*", "https://planalto.gov.br/*"];
+/** Mesma página no Novo Portal (o Planalto continua como reserva). */
+export const noPortal = (u) => String(u).startsWith(PREFIXO_PLANALTO) ? PREFIXO_PORTAL + String(u).slice(PREFIXO_PLANALTO.length) : String(u);
 export const MAX_LEIS = 40, MAX_BYTES = 20 * 1024 * 1024;
 
-/** Só endereços de leis do Planalto: a página do app não consegue mandar a extensão buscar outro lugar. */
-export const urlPermitida = (u) => { try { const x = new URL(String(u)); return x.protocol === "https:" && String(u).startsWith(PREFIXO_PLANALTO) && !x.username && !x.password; } catch { return false; } };
+/** Só endereços de leis do Planalto ou do Novo Portal da Legislação: a página do app não consegue mandar a extensão buscar outro lugar. */
+export const urlPermitida = (u) => { try { const x = new URL(String(u)); return x.protocol === "https:" && (String(u).startsWith(PREFIXO_PLANALTO) || String(u).startsWith(PREFIXO_PORTAL)) && !x.username && !x.password; } catch { return false; } };
 
 /** Devolve null se a página parece uma lei de verdade, ou o motivo (texto curto) se for erro/bloqueio. Usa os bytes como latin1 só para procurar avisos. */
 export function motivoDeRecusa(status, bytes) {
@@ -32,7 +35,7 @@ export const nomeDoArquivo = (url) => decodeURIComponent(String(url).split("?")[
 
 // ----- Teste de acesso pelo navegador (Central de fontes): só estes sites oficiais, só GET, sem cookies -----
 export const PROTOCOLO_TESTE = "https:";
-export const HOSTS_TESTE = ["portal.stf.jus.br", "www.stj.jus.br", "www.cjf.jus.br", "www.tjgo.jus.br", "transparencia.tjgo.jus.br", "www.planalto.gov.br", "www.lexml.gov.br", "normas.leg.br", "www2.camara.leg.br", "legis.senado.leg.br", "goias.gov.br", "leis.org", "leisestaduais.com.br", "www.jusbrasil.com.br", "acessoainformacao.montesclarosdegoias.go.leg.br"];
+export const HOSTS_TESTE = ["portal.stf.jus.br", "www.stj.jus.br", "www.cjf.jus.br", "www.tjgo.jus.br", "transparencia.tjgo.jus.br", "www.planalto.gov.br", "portaldalegislacao.presidencia.gov.br", "appasp.economia.go.gov.br", "www.lexml.gov.br", "normas.leg.br", "www2.camara.leg.br", "legis.senado.leg.br", "goias.gov.br", "leis.org", "leisestaduais.com.br", "www.jusbrasil.com.br", "acessoainformacao.montesclarosdegoias.go.leg.br"];
 export const urlDeTestePermitida = (u) => { try { const x = new URL(String(u)); return x.protocol === PROTOCOLO_TESTE && HOSTS_TESTE.includes(x.hostname) && !x.username && !x.password; } catch { return false; } };
 export function sitesValidos(lista) {
   const out = [], vistos = new Set();
@@ -72,10 +75,10 @@ export function urlsFederais({ tipo, numero, ano }) {
   if (!n || !a) return out;
   const nPonto = n.length > 3 ? `${n.slice(0, -3)}.${n.slice(-3)}` : n;
   if (tipo === "lei") {
-    if (f) out.push(`${P}_ato${f}/${a}/lei/l${n}.htm`, `${P}_ato${f}/${a}/lei/l${n}compilado.htm`);
+    if (f) out.push(`${P}_ato${f}/${a}/lei/l${n}.htm`, `${P}_ato${f}/${a}/lei/l${nPonto}.htm`, `${P}_ato${f}/${a}/lei/l${n}compilado.htm`, `${P}_ato${f}/${a}/lei/l${n}compilada.htm`);
     else if (a >= 2003) out.push(`${P}leis/${a}/l${n}.htm`, `${P}leis/${a}/l${nPonto}.htm`, `${P}leis/${a}/l${n}compilado.htm`);
     else if (a === 2002 || a === 2001) out.push(a === 2001 ? `${P}leis/leis_2001/l${n}.htm` : `${P}leis/2002/l${n}.htm`, `${P}leis/l${n}.htm`);
-    else out.push(`${P}leis/l${n}.htm`, `${P}leis/l${n}compilado.htm`, `${P}leis/l${n}cons.htm`);
+    else out.push(`${P}leis/l${n}.htm`, `${P}leis/l${n}compilada.htm`, `${P}leis/l${n}compilado.htm`, `${P}leis/l${n}cons.htm`);
   } else if (tipo === "lei complementar") {
     out.push(f ? `${P}_ato${f}/${a}/lei/lcp/lcp${n}.htm` : `${P}leis/lcp/lcp${n}.htm`, `${P}leis/lcp/lcp${n}.htm`, `${P}leis/lcp/lcp${n}compilado.htm`);
   } else if (tipo === "decreto") {
@@ -87,7 +90,8 @@ export function urlsFederais({ tipo, numero, ano }) {
   } else if (tipo === "emenda constitucional") {
     out.push(`${P}constituicao/emendas/emc/emc${n}.htm`);
   }
-  return [...new Set(out)].filter(urlPermitida);
+  const todos = [...new Set(out)];
+  return [...todos.map(noPortal), ...todos].filter(urlPermitida);      // o Novo Portal primeiro (mesmos caminhos), depois o Planalto
 }
 
 /** A página parece conter o ato citado? Procura "Art. N" e o número (com ou sem ponto). */
@@ -130,7 +134,14 @@ export function sitesParaFonte(item, fontesBusca) {
   if (item.esfera === "estadual" || item.esfera === "municipal") return lista.filter((f) => f.esfera === item.esfera && casaEnte(f.ente, item.ente));
   return item.esfera === "indefinida" ? lista : [];
 }
-export const urlDeFontePermitida = (u) => urlDeTestePermitida(u);
+/** Site de busca configurado pelo Super Admin (leis e decretos estaduais/municipais): qualquer https público, sem usuário/senha, sem IP nem endereço interno. A extensão só consegue abrir depois que o usuário clica em "Permitir" no Chrome. */
+export const urlDeFontePermitida = (u) => {
+  try {
+    const x = new URL(String(u)), h = x.hostname.toLowerCase();
+    if (x.protocol !== "https:" || x.username || x.password || (x.port && x.port !== "443")) return false;
+    return h.includes(".") && !/^\d{1,3}(\.\d{1,3}){3}$/.test(h) && !h.includes(":") && !/(^|\.)(localhost|local|internal|lan|home|intranet)$/.test(h);
+  } catch { return false; }
+};
 export function itensValidos(lista) {
   const out = [], vistos = new Set();
   for (const l of Array.isArray(lista) ? lista : []) {
@@ -140,4 +151,4 @@ export function itensValidos(lista) {
   }
   return out;
 }
-export const origensDosSitesDeFonte = (itens, fontesBusca) => [...new Set([PREFIXO_PLANALTO, ...(Array.isArray(fontesBusca) ? fontesBusca : []).filter((f) => f && urlDeFontePermitida(f.url)).map((f) => f.url)].map((u) => new URL(u).origin + "/*"))];
+export const origensDosSitesDeFonte = (itens, fontesBusca) => [...new Set([PREFIXO_PLANALTO, PREFIXO_PORTAL, ...(Array.isArray(fontesBusca) ? fontesBusca : []).filter((f) => f && urlDeFontePermitida(f.url)).map((f) => f.url)].map((u) => new URL(u).origin + "/*"))];

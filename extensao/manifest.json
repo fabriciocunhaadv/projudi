@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Conclusões Projudi",
-  "version": "4.0.5",
+  "version": "4.0.6",
   "description": "Confere automaticamente as conclusões não analisadas e pré-analisadas de cada serventia no Projudi/TJGO.",
   "permissions": [
     "activeTab",
@@ -15,6 +15,7 @@
     "unlimitedStorage"
   ],
   "optional_host_permissions": [
+    "https://*/*",
     "https://portal.stf.jus.br/*",
     "https://www.stj.jus.br/*",
     "https://www.cjf.jus.br/*",
@@ -28,6 +29,8 @@
     "https://leisestaduais.com.br/*",
     "https://www.jusbrasil.com.br/*",
     "https://planalto.gov.br/*",
+    "https://portaldalegislacao.presidencia.gov.br/*",
+    "https://appasp.economia.go.gov.br/*",
     "https://acessoainformacao.montesclarosdegoias.go.leg.br/*",
     "https://chatgpt.com/*",
     "https://chat.openai.com/*",

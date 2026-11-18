@@ -167,3 +167,9 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 ## LEMBRETE para a próxima versão da extensão (4.0.6+) — pedido do usuário
 - Tela "Atualizar as leis": tentar o Novo Portal (`portaldalegislacao.presidencia.gov.br/ccivil_03/...`) antes do Planalto (host em `optional_host_permissions`, `ORIGENS_PLANALTO`, `HOSTS_TESTE`, `urlPermitida`).
 - Fontes pendentes: corrigir nomes em `urlsFederais` (`l6404compilada.htm`, `l10.931.htm`, `_ato2004-2006/...`); adicionar CNJ (atos.cnj.jus.br), Casa Civil GO (legisla.casacivil.go.gov.br), TJGO (provimentos); `leisestaduais.com.br` dá HTTP 403.
+
+## 4.0.6 — Sites de busca livres + Novo Portal da Legislação (pedido do usuário)
+- Studio (Fontes pendentes → "Sites de busca"): o Super Admin cola qualquer endereço https público (listagem de leis/decretos estaduais ou municipais); recusa IP, localhost/endereços internos, usuário/senha e porta diferente. Aviso na tela: o Chrome vai pedir permissão para cada site novo.
+- Extensão: `manifest.json` ganhou `https://*/*` em `optional_host_permissions` (o Chrome pergunta site por site; sem isso `chrome.permissions.request` não funciona para sites novos), mais portal novo e `appasp.economia.go.gov.br`. `leis-core.js`: `urlDeFontePermitida` = qualquer https público; `urlPermitida` aceita Planalto E Novo Portal; `urlsFederais` tenta o Novo Portal primeiro e ganhou nomes `…compilada.htm` e `l10.931.htm` (2004-2006); `origensDosSitesDeFonte` pede também o portal. `leis.js`: atualização das 29 leis tenta o Novo Portal e cai no Planalto.
+- Testes: `teste_leis_core.mjs`, `e2e_leis_planalto.py`, `e2e_fontes_pendentes.py`, `e2e_teste_acesso.py` (ajustados: apontam o portal para o servidor falso).
+- Ordem de publicação: Studio primeiro (aceita os sites), depois a extensão 4.0.6 na loja.
