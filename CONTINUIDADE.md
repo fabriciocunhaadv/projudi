@@ -150,3 +150,12 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 - `iniciar.js`: só se o perfil for magistrado aparece "Lupa do Magistrado" como recomendada (usa só processos pré-analisados); para os demais não aparece.
 - Pendente: teste e2e do perfil (magistrado/assessor), efeito do App.tsx do Studio ainda local (sem publicar).
 - Histórico: ato do Gigante sumido só em um computador — suspeita: unidade ativa diferente ou marca de exclusão local; aguardando resposta do usuário.
+
+## 4.0.4 — "Inicie aqui" em 6 passos (pedido do usuário)
+- Fluxo: 1 Verificar · 2 Serventias · **3 Processos** (lista com caixinhas: não analisados e pré-analisados, filtro, marcar/desmarcar todos, incluir já baixados) · **4 O que fazer e PARA ONDE vai** (Análise principal, Lupa [só magistrado, só pré-analisados], Turbo, IA externa [escolhe ChatGPT/Gemini/Claude/Jusbrasil], Agaia, Só PDF; caixa "Para onde vai" e campo de prompt só das serventias marcadas) · 5 Conferir e processar · 6 Acompanhar.
+- Só os processos marcados no passo 3 são enviados; o lote leva `studio.modo` = analise/lupa/turbo/ia e `iaId`.
+- Corrigido texto quebrado `$(modo === ...)` no passo de conferência.
+- Teste: `tests/e2e_inicie_aqui.py` (atualizado). Painel completo não mudou.
+
+## Histórico (Studio, commits locais; publicar com "Pode publicar")
+- Busca por nº de processo sem resultado → pergunta ao banco, recupera e libera marca de exclusão local; se achar em OUTRA unidade, avisa qual. Rota `GET /api/db/history?unit=*` (todas as unidades do gabinete). Investigação do ato 5097642 (gigante) ainda aberta: mesmo assim não apareceu; pedir ao usuário o resultado do botão "Abrir o Histórico" (painel Gigantes).
