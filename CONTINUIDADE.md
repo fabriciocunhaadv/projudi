@@ -173,3 +173,7 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 - Extensão: `manifest.json` ganhou `https://*/*` em `optional_host_permissions` (o Chrome pergunta site por site; sem isso `chrome.permissions.request` não funciona para sites novos), mais portal novo e `appasp.economia.go.gov.br`. `leis-core.js`: `urlDeFontePermitida` = qualquer https público; `urlPermitida` aceita Planalto E Novo Portal; `urlsFederais` tenta o Novo Portal primeiro e ganhou nomes `…compilada.htm` e `l10.931.htm` (2004-2006); `origensDosSitesDeFonte` pede também o portal. `leis.js`: atualização das 29 leis tenta o Novo Portal e cai no Planalto.
 - Testes: `teste_leis_core.mjs`, `e2e_leis_planalto.py`, `e2e_fontes_pendentes.py`, `e2e_teste_acesso.py` (ajustados: apontam o portal para o servidor falso).
 - Ordem de publicação: Studio primeiro (aceita os sites), depois a extensão 4.0.6 na loja.
+
+## 4.0.7 — Segredo de justiça no Agaia: botão "Rodar no Studio" (pedido do usuário)
+- `esteira.js`: quando o Agaia devolve segredo de justiça, a linha marca `sigiloso` e mostra botão destacado "🔒 Segredo de justiça — Rodar no Studio". O botão monta um lote de 1 processo (prompt do Studio da serventia; exige `url` do processo) e abre `lote.html`, que baixa o PDF, faz OCR/texto e envia à análise normal do Studio. A linha do Agaia fica "pulado" com aviso. Não testado contra Projudi/Agaia reais.
+- Extensão 4.0.7 empacotada (`publicacao/projudi-extensao-4.0.7.zip`); o usuário envia à loja.

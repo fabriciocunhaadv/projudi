@@ -73,7 +73,7 @@ async function analisarNoAgaia(it, valida) {
   if (!(await valida()) || r.cancelado) return;
   if (!r.ok) {
     if (r.sessao) { pausaAte = Date.now() + 3 * 60000; await atualizar(it.id, { estado: "aguardando", erro: "", agaiaPedido: null, aviso: "O Agaia pediu login: entre no Agaia; a fila retoma em 3 minutos." }); return; }
-    await atualizar(it.id, { estado: "erro", erro: "Agaia: " + r.erro, agaiaErro: r.erro, agaiaPedido: null, aviso: "A esteira seguiu para o próximo processo." });
+    await atualizar(it.id, { estado: "erro", erro: "Agaia: " + r.erro, agaiaErro: r.erro, sigiloso: !!r.sigiloso || /segredo de justi/i.test(String(r.erro||"")), agaiaPedido: null, aviso: (r.sigiloso || /segredo de justi/i.test(String(r.erro||""))) ? "Segredo de justiça: use o botão “Rodar no Studio” (a extensão baixa o PDF, faz o OCR e analisa no Studio)." : "A esteira seguiu para o próximo processo." });
     return;
   }
   const texto = r.minutaTexto || "";
@@ -341,6 +341,7 @@ async function desenhar() {
     const b = [];
     if (it.estado === "aguardando") b.push(`<button data-a="pular" data-id="${it.id}">Pular</button>`);
     if (["aguardando", "pausado", "erro", "analisando"].includes(it.estado)) b.push(`<button data-a="usar" data-id="${it.id}" title="A extensão procura o número do processo no Histórico Local do Studio, carrega a minuta e a leva ao Google Docs, sem analisar de novo">Usar a minuta do Studio (busca no Histórico)</button>`);
+    if (it.sigiloso && it.estado === "erro") b.push(`<button data-a="sigilo-studio" data-id="${it.id}" style="background:#b45309;color:#fff;font-weight:700;padding:6px 10px;border:2px solid #78350f;border-radius:8px;cursor:pointer" title="O Agaia não roda processo em segredo de justiça. A extensão procura este processo na unidade, baixa o PDF, faz o OCR e extrai o texto, e a análise roda no Studio.">🔒 Segredo de justiça — Rodar no Studio</button>`);
     if (["pausado", "erro", "analisando"].includes(it.estado)) b.push(`<button data-a="repetir" data-id="${it.id}">${it.estado === "erro" ? "Tentar de novo" : "Analisar de novo"}</button>`);
     if (it.estado === "conferindo") { if (it.docUrl) b.push(`<a href="${esc(it.docUrl)}" target="_blank">Abrir Docs</a>`); b.push(`<button data-a="conferido" data-id="${it.id}">✔ Terminei a conferência — cadastrar no Projudi</button>`); }
     if (it.estado === "cadastrando") { b.push(`<button data-a="projudi" data-id="${it.id}">Abrir o processo</button>`, `<button data-a="concluir" data-id="${it.id}">✔ Lancei no Projudi — próximo processo</button>`); }
@@ -379,6 +380,20 @@ $("linhas").addEventListener("click", async (ev) => {
   if (a === "pular") { await fecharAbas((await todos()).find((x) => x.id === id)); await atualizar(id, { estado: "pulado" }); }
   if (a === "repetir") await atualizar(id, { estado: "aguardando", erro: "", rodada: 0 });
   if (a === "normal") await atualizar(id, { modo: "analise", estado: "aguardando", erro: "", grande: false, cotaVezes: 0, tentativas: 0, rodada: 0, aviso: "refeito na análise normal" });
+  if (a === "sigilo-studio") {
+    const it = (await todos()).find((x) => x.id === id); if (!it) return;
+    const { automacao = {} } = await chrome.storage.sync.get("automacao");
+    const chaveServ = Object.keys(automacao).find((x) => String(x).trim().toLowerCase() === String(it.serventia || "").trim().toLowerCase());
+    const prompt = (chaveServ && automacao[chaveServ]?.prompt) || (globalThis.Sugestoes ? Sugestoes.prompt(it.serventia) : "") || "";
+    if (!prompt) { alert("Defina o “Prompt no Studio” desta serventia no Painel antes de rodar no Studio:\n\n" + (it.serventia || "(serventia não identificada)")); return; }
+    if (!it.url) { alert("Esta linha não guardou o endereço do processo no Projudi. Envie o processo de novo pelo Painel."); return; }
+    const hoje = new Date().toISOString().slice(0, 10), lote = String(Date.now());
+    const pasta = `Projudi/${hoje}/${String(it.serventia || "Segredo").replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60)}/${String(it.classificador || "Segredo de justiça").replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60)}`;
+    await chrome.storage.local.set({ ["lote_" + lote]: { itens: [{ processo: it.processo, url: it.url, classificador: it.classificador || "", serventia: it.serventia || "", situacao: it.tipo || "", urlPre: it.urlPre || "", serventiaUrl: it.serventiaUrl || "", arquivoModelos: automacao[chaveServ]?.arquivoModelos || "", prompt, pasta }], pasta: "Projudi/" + hoje, opcoes: { atualizarBase: false, studio: { ativo: true, modo: "analise", docs: false } } } });
+    await atualizar(id, { estado: "pulado", sigiloso: false, aviso: "Segredo de justiça: enviado para rodar no Studio (a extensão baixa o PDF, faz o OCR e analisa lá). Acompanhe a nova linha da esteira." });
+    chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + lote) });
+    desenhar(); return;
+  }
   if (a === "usar") { usarMinutaDoStudio((await todos()).find((x) => x.id === id)); return; }
   if (a === "conferido") await atualizar(id, { estado: "conferido" });
   if (a === "concluir") { await fecharAbas((await todos()).find((x) => x.id === id)); await atualizar(id, { estado: "concluido" }); }
