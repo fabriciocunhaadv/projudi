@@ -193,3 +193,6 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 - Regra de versão do usuário: depois de 4.0.10 vem 5.0.0.
 - Ideia em discussão (NÃO feita, aguardando "pode fazer"): na etapa 1 do motor principal, gerar a minuta sem teses/base e, na MESMA etapa, uma passada automática de calibragem com teses e base relevantes (preservando fatos/citações, com conferência antes/depois e aviso se falhar); só quando houver tese/base relevante.
 - DECISÃO DO USUÁRIO (19/11): NÃO fazer a calibragem de teses/base na etapa 1 (ideia descartada). Teses e base continuam entrando na chamada única da etapa 1, como hoje.
+
+## 5.0.0 — "Inicie aqui" abrível pelo Studio (19/11, regra do usuário: depois de 4.0.10 vem 5.0.0)
+- `manifest.json`: `iniciar.html` entra em `web_accessible_resources` (antes só painel/pauta; o Chrome bloqueava a aba do "Inicie aqui" aberta pelo Studio). `studio-base.js` anuncia o recurso `inicie-web`. Inclui tudo da 4.0.10 (passo 3 com todos, Dias, ordem decrescente). O 5.0.0 substitui o 4.0.10 na loja.

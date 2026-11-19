@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Conclusões Projudi",
-  "version": "4.0.10",
+  "version": "5.0.0",
   "description": "Confere automaticamente as conclusões não analisadas e pré-analisadas de cada serventia no Projudi/TJGO.",
   "permissions": [
     "activeTab",
@@ -55,7 +55,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["painel.html", "pauta.html"],
+      "resources": ["painel.html", "pauta.html", "iniciar.html"],
       "matches": ["https://judicial-mysql.assessor.net.br/*"]
     }
   ],
