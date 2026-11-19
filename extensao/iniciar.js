@@ -37,6 +37,7 @@ const visiveis = () => (estado?.serventias || []).filter((s) => !ocultas.servs.i
 const procsDe = (s) => ["naoAnalisadas", "preAnalisadas"].flatMap((tipo) => (s.processos?.[tipo] || []).map((p) => ({ ...p, tipo, serventia: s.serventia, serventiaUrl: s.url || "" })));
 const ativa = (s) => !!automacao[s.serventia]?.ativa;
 const promptDe = (serv) => automacao[serv]?.prompt || (globalThis.Sugestoes ? Sugestoes.prompt(serv) : "") || "";
+const diasDoProcesso = (p) => { const t = Ordenar.ms(p.dataInicio || p.dataPreAnalise); return Number.isFinite(t) ? Math.max(0, Math.floor((Date.now() - t) / 86400000)) : null; };      // mesmo cálculo do painel completo
 const contar = (arr) => ({ na: arr.filter((p) => p.tipo === "naoAnalisadas").length, pre: arr.filter((p) => p.tipo === "preAnalisadas").length });      // dois totais (não analisados × pré-analisados): um total geral dá a falsa impressão de que falta tudo
 const rotCont = (c) => `${c.na} não analisado${c.na === 1 ? "" : "s"} · ${c.pre} pré-analisado${c.pre === 1 ? "" : "s"}`;
 function todosCand() {      // todos os processos das serventias ligadas, na ordem de trabalho (cada processo uma vez)
@@ -122,10 +123,10 @@ function telaPasso3() {      // escolher QUAIS processos serão enviados (pré-a
   const marcados = escolhidos().length, qtd = (tipo) => todos.filter((p) => p.tipo === tipo && (incluirFeitos || !feitoDe(p))).length;
   const SECOES = [["naoAnalisadas", "Não analisadas", "ainda sem minuta"], ["preAnalisadas", "Pré-analisadas", "já têm a minuta do assessor"]];
   const grupos = SECOES.map(([tipo, nome, dica]) => {
-    const g = naLista.filter((p) => p.tipo === tipo); if (!g.length) return "";
+    const g = naLista.filter((p) => p.tipo === tipo).sort((a, b) => (diasDoProcesso(b) ?? -1) - (diasDoProcesso(a) ?? -1)); if (!g.length) return "";      // mais antigos primeiro (só a listagem; a ordem de envio continua a ordem de trabalho)
     const marc = g.filter((p) => !excl.has(p.processo)).length;
     return `<h3 class="gh"><label><input type="checkbox" data-todos="${tipo}" ${marc === g.length ? "checked" : ""}> ${nome}</label> <small>(${marc} de ${g.length} marcados · ${dica})</small></h3>` +
-      `<div class="tbw"><table class="tp"><tbody>${g.slice(0, 300).map((p) => `<tr class="${excl.has(p.processo) ? "off" : ""}"><td><input type="checkbox" data-proc="${esc(p.processo)}" ${excl.has(p.processo) ? "" : "checked"}></td><td class="n">${esc(p.processo)}</td><td>${esc(curto(p.serventia))}</td><td>${esc(p.classificador || "(sem classificador)")}</td><td>${esc(p.urgenciaTexto || "")}</td><td>${feitoDe(p) ? '<span class="stt ok">já baixado</span>' : ""}</td></tr>`).join("")}</tbody></table></div>`;
+      `<div class="tbw"><table class="tp"><thead><tr><th></th><th>Processo</th><th>Serventia</th><th>Classificador</th><th>Urgência</th><th class="dd">Dias</th><th></th></tr></thead><tbody>${g.map((p) => { const d = diasDoProcesso(p); return `<tr class="${excl.has(p.processo) ? "off" : ""}"><td><input type="checkbox" data-proc="${esc(p.processo)}" ${excl.has(p.processo) ? "" : "checked"}></td><td class="n">${esc(p.processo)}</td><td>${esc(curto(p.serventia))}</td><td>${esc(p.classificador || "(sem classificador)")}</td><td>${esc(p.urgenciaTexto || "")}</td><td class="dd ${d != null && d >= 30 ? "velho" : ""}" data-testid="iniciar-dias" title="dias desde o início do processo na sua fila">${d == null ? "" : d}</td><td>${feitoDe(p) ? '<span class="stt ok">já baixado</span>' : ""}</td></tr>`; }).join("")}</tbody></table></div>`;
   }).join("");
   return moldura("Passo 3 de 6 · Quais processos enviar?", "Estes são os processos das serventias que você ligou. Marque os que quer enviar para análise.",
     `<div class="tbar"><span class="chip" data-testid="iniciar-marcados"><b>${dig(marcados)}</b>&nbsp;de ${dig(todos.filter(noFiltro).length)} marcados</span>` +

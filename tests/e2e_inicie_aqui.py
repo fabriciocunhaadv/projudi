@@ -64,6 +64,9 @@ with sync_playwright() as p:
     # ---- passo 3: escolher os processos ----
     pg.click("[data-acao=continuar]"); t = pg.inner_text("#app")
     ok("Passo 3 de 6" in t and "Quais processos enviar" in t and pg.locator("input[data-proc]").count() == 3, f"passo 3: lista os 3 processos das serventias ligadas ({pg.locator('input[data-proc]').count()})")
+    ok("Dias" in pg.inner_text(".tp thead") and pg.locator("[data-testid=iniciar-dias]").count() == 3, "passo 3 tem a coluna Dias")
+    ok(pg.evaluate("[...document.querySelectorAll('.tbw')].every(e => getComputedStyle(e).overflowY !== 'auto' && getComputedStyle(e).overflowY !== 'scroll' && e.scrollHeight <= e.clientHeight + 1)"), "passo 3 sem barra de rolagem (mostra todos)")
+    ok(pg.evaluate("[...document.querySelectorAll('.tbw')].every(t => { const v = [...t.querySelectorAll('[data-testid=iniciar-dias]')].map(x => parseInt(x.textContent)).filter(n => !isNaN(n)); return v.every((n, i) => i === 0 || v[i - 1] >= n); })"), "passo 3 em ordem decrescente de dias")
     ok("3" in pg.inner_text("[data-testid=iniciar-marcados]") and pg.locator("input[data-proc]:checked").count() == 3, "todos vêm marcados")
     pg.click("input[data-proc='5000003-33.2026.8.09.0166']"); pg.wait_for_timeout(150)
     ok(pg.locator("input[data-proc]:checked").count() == 2 and pg.inner_text("[data-testid=iniciar-marcados]").startswith("2"), "desmarcar um processo tira da seleção (2 de 3)")
