@@ -231,3 +231,7 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 
 ## 5.0.8 — diagnóstico automático do último envio (21/11)
 - Usuário (versão 5.0.7) relatou: Studio diz "enviado e conferido", mas a tela de edição do Agaia depois mostra o texto sem marcas e sem quebras. Não reproduzi. 5.0.8 grava em `chrome.storage.local.agaia_prompt_ultimo` (mostrado em `agaia-prompts.html` → "Último envio…", botão copiar): valor do campo `conteudo` ANTES de salvar, alertas/URL da página após salvar e assinatura do campo relido depois (tamanho, `&lt;`, `<p>`, `<div>`, início/fim). Pedir ao usuário que envie 1 prompt, abra Cópias e cole o diagnóstico.
+
+## Studio (21/11) — "Distribuir vários" prompts (pedido do usuário, superadmin)
+- `PromptManagerModal`: botão "Distribuir vários" (só superadmin, ao lado de Backup/Restaurar) → caixinhas nos prompts + "Marcar/Desmarcar todos" → "Escolher gabinetes" (mesma lista do envio individual, "Selecionar Todos") → confirmação ("Enviar N prompt(s) para todos os X gabinetes?", avisa que prompt de mesmo id é SUBSTITUÍDO) → envio um a um (`src/utils/distribuirPrompts.ts`, usa `broadcastPromptToTenants`); falha de um não impede os outros; os que falharam ficam marcados.
+- Testes: `testes/teste_distribuir_prompts.ts`, `testes/teste_prompts_lote.py` (stubs `_stubs/firestoreutils_prompts.ts`, `vite.prompts.config.ts`). Studio commitado (local); publicar só após "Pode publicar".
