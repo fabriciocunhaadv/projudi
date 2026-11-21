@@ -228,3 +228,6 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 
 ## 21/11 (noite) — formato do Agaia confirmado
 - O resumo do prompt 14251 (colado À MÃO pelo usuário) mostrou o formato correto: textarea `conteudo` = `<p>&lt;?xml …&gt;</p><p>&nbsp; &lt;identificacao&gt;</p>…` (Summernote normaliza para `<p>`, escapa `<>` e usa `&nbsp;` no recuo). A 5.0.6 grava via `summernote("code")` e deve produzir o mesmo. O "Extension context invalidated" visto no Studio = Studio aberto durante atualização da extensão (agora o Studio avisa "recarregue (F5)"; commit local do Studio, aguardando "Pode publicar").
+
+## 5.0.8 — diagnóstico automático do último envio (21/11)
+- Usuário (versão 5.0.7) relatou: Studio diz "enviado e conferido", mas a tela de edição do Agaia depois mostra o texto sem marcas e sem quebras. Não reproduzi. 5.0.8 grava em `chrome.storage.local.agaia_prompt_ultimo` (mostrado em `agaia-prompts.html` → "Último envio…", botão copiar): valor do campo `conteudo` ANTES de salvar, alertas/URL da página após salvar e assinatura do campo relido depois (tamanho, `&lt;`, `<p>`, `<div>`, início/fim). Pedir ao usuário que envie 1 prompt, abra Cópias e cole o diagnóstico.

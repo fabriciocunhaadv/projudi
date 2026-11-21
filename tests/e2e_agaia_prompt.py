@@ -98,6 +98,8 @@ def main():
         rt = env("Outros Área Judicial - Come Tags", "<prompt><titulo>X</titulo>\nregra</prompt>"); print("engole tags:", rt)
         assert not rt["ok"] and rt.get("alterado") and "Devolvi o texto antigo" in rt["erro"], rt
         assert vis(prompts["14"]["texto"]).strip() == "texto original sem marcas", repr(vis(prompts["14"]["texto"]))
+        ult = ver.evaluate("chrome.storage.local.get('agaia_prompt_ultimo').then(x => x.agaia_prompt_ultimo)"); print("ultimo:", {k: (v if k != "relidoDepois" else "...") for k, v in ult.items()})
+        assert ult["relidoDepois"]["entidadeLt"] > 0 or ult["relidoDepois"]["campoTam"] > 0, ult
         # 5) vários seguidos (fila): cada um na sua vez
         r4 = ver.evaluate("""async () => await Promise.all([
           chrome.runtime.sendMessage({ acao: 'agaia-prompt-enviar', titulo: 'Prompt Outro A', texto: 'novo A' }),

@@ -108,7 +108,9 @@
     const bruto = campoBruto(), sn = !!document.querySelector(".note-editable");
     if (bruto && sn) {      // espera o Summernote carregar o texto no editor; devolve o texto VISÍVEL (para conferir) e o BRUTO (para a cópia de segurança)
       let ed = null; for (let i = 0; i < 40 && !(ed = document.querySelector(".note-editable")); i++) await dorme(300);
-      return { ok: true, texto: blocosParaTexto(ed), bruto: String(bruto.value || "").replace(/\r\n?/g, "\n"), html: "", tipo: "summernote", titulo: campoTitulo()?.value || "", salvarOk: !!botaoSalvar() };
+      const bv = String(bruto.value || ""), c = (re) => (bv.match(re) || []).length;
+      const assinatura = { campoTam: bv.length, campoInicio: bv.slice(0, 260), campoFim: bv.slice(-160), entidadeLt: c(/&lt;/g), menorQueCru: c(/</g) - c(/<\/?(p|div|br|span)[ >\/]/gi), p: c(/<p[ >]/gi), div: c(/<div[ >]/gi), br: c(/<br/gi), editorInicio: String(ed.innerHTML || "").slice(0, 200), editorTextoInicio: blocosParaTexto(ed).slice(0, 160) };
+      return { ok: true, texto: blocosParaTexto(ed), assinatura, bruto: bv.replace(/\r\n?/g, "\n"), html: "", tipo: "summernote", titulo: campoTitulo()?.value || "", salvarOk: !!botaoSalvar() };
     }
     let eds = [];
     for (let i = 0; i < 40 && !(eds = editores()).length; i++) await dorme(300);
@@ -159,7 +161,7 @@
       if (norm(lido) !== norm(t)) return { ok: false, erro: "o editor do Agaia não ficou com o texto enviado (conferência antes de salvar)", visto: lido.slice(0, 120) };
       if (!/&lt;|<div|<p|<br/i.test(String(bruto.value || "")) && /[<]/.test(t)) return { ok: false, erro: "o Agaia não atualizou o campo que ele envia ao salvar" };
       setTimeout(() => salvar0.click(), 250);
-      return { ok: true, esperado: t, modo: "summernote", tamanhoCampo: String(bruto.value || "").length };
+      return { ok: true, esperado: t, modo: "summernote", tamanhoCampo: String(bruto.value || "").length, antes: { campoTam: String(bruto.value || "").length, campoInicio: String(bruto.value || "").slice(0, 260), entidadeLt: (String(bruto.value || "").match(/&lt;/g) || []).length } };
     }
     const eds = editores(); if (!eds.length) return { ok: false, erro: "não achei o campo de texto do prompt" };
     const ed = eds[0], salvar = botaoSalvar();
@@ -187,6 +189,7 @@
   chrome.runtime.onMessage.addListener((m, s, responder) => {
     if (m?.acao === "agaia-prompt-ping") { responder({ ok: true, lista: linhasDaTabela().length, editor: editores().length }); return false; }
     if (m?.acao === "agaia-prompt-achar") { achar(String(m.titulo || "")).then(responder, (e) => responder({ ok: false, erro: String(e?.message || e) })); return true; }
+    if (m?.acao === "agaia-prompt-pagina") { responder({ url: location.href, titulo: document.title, alertas: [...document.querySelectorAll(".alert, [role=alert], .toast, .swal2-popup, .flash, .invalid-feedback")].map((x) => (x.textContent || "").replace(/\s+/g, " ").trim().slice(0, 240)).filter(Boolean).slice(0, 6) }); return false; }
     if (m?.acao === "agaia-prompt-bruto") { const b = campoBruto(); responder(b ? { ok: true, texto: String(b.value || ""), titulo: campoTitulo()?.value || "", url: location.href } : { ok: false, erro: "esta aba não é a tela de edição de um prompt do Agaia" }); return false; }
     if (m?.acao === "agaia-prompt-diagnostico") { responder(diagnostico()); return false; }
     if (m?.acao === "agaia-prompt-ler") { ler().then(responder, (e) => responder({ ok: false, erro: String(e?.message || e) })); return true; }

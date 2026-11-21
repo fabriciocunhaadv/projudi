@@ -67,11 +67,14 @@ function agaiaPromptSubstituir(pedido) {
       if (!g?.ok) return { ok: false, erro: g?.erro || "o Agaia não aceitou o texto", backupId: pedido.restaurar ? "" : backup.id };
       await agaiaDorme(800);
       await agaiaAbaCarregou(aba.id, 20000);
+      let pagina = null; try { pagina = await chrome.tabs.sendMessage(aba.id, { acao: "agaia-prompt-pagina" }); } catch (e) { /* sem resposta */ }
       // confere: abre de novo a página de edição e compara com o que foi enviado
       if (!(await agaiaAbrir(aba.id, a.href))) return { ok: false, erro: "salvei, mas não consegui reabrir a página para conferir", backupId: backup.id };
       const depois = await chrome.tabs.sendMessage(aba.id, { acao: "agaia-prompt-ler" });
       const n = (s) => String(s || "").replace(/ /g, " ").replace(/[ \t]+/g, " ").replace(/\s*\n\s*/g, "\n").trim();
+      const registro = (conf) => chrome.storage.local.set({ agaia_prompt_ultimo: { quando: new Date().toISOString(), titulo, tituloAgaia: a.tituloAgaia || "", versao: chrome.runtime.getManifest().version, restaurar: !!pedido.restaurar, enviadoCaracteres: novoTexto.length, antesDeSalvar: g.antes || null, aposSalvar: pagina, relidoDepois: depois?.assinatura || null, editorTextoConfere: conf } }).catch(() => {});
       const confere = pedido.restaurar && typeof pedido.bruto === "string" ? (depois?.ok && String(depois.bruto || "") === pedido.bruto.replace(/\r\n?/g, "\n")) : (depois?.ok && n(depois.texto) === n(novoTexto));
+      await registro(!!confere);
       if (!confere) {
         // o Agaia gravou diferente do enviado (ex.: engoliu as marcas < >): devolve o texto antigo para não deixar o prompt estragado
         let voltou = false;

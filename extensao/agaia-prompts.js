@@ -56,3 +56,9 @@ $("bruto").onclick = async () => {
     i.textContent = `Título: ${r.titulo} · ${r.texto.length.toLocaleString("pt-BR")} caracteres · ${linhas.length.toLocaleString("pt-BR")} linhas · última linha: “${fim.slice(0, 80)}” · termina com “Texto fornecido: {}”: ${/Texto fornecido:\s*\{\}\s*$/.test(r.texto) ? "SIM" : "NÃO"}`;
   } catch (e) { i.textContent = "Não consegui: " + (e?.message || e) + " (recarregue a aba do Agaia e tente de novo)"; }
 };
+
+(async () => {
+  const { agaia_prompt_ultimo: u } = await chrome.storage.local.get("agaia_prompt_ultimo");
+  $("ultimotxt").textContent = u ? JSON.stringify(u, null, 1) : "Nenhum envio registrado ainda.";
+  $("copiarultimo").onclick = async () => { try { await navigator.clipboard.writeText($("ultimotxt").textContent); $("status").textContent = "Diagnóstico do último envio copiado. Cole na conversa."; } catch (e) { $("status").textContent = "Selecione o texto e copie."; } };
+})();
