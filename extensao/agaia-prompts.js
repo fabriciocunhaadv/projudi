@@ -27,3 +27,15 @@ async function desenhar() {
   }
 }
 desenhar();
+
+$("diag").onclick = async () => {
+  const t = $("diagtxt"); t.style.display = "block"; t.value = "Lendo…";
+  try {
+    const abas = await chrome.tabs.query({ url: "https://simplesefacil.tjgo.jus.br/agaia/*" });
+    const aba = abas.find((a) => /\/prompts\/edit\//.test(a.url)) || abas[0];
+    if (!aba) { t.value = "Abra o Agaia na tela de edição de um prompt e clique de novo."; return; }
+    const r = await chrome.tabs.sendMessage(aba.id, { acao: "agaia-prompt-diagnostico" });
+    t.value = JSON.stringify(r, null, 1); t.select();
+    try { await navigator.clipboard.writeText(t.value); $("status").textContent = "Diagnóstico copiado. Cole na conversa."; } catch (e) { $("status").textContent = "Selecione o texto da caixa, copie e cole na conversa."; }
+  } catch (e) { t.value = "Não consegui: " + (e?.message || e) + " (recarregue a aba do Agaia e tente de novo)"; }
+};

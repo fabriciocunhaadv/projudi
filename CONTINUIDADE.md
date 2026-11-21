@@ -209,3 +209,8 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 ## 5.0.3 — Cópias do Agaia: devolver não duplica + apagar cópia (pedido do usuário, 21/11)
 - "Devolver ao Agaia" não cria nova cópia; botão "Apagar esta cópia" (2 cliques). 
 - ABERTO: o usuário testou o envio real: o prompt do Studio (XML com `<tags>`) apareceu no editor do Agaia SEM as tags e sem quebras (Agaia trata o conteúdo como HTML). Aguardando o outerHTML do editor e do Salvar do Agaia (pedido enviado ao usuário) para corrigir a forma de gravar em `escrever()` de `agaia-prompt.js`.
+
+## 5.0.4 — Agaia: conferência com devolução automática + botão Diagnosticar (21/11)
+- Teste real: o Agaia mostrou o prompt XML sem as marcas `< >`/CDATA e sem quebras (ele trata o texto como HTML). Agora, se após Salvar o texto relido diferir do enviado, a extensão DEVOLVE o texto antigo sozinha e avisa. Página `agaia-prompts.html` ganhou "Diagnosticar a página do Agaia aberta" (copia retrato do editor/formulário) — pedir ao usuário que clique com a tela de EDIÇÃO aberta e cole o resultado; com ele ajustar `escrever()` em `agaia-prompt.js`. Ainda ABERTO.
+## Studio (21/11) — embargos virando "SENTENÇA" no cabeçalho
+- Causa: `evidenciaEmbargosNosAutos` (busca por texto) falhou → o ato caía no padrão "sentença" mesmo com a Etapa 1 tendo feito decisão de embargos. Correção: `decideEmbargosNaMinuta` (server.ts) — se a Etapa 1 disse actType embargos E o dispositivo decide embargos (conheço/rejeito/acolho…), vale como evidência (`evidenciaEmbargosFinal`). Teste: `testes/teste_embargos_na_minuta.ts`. Studio commitado; publicar só após "Pode publicar".

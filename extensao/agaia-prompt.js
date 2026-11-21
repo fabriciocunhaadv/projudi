@@ -132,9 +132,23 @@
     return { ok: true, esperado };
   }
 
+
+  /** Retrato da página de edição (para eu ajustar a gravação sem adivinhar): editor, campos do formulário, botão Salvar. Não inclui o texto inteiro do prompt. */
+  function diagnostico() {
+    const cab = (x, n = 400) => String(x || "").slice(0, n);
+    const eds = editores().slice(0, 3).map((e) => ({ tipo: e.tipo, tag: e.el.tagName, id: e.el.id, classe: cab(e.el.className, 120), ce: e.el.getAttribute("contenteditable"), outerComeco: cab(e.el.outerHTML, 600), innerComeco: cab(e.tipo === "textarea" ? e.el.value : e.el.innerHTML, 700), tamanhoInner: (e.tipo === "textarea" ? e.el.value : e.el.innerHTML).length, pai: cab(e.el.parentElement?.outerHTML.replace(e.el.outerHTML, "[EDITOR]"), 500) }));
+    const campos = [...document.querySelectorAll("form input, form textarea, form select")].map((c) => ({ tag: c.tagName, tipo: c.type || "", nome: c.name || "", id: c.id || "", tam: String(c.value || "").length, comeco: cab(c.value, 160) }));
+    const forms = [...document.querySelectorAll("form")].map((f) => ({ action: f.getAttribute("action"), method: f.method, enctype: f.enctype, id: f.id, classe: cab(f.className, 80) }));
+    const s = botaoSalvar();
+    const botoes = [...document.querySelectorAll("button,a.btn,input[type=submit]")].filter(visivel).map((b) => cab((b.textContent || b.value || "").replace(/\s+/g, " ").trim(), 40));
+    const scripts = [...document.scripts].map((x) => x.src ? x.src.split("/").slice(-1)[0] : "").filter(Boolean);
+    return { url: location.href, forms, editores: eds, campos, salvar: s ? cab(s.outerHTML, 400) : null, botoes, scripts, libs: { quill: !!document.querySelector(".ql-container"), tinymce: !!document.querySelector(".tox,.mce-tinymce"), ckeditor: !!document.querySelector(".ck-editor"), summernote: !!document.querySelector(".note-editor"), trix: !!document.querySelector("trix-editor") } };
+  }
+
   chrome.runtime.onMessage.addListener((m, s, responder) => {
     if (m?.acao === "agaia-prompt-ping") { responder({ ok: true, lista: linhasDaTabela().length, editor: editores().length }); return false; }
     if (m?.acao === "agaia-prompt-achar") { achar(String(m.titulo || "")).then(responder, (e) => responder({ ok: false, erro: String(e?.message || e) })); return true; }
+    if (m?.acao === "agaia-prompt-diagnostico") { responder(diagnostico()); return false; }
     if (m?.acao === "agaia-prompt-ler") { ler().then(responder, (e) => responder({ ok: false, erro: String(e?.message || e) })); return true; }
     if (m?.acao === "agaia-prompt-gravar") { gravar(m).then(responder, (e) => responder({ ok: false, erro: String(e?.message || e) })); return true; }
     return false;

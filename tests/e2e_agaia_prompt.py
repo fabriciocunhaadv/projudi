@@ -12,6 +12,7 @@ prompts = {  # id -> dados guardados "no servidor"
     "77": {"titulo": "Fabrício Minha Sentença Cível", "texto": "Texto ANTIGO do Agaia\nsegunda linha antiga\n\nTexto fornecido: {}", "unidade": "Juizado"},
     "12": {"titulo": "Fabrício Juizado Especial Criminal", "texto": "crim", "unidade": "Vara"},
     "13": {"titulo": "Fabrício Juizado Especial Cível", "texto": "civ", "unidade": "Vara"},
+    "14": {"titulo": "Fabrício Come Tags", "texto": "texto original sem marcas", "unidade": "Vara"},
     "90": {"titulo": "Duplicado", "texto": "d1", "unidade": "Vara X"},
     "91": {"titulo": "Duplicado", "texto": "d2", "unidade": "Vara Y"},
 }
@@ -46,7 +47,8 @@ class H(http.server.BaseHTTPRequestHandler):
         else: s._html("<html><body>home</body></html>")
     def do_POST(s):
         i = s.path.rsplit("/", 1)[1]; n = int(s.headers.get("Content-Length", 0)); t = s.rfile.read(n).decode()
-        if i not in ("77_ignora",): prompts[i]["texto"] = t; salvos.append((i, t))
+        if i == "14": t = __import__("re").sub(r"<[^>]*>", "", t)      # Agaia que engole as marcas
+        prompts[i]["texto"] = t; salvos.append((i, t))
         s.send_response(200); s.end_headers()
     def log_message(*a): pass
 
@@ -54,6 +56,7 @@ def main():
     tmp = Path(tempfile.mkdtemp()); ext = tmp / "ext"; shutil.copytree(RAIZ, ext)
     m = ext / "manifest.json"; m.write_text(m.read_text().replace("https://simplesefacil.tjgo.jus.br/agaia/*", "http://localhost/agaia/*").replace("https://*.tjgo.jus.br/*", "http://localhost/*"))
     b = ext / "agaia-prompts-bg.js"; t = b.read_text().replace("https://simplesefacil.tjgo.jus.br/agaia/", f"http://localhost:{PORTA}/agaia/"); b.write_text(t)
+    j = ext / "agaia-prompts.js"; j.write_text(j.read_text().replace("https://simplesefacil.tjgo.jus.br/agaia/*", "http://localhost/agaia/*"))
     srv = http.server.ThreadingHTTPServer(("localhost", PORTA), H); threading.Thread(target=srv.serve_forever, daemon=True).start()
     exe = os.environ.get("CHROMIUM_PATH") or glob.glob("/opt/pw-browsers/chromium-*/chrome-linux*/chrome")[0]
     with sync_playwright() as p:
@@ -85,6 +88,9 @@ def main():
         # 4) título duplicado: não escolhe no escuro
         r3 = env("Duplicado", "y"); print("duplicado:", r3); assert not r3["ok"] and "2 prompts" in r3["erro"], r3
         assert prompts["90"]["texto"] == "d1" and prompts["91"]["texto"] == "d2"
+        rt = env("Outros Área Judicial - Come Tags", "<prompt><titulo>X</titulo>\nregra</prompt>"); print("engole tags:", rt)
+        assert not rt["ok"] and rt.get("alterado") and "Devolvi o texto antigo" in rt["erro"], rt
+        assert prompts["14"]["texto"].strip() == "texto original sem marcas", repr(prompts["14"]["texto"])
         # 5) vários seguidos (fila): cada um na sua vez
         r4 = ver.evaluate("""async () => await Promise.all([
           chrome.runtime.sendMessage({ acao: 'agaia-prompt-enviar', titulo: 'Prompt Outro A', texto: 'novo A' }),
@@ -102,6 +108,9 @@ def main():
         # 7) página das cópias abre e lista
         pg = ctx.new_page(); pg.goto(base + "agaia-prompts.html"); pg.wait_for_selector(".item")
         assert pg.locator(".item").count() >= 3 and pg.locator("button", has_text="Devolver ao Agaia").count() >= 3
+        usuario.goto(f"http://localhost:{PORTA}/agaia/prompts/edit/77"); usuario.wait_for_selector("#ed"); __import__("time").sleep(1)
+        pg.click("#diag"); pg.wait_for_function("document.getElementById('diagtxt').value.length > 50")
+        dg = pg.evaluate("document.getElementById('diagtxt').value"); assert '"editores"' in dg and "ql-editor" in dg, dg[:300]
         n = pg.locator(".item").count(); pg.locator("button", has_text="Apagar esta cópia").first.click(); pg.locator("button", has_text="Clique de novo").first.click()
         pg.wait_for_function(f"document.querySelectorAll('.item').length == {n - 1}")
         ctx.close()
