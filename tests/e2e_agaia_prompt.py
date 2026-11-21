@@ -26,14 +26,15 @@ const ids = Object.keys(P);
 document.getElementById('tb').innerHTML = ids.slice(0, 2).map((i) => lin(i, P[i])).join('');
 function pag2() { document.getElementById('tb').innerHTML = ids.slice(2).map((i) => lin(i, P[i])).join(''); document.getElementById('prox').parentElement.className += ' disabled'; }
 </script></body></html>"""
-EDIT = """<html><body><h1>Editar Prompt</h1><form onsubmit="return false">
+EDIT = """<html><body><h1>Editar Prompt</h1><form id="prompt-form" onsubmit="return false">
 <label for="titulo">Título</label><input type="text" id="titulo" name="titulo" value="%(titulo)s">
-<div class="toolbar"><button type="button">B</button><button type="button">I</button><button type="button">MELHORAR PROMPT</button></div>
-<div id="ed" class="ql-editor" contenteditable="true" style="width:600px;height:300px;border:1px solid #000">%(html)s</div>
-<button type="button" id="salvar" onclick="gravarPrompt()">Salvar</button> <button type="button">Cancelar</button></form>
+<div class="note-editor"><div id="ed" class="note-editable card-block" contenteditable="true" style="width:600px;height:300px;border:1px solid #000"></div>
+<textarea id="conteudo" name="conteudo" style="display:none">%(esc)s</textarea></div>
+<button type="submit" id="btn_salvar" onclick="gravarPrompt()">Salvar</button> <button type="button">Cancelar</button></form>
 <script>
-function texto() { const e = document.getElementById('ed'); return [...e.childNodes].map((c) => c.textContent).join('\\n'); }
-async function gravarPrompt() { await fetch('/salvar/%(id)s', { method: 'POST', body: texto() }); location.href = '/agaia/prompts/%(id)s'; }
+// como o Summernote do Agaia: o texto bruto vem do textarea e é mostrado como HTML (marcas somem na tela)
+document.getElementById('ed').innerHTML = document.getElementById('conteudo').value;
+async function gravarPrompt() { await fetch('/salvar/%(id)s', { method: 'POST', body: document.getElementById('conteudo').value }); location.href = '/agaia/prompts/%(id)s'; }
 </script></body></html>"""
 def corpo_html(t): return "".join("<p>" + (l.replace("&", "&amp;").replace("<", "&lt;") or "<br>") + "</p>" for l in t.split("\n"))
 class H(http.server.BaseHTTPRequestHandler):
@@ -42,7 +43,7 @@ class H(http.server.BaseHTTPRequestHandler):
         p = urllib.parse.urlparse(s.path).path
         if p == "/agaia/prompts/lista": s._html(LISTA % {"rows": json.dumps(prompts)})
         elif p.startswith("/agaia/prompts/edit/"):
-            i = p.rsplit("/", 1)[1]; d = prompts[i]; s._html(EDIT % {"id": i, "titulo": d["titulo"], "html": corpo_html(d["texto"])})
+            i = p.rsplit("/", 1)[1]; d = prompts[i]; s._html(EDIT % {"id": i, "titulo": d["titulo"], "esc": __import__("html").escape(d["texto"])})
         elif p.startswith("/agaia/prompts/"): s._html("<html><body><h1>Detalhe</h1><button>Lista de Prompts</button><button>Editar</button></body></html>")
         else: s._html("<html><body>home</body></html>")
     def do_POST(s):
@@ -68,10 +69,10 @@ def main():
         antes = len(ctx.pages)
         env = lambda titulo, texto: ver.evaluate("async ([t, x]) => await chrome.runtime.sendMessage({ acao: 'agaia-prompt-enviar', titulo: t, texto: x })", [titulo, texto])
         # 1) troca, título só difere em maiúsculas/acentos; o prompt do Studio já traz a linha final no meio: sai uma só, no fim
-        studio = "Você é um assessor.\n\nTexto fornecido: {}\nRegra 1\nRegra 2 <b>&</b>"
+        studio = "<?xml version=\"1.0\"?>\n<prompt>\n <x><![CDATA[\nVocê é um assessor.\n]]></x>\n\nTexto fornecido: {}\nRegra 1\nRegra 2 <b>&</b>\n</prompt>"
         r = env("Outros Área Judicial - Minha sentenca civel", studio)
         print("troca:", r, repr(prompts["77"]["texto"]), salvos); assert r["ok"], r
-        esperado = "Você é um assessor.\n\nRegra 1\nRegra 2 <b>&</b>\n\nTexto fornecido: {}"
+        esperado = "<?xml version=\"1.0\"?>\n<prompt>\n <x><![CDATA[\nVocê é um assessor.\n]]></x>\n\nRegra 1\nRegra 2 <b>&</b>\n</prompt>\n\nTexto fornecido: {}"
         assert prompts["77"]["texto"].strip() == esperado, repr(prompts["77"]["texto"])
         assert prompts["10"]["texto"].startswith("antigo A") and prompts["11"]["texto"].startswith("antigo B"), "mexeu em outro prompt"
         assert len(ctx.pages) == antes, "abriu aba nova"
@@ -110,7 +111,7 @@ def main():
         assert pg.locator(".item").count() >= 3 and pg.locator("button", has_text="Devolver ao Agaia").count() >= 3
         usuario.goto(f"http://localhost:{PORTA}/agaia/prompts/edit/77"); usuario.wait_for_selector("#ed"); __import__("time").sleep(1)
         pg.click("#diag"); pg.wait_for_function("document.getElementById('diagtxt').value.length > 50")
-        dg = pg.evaluate("document.getElementById('diagtxt').value"); assert '"editores"' in dg and "ql-editor" in dg, dg[:300]
+        dg = pg.evaluate("document.getElementById('diagtxt').value"); assert '"editores"' in dg and "note-editable" in dg, dg[:300]
         n = pg.locator(".item").count(); pg.locator("button", has_text="Apagar esta cópia").first.click(); pg.locator("button", has_text="Clique de novo").first.click()
         pg.wait_for_function(f"document.querySelectorAll('.item').length == {n - 1}")
         ctx.close()

@@ -90,7 +90,12 @@
     return [...document.querySelectorAll("button,input[type=submit],input[type=button],a.btn")].filter(visivel).find((b) => /^\s*salvar\s*$/i.test(b.textContent || b.value || ""));
   }
 
+  /** Summernote do Agaia: o texto guardado (bruto, com as marcas < >) está no textarea oculto "conteudo"; o editor só o MOSTRA como HTML (por isso as marcas somem na tela). É esse campo que vale. */
+  const campoBruto = () => document.querySelector("textarea[name=conteudo], textarea#conteudo");
+
   async function ler() {
+    const bruto = campoBruto();
+    if (bruto && document.querySelector(".note-editable")) return { ok: true, texto: String(bruto.value || "").replace(/\r\n?/g, "\n"), html: "", tipo: "conteudo", titulo: campoTitulo()?.value || "", salvarOk: !!botaoSalvar() };
     let eds = [];
     for (let i = 0; i < 40 && !(eds = editores()).length; i++) await dorme(300);
     if (!eds.length) return { ok: false, erro: "não achei o campo de texto do prompt na página de edição do Agaia" };
@@ -122,6 +127,17 @@
   }
 
   async function gravar({ texto, html }) {
+    const bruto = campoBruto(), ed0 = document.querySelector(".note-editable");
+    if (bruto && ed0) {      // grava o texto BRUTO no campo que o formulário envia; o editor é só espelho (mesmo que o Agaia faz ao carregar a página)
+      const salvar0 = botaoSalvar(); if (!salvar0) return { ok: false, erro: "não achei o botão Salvar" };
+      const t = String(texto ?? "").replace(/\r\n?/g, "\n");
+      const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set; set.call(bruto, t);
+      ed0.innerHTML = t;
+      await dorme(200);
+      if (String(bruto.value) !== t) return { ok: false, erro: "o Agaia alterou o campo do prompt ao escrever; não salvei" };
+      setTimeout(() => salvar0.click(), 250);
+      return { ok: true, esperado: t, modo: "conteudo" };
+    }
     const eds = editores(); if (!eds.length) return { ok: false, erro: "não achei o campo de texto do prompt" };
     const ed = eds[0], salvar = botaoSalvar();
     if (!salvar) return { ok: false, erro: "não achei o botão Salvar" };

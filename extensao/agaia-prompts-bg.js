@@ -79,7 +79,7 @@ function agaiaPromptSubstituir(pedido) {
         return { ok: false, erro: "o Agaia não guardou o texto como enviado (conferi depois de Salvar: ele alterou o texto, por exemplo as marcas < >). " + (voltou ? "Devolvi o texto antigo ao prompt; nada foi perdido." : "O texto antigo está na cópia de segurança (devolva por lá)."), backupId: backup.id, alterado: true };
       }
       await agaiaAbrir(aba.id, AGAIA_PROMPTS_LISTA).catch(() => {});      // volta à lista, pronta para o próximo
-      return { ok: true, backupId: backup.id, agaiaId: a.id || "", tituloAgaia: a.tituloAgaia || "" };
+      return { ok: true, backupId: backup.id, agaiaId: a.id || "", tituloAgaia: a.tituloAgaia || "", caracteres: novoTexto.length };
     } catch (e) {
       return { ok: false, erro: "falha da extensão no Agaia: " + String(e?.message || e) };
     }
