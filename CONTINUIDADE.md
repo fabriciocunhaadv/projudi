@@ -225,3 +225,6 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 
 ## 5.0.7 — só diagnóstico (21/11)
 - Teste real da 5.0.6: Studio disse "46.158 caracteres enviados (Studio: 46.137 + linha final) e conferidos", mas a tela "Conteúdo" do Agaia continuou mostrando o texto sem as marcas XML/CDATA. Colar à mão mostra certo. Botão "Ver o texto guardado" agora copia um RESUMO (contagem de `<`, `&lt;`, `<div>`, `<br>`, início/meio/fim). Pedir ao usuário o resumo do prompt 14251 (enviado) e 15422 (colado à mão) para comparar o formato guardado e ajustar `textoParaDivs`/MAIN.
+
+## 21/11 (noite) — formato do Agaia confirmado
+- O resumo do prompt 14251 (colado À MÃO pelo usuário) mostrou o formato correto: textarea `conteudo` = `<p>&lt;?xml …&gt;</p><p>&nbsp; &lt;identificacao&gt;</p>…` (Summernote normaliza para `<p>`, escapa `<>` e usa `&nbsp;` no recuo). A 5.0.6 grava via `summernote("code")` e deve produzir o mesmo. O "Extension context invalidated" visto no Studio = Studio aberto durante atualização da extensão (agora o Studio avisa "recarregue (F5)"; commit local do Studio, aguardando "Pode publicar").
