@@ -90,12 +90,26 @@
     return [...document.querySelectorAll("button,input[type=submit],input[type=button],a.btn")].filter(visivel).find((b) => /^\s*salvar\s*$/i.test(b.textContent || b.value || ""));
   }
 
+  const textoParaDivs = (t) => String(t).split("\n").map((l) => l.length ? "<div>" + escapa(l).replace(/\t/g, "    ").replace(/^ +/, (m) => "&nbsp;".repeat(m.length)).replace(/ {2,}/g, (m) => " " + "&nbsp;".repeat(m.length - 1)) + "</div>" : "<div><br></div>").join("");
+  /** Pede ao script da página (mundo MAIN, com acesso ao jQuery/Summernote do Agaia) que coloque o HTML no editor e atualize o campo enviado. */
+  function viaSummernote(html) {
+    return new Promise((res) => {
+      const id = "sn" + Date.now() + Math.random().toString(36).slice(2, 6);
+      const f = (ev) => { const d = ev.data; if (ev.source !== window || !d || d.__agaiaPromptMainResp !== id) return; window.removeEventListener("message", f); clearTimeout(t); res(d); };
+      const t = setTimeout(() => { window.removeEventListener("message", f); res({ ok: false, erro: "o script da página do Agaia não respondeu" }); }, 15000);
+      window.addEventListener("message", f);
+      window.postMessage({ __agaiaPromptMain: "codigo", id, html }, "*");
+    });
+  }
   /** Summernote do Agaia: o texto guardado (bruto, com as marcas < >) está no textarea oculto "conteudo"; o editor só o MOSTRA como HTML (por isso as marcas somem na tela). É esse campo que vale. */
   const campoBruto = () => document.querySelector("textarea[name=conteudo], textarea#conteudo");
 
   async function ler() {
-    const bruto = campoBruto();
-    if (bruto && document.querySelector(".note-editable")) return { ok: true, texto: String(bruto.value || "").replace(/\r\n?/g, "\n"), html: "", tipo: "conteudo", titulo: campoTitulo()?.value || "", salvarOk: !!botaoSalvar() };
+    const bruto = campoBruto(), sn = !!document.querySelector(".note-editable");
+    if (bruto && sn) {      // espera o Summernote carregar o texto no editor; devolve o texto VISÍVEL (para conferir) e o BRUTO (para a cópia de segurança)
+      let ed = null; for (let i = 0; i < 40 && !(ed = document.querySelector(".note-editable")); i++) await dorme(300);
+      return { ok: true, texto: blocosParaTexto(ed), bruto: String(bruto.value || "").replace(/\r\n?/g, "\n"), html: "", tipo: "summernote", titulo: campoTitulo()?.value || "", salvarOk: !!botaoSalvar() };
+    }
     let eds = [];
     for (let i = 0; i < 40 && !(eds = editores()).length; i++) await dorme(300);
     if (!eds.length) return { ok: false, erro: "não achei o campo de texto do prompt na página de edição do Agaia" };
@@ -126,17 +140,26 @@
     return norm(textoDe(ed)) === norm(texto != null ? texto : blocosParaTexto(Object.assign(document.createElement("div"), { innerHTML: html })));
   }
 
-  async function gravar({ texto, html }) {
+  async function gravar({ texto, html, bruto: brutoPedido }) {
     const bruto = campoBruto(), ed0 = document.querySelector(".note-editable");
-    if (bruto && ed0) {      // grava o texto BRUTO no campo que o formulário envia; o editor é só espelho (mesmo que o Agaia faz ao carregar a página)
+    if (bruto && ed0) {
       const salvar0 = botaoSalvar(); if (!salvar0) return { ok: false, erro: "não achei o botão Salvar" };
+      const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;
+      if (typeof brutoPedido === "string") {      // DEVOLVER cópia: volta o texto bruto exatamente como estava guardado
+        const t = brutoPedido.replace(/\r\n?/g, "\n"); set.call(bruto, t); ed0.innerHTML = t; await dorme(200);
+        if (String(bruto.value) !== t) return { ok: false, erro: "o Agaia alterou o campo ao devolver a cópia; não salvei" };
+        setTimeout(() => salvar0.click(), 250); return { ok: true, modo: "bruto" };
+      }
+      // ENVIAR: igual a colar à mão — o texto entra no editor (marcas < > escapadas, uma linha por <div>) pela API do próprio Summernote, que atualiza o campo enviado
       const t = String(texto ?? "").replace(/\r\n?/g, "\n");
-      const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set; set.call(bruto, t);
-      ed0.innerHTML = t;
-      await dorme(200);
-      if (String(bruto.value) !== t) return { ok: false, erro: "o Agaia alterou o campo do prompt ao escrever; não salvei" };
+      const r = await viaSummernote(textoParaDivs(t));
+      if (!r.ok) return { ok: false, erro: "não consegui escrever pelo editor do Agaia (" + (r.erro || "sem resposta") + ")" };
+      await dorme(300);
+      const lido = blocosParaTexto(document.querySelector(".note-editable"));
+      if (norm(lido) !== norm(t)) return { ok: false, erro: "o editor do Agaia não ficou com o texto enviado (conferência antes de salvar)", visto: lido.slice(0, 120) };
+      if (!/&lt;|<div|<p|<br/i.test(String(bruto.value || "")) && /[<]/.test(t)) return { ok: false, erro: "o Agaia não atualizou o campo que ele envia ao salvar" };
       setTimeout(() => salvar0.click(), 250);
-      return { ok: true, esperado: t, modo: "conteudo" };
+      return { ok: true, esperado: t, modo: "summernote", tamanhoCampo: String(bruto.value || "").length };
     }
     const eds = editores(); if (!eds.length) return { ok: false, erro: "não achei o campo de texto do prompt" };
     const ed = eds[0], salvar = botaoSalvar();
@@ -164,6 +187,7 @@
   chrome.runtime.onMessage.addListener((m, s, responder) => {
     if (m?.acao === "agaia-prompt-ping") { responder({ ok: true, lista: linhasDaTabela().length, editor: editores().length }); return false; }
     if (m?.acao === "agaia-prompt-achar") { achar(String(m.titulo || "")).then(responder, (e) => responder({ ok: false, erro: String(e?.message || e) })); return true; }
+    if (m?.acao === "agaia-prompt-bruto") { const b = campoBruto(); responder(b ? { ok: true, texto: String(b.value || ""), titulo: campoTitulo()?.value || "", url: location.href } : { ok: false, erro: "esta aba não é a tela de edição de um prompt do Agaia" }); return false; }
     if (m?.acao === "agaia-prompt-diagnostico") { responder(diagnostico()); return false; }
     if (m?.acao === "agaia-prompt-ler") { ler().then(responder, (e) => responder({ ok: false, erro: String(e?.message || e) })); return true; }
     if (m?.acao === "agaia-prompt-gravar") { gravar(m).then(responder, (e) => responder({ ok: false, erro: String(e?.message || e) })); return true; }

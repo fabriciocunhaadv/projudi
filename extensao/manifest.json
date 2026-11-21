@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Conclusões Projudi",
-  "version": "5.0.5",
+  "version": "5.0.6",
   "description": "Confere automaticamente as conclusões não analisadas e pré-analisadas de cada serventia no Projudi/TJGO.",
   "permissions": [
     "activeTab",
@@ -142,6 +142,16 @@
         "agaia-prompt.js"
       ],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://simplesefacil.tjgo.jus.br/agaia/*"
+      ],
+      "js": [
+        "agaia-prompt-main.js"
+      ],
+      "run_at": "document_idle",
+      "world": "MAIN"
     }
   ],
   "content_security_policy": {

@@ -217,3 +217,8 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 
 ## 5.0.5 — Agaia: grava o texto BRUTO no campo `conteudo` (Summernote) (21/11)
 - Diagnóstico real: o editor do Agaia é Summernote (`.note-editable`); o texto guardado está no `textarea#conteudo` (bruto, com `<tags>`/CDATA); o editor só o MOSTRA como HTML (marcas somem, quebras colapsam; a tela "Conteúdo" usa marked+DOMPurify e também esconde). Versões ≤5.0.4 escreviam pelo editor (altera o texto). Agora `ler()`/`gravar()` usam o campo bruto (editor só espelha) e a conferência relê o campo bruto; se diferir, devolve o texto antigo. Mensagem do Studio mostra nº de caracteres enviados/conferidos.
+
+## 5.0.6 — Agaia: enviar igual a COLAR À MÃO (21/11)
+- Descoberta do usuário: colando manualmente no Agaia dá certo (tela "Conteúdo" mostra `<tags>` e linhas). Ou seja, o formato guardado é o HTML do Summernote (texto escapado, uma linha por `<div>`), NÃO o texto bruto. 5.0.5 gravava bruto no textarea `conteudo` (Agaia mostra as marcas sumidas e pode tirá-las ao usar o prompt) — errado.
+- Agora: `agaia-prompt-main.js` (content script MUNDO MAIN) recebe o HTML por postMessage e chama `$("#conteudo").summernote("code", html)` (atualiza editor + campo). `agaia-prompt.js`: `textoParaDivs`, `viaSummernote`, conferência antes de salvar (texto do editor = enviado) e depois de salvar (relê o editor). Cópia de segurança guarda `bruto` (valor do textarea como estava) e "Devolver" restaura o bruto exato. Botão "Ver o texto guardado (bruto)" em `agaia-prompts.html`.
+- Teste: `tests/e2e_agaia_prompt.py` (fake imita Summernote + jQuery). NÃO visto no Agaia real ainda.

@@ -289,7 +289,7 @@ chrome.runtime.onMessage.addListener((m, s, responder) => {
     return true;
   }
   if (m?.acao === "agaia-prompt-enviar" || m?.acao === "agaia-prompt-restaurar") {       // Studio → Agaia: troca o texto do prompt do Agaia (mesmo título) pelo do Studio; “restaurar” devolve uma cópia de segurança
-    agaiaPromptSubstituir({ titulo: String(m.titulo || ""), texto: String(m.texto || ""), restaurar: m.acao === "agaia-prompt-restaurar" }).then(responder, (e) => responder({ ok: false, erro: String(e?.message || e) }));
+    agaiaPromptSubstituir({ titulo: String(m.titulo || ""), texto: String(m.texto || ""), bruto: typeof m.bruto === "string" ? m.bruto : undefined, restaurar: m.acao === "agaia-prompt-restaurar" }).then(responder, (e) => responder({ ok: false, erro: String(e?.message || e) }));
     return true;
   }
   if (m?.acao === "agaia-prompt-copias") { chrome.tabs.create({ url: chrome.runtime.getURL("agaia-prompts.html") }).then(() => responder({ ok: true }), (e) => responder({ ok: false, erro: String(e?.message || e) })); return true; }

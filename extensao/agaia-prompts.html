@@ -15,6 +15,9 @@
 <p class="dica">Toda vez que o Studio troca um prompt do Agaia, a extensão guarda aqui o texto que estava antes (as últimas 60 cópias). Você pode baixar o texto ou devolvê-lo ao Agaia.</p>
 <div id="status"></div>
 <p><button id="diag">Diagnosticar a página do Agaia aberta (para o suporte)</button> <span class="dica">Deixe aberta no Agaia a tela de EDIÇÃO de um prompt e clique.</span></p>
+<p><button id="bruto">Ver o texto guardado no prompt do Agaia (bruto, completo)</button> <span class="dica">Com a tela de EDIÇÃO do prompt aberta. A tela do Agaia esconde as marcas &lt; &gt;; aqui você vê o que está de fato guardado.</span></p>
+<div id="brutoinfo" class="dica"></div>
+<textarea id="brutotxt" readonly rows="14" style="width:100%;display:none;font:12px monospace"></textarea>
 <textarea id="diagtxt" readonly rows="8" style="width:100%;display:none"></textarea>
 <div id="lista"></div>
 <script src="agaia-prompts.js"></script>

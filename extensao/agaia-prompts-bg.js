@@ -61,9 +61,9 @@ function agaiaPromptSubstituir(pedido) {
       const sn = (x) => String(x || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
       if (atual.titulo && a.tituloAgaia && sn(atual.titulo) !== sn(a.tituloAgaia)) return { ok: false, erro: `a página de edição mostra o título “${atual.titulo}”, diferente do da lista (“${a.tituloAgaia}”); não troquei nada` };
       // cópia de segurança ANTES de trocar
-      const backup = { id: "b" + Date.now(), titulo, tituloAgaia: a.tituloAgaia || "", agaiaId: a.id || "", unidade: a.unidade || "", texto: atual.texto || "", html: atual.html || "", tipo: atual.tipo, em: Date.now(), origem: pedido.restaurar ? "antes-de-restaurar" : "antes-de-enviar" };
+      const backup = { id: "b" + Date.now(), titulo, tituloAgaia: a.tituloAgaia || "", agaiaId: a.id || "", unidade: a.unidade || "", texto: atual.texto || "", bruto: typeof atual.bruto === "string" ? atual.bruto : "", html: atual.html || "", tipo: atual.tipo, em: Date.now(), origem: pedido.restaurar ? "antes-de-restaurar" : "antes-de-enviar" };
       if (!pedido.restaurar) await agaiaGuardarBackup(backup);      // devolver uma cópia NÃO cria outra cópia
-      const g = await chrome.tabs.sendMessage(aba.id, { acao: "agaia-prompt-gravar", texto: novoTexto, html: null });
+      const g = await chrome.tabs.sendMessage(aba.id, { acao: "agaia-prompt-gravar", texto: novoTexto, bruto: pedido.restaurar && typeof pedido.bruto === "string" ? pedido.bruto : undefined });
       if (!g?.ok) return { ok: false, erro: g?.erro || "o Agaia não aceitou o texto", backupId: pedido.restaurar ? "" : backup.id };
       await agaiaDorme(800);
       await agaiaAbaCarregou(aba.id, 20000);
@@ -71,10 +71,11 @@ function agaiaPromptSubstituir(pedido) {
       if (!(await agaiaAbrir(aba.id, a.href))) return { ok: false, erro: "salvei, mas não consegui reabrir a página para conferir", backupId: backup.id };
       const depois = await chrome.tabs.sendMessage(aba.id, { acao: "agaia-prompt-ler" });
       const n = (s) => String(s || "").replace(/ /g, " ").replace(/[ \t]+/g, " ").replace(/\s*\n\s*/g, "\n").trim();
-      if (!depois?.ok || n(depois.texto) !== n(novoTexto)) {
+      const confere = pedido.restaurar && typeof pedido.bruto === "string" ? (depois?.ok && String(depois.bruto || "") === pedido.bruto.replace(/\r\n?/g, "\n")) : (depois?.ok && n(depois.texto) === n(novoTexto));
+      if (!confere) {
         // o Agaia gravou diferente do enviado (ex.: engoliu as marcas < >): devolve o texto antigo para não deixar o prompt estragado
         let voltou = false;
-        if (!pedido.restaurar) { try { const g2 = await chrome.tabs.sendMessage(aba.id, { acao: "agaia-prompt-gravar", texto: backup.texto, html: null }); if (g2?.ok) { await agaiaDorme(800); await agaiaAbaCarregou(aba.id, 20000); voltou = true; } } catch (e) { /* segue */ } }
+        if (!pedido.restaurar) { try { const g2 = await chrome.tabs.sendMessage(aba.id, { acao: "agaia-prompt-gravar", texto: backup.texto, bruto: backup.bruto || undefined }); if (g2?.ok) { await agaiaDorme(800); await agaiaAbaCarregou(aba.id, 20000); voltou = true; } } catch (e) { /* segue */ } }
         await agaiaAbrir(aba.id, AGAIA_PROMPTS_LISTA).catch(() => {});
         return { ok: false, erro: "o Agaia não guardou o texto como enviado (conferi depois de Salvar: ele alterou o texto, por exemplo as marcas < >). " + (voltou ? "Devolvi o texto antigo ao prompt; nada foi perdido." : "O texto antigo está na cópia de segurança (devolva por lá)."), backupId: backup.id, alterado: true };
       }

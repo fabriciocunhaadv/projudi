@@ -32,10 +32,16 @@ EDIT = """<html><body><h1>Editar Prompt</h1><form id="prompt-form" onsubmit="ret
 <textarea id="conteudo" name="conteudo" style="display:none">%(esc)s</textarea></div>
 <button type="submit" id="btn_salvar" onclick="gravarPrompt()">Salvar</button> <button type="button">Cancelar</button></form>
 <script>
-// como o Summernote do Agaia: o texto bruto vem do textarea e é mostrado como HTML (marcas somem na tela)
+// como o Summernote do Agaia: o texto do textarea é mostrado como HTML (marcas somem na tela); a API summernote("code") atualiza editor e textarea
+window.$ = window.jQuery = function (sel) { const el = document.querySelector(sel); return { length: el ? 1 : 0, val(v) { if (v === undefined) return el.value; el.value = v; return this; }, summernote(cmd, h) { const ed = document.getElementById('ed'); if (cmd === 'code') { if (h === undefined) return ed.innerHTML; ed.innerHTML = h; el.value = h; } } }; };
 document.getElementById('ed').innerHTML = document.getElementById('conteudo').value;
 async function gravarPrompt() { await fetch('/salvar/%(id)s', { method: 'POST', body: document.getElementById('conteudo').value }); location.href = '/agaia/prompts/%(id)s'; }
 </script></body></html>"""
+def vis(v):
+    import html, re
+    if "<div" not in v: return v
+    v = re.sub(r"^<div>|</div>$", "", v)
+    return "\n".join("" if l == "<br>" else html.unescape(l).replace("\xa0", " ") for l in v.split("</div><div>"))
 def corpo_html(t): return "".join("<p>" + (l.replace("&", "&amp;").replace("<", "&lt;") or "<br>") + "</p>" for l in t.split("\n"))
 class H(http.server.BaseHTTPRequestHandler):
     def _html(s, h): s.send_response(200); s.send_header("Content-Type", "text/html; charset=utf-8"); s.end_headers(); s.wfile.write(h.encode())
@@ -71,39 +77,39 @@ def main():
         # 1) troca, título só difere em maiúsculas/acentos; o prompt do Studio já traz a linha final no meio: sai uma só, no fim
         studio = "<?xml version=\"1.0\"?>\n<prompt>\n <x><![CDATA[\nVocê é um assessor.\n]]></x>\n\nTexto fornecido: {}\nRegra 1\nRegra 2 <b>&</b>\n</prompt>"
         r = env("Outros Área Judicial - Minha sentenca civel", studio)
-        print("troca:", r, repr(prompts["77"]["texto"]), salvos); assert r["ok"], r
+        print("troca:", r, repr(vis(prompts["77"]["texto"])), salvos); assert r["ok"], r
         esperado = "<?xml version=\"1.0\"?>\n<prompt>\n <x><![CDATA[\nVocê é um assessor.\n]]></x>\n\nRegra 1\nRegra 2 <b>&</b>\n</prompt>\n\nTexto fornecido: {}"
-        assert prompts["77"]["texto"].strip() == esperado, repr(prompts["77"]["texto"])
-        assert prompts["10"]["texto"].startswith("antigo A") and prompts["11"]["texto"].startswith("antigo B"), "mexeu em outro prompt"
+        assert vis(prompts["77"]["texto"]).strip() == esperado, repr(vis(prompts["77"]["texto"]))
+        assert vis(prompts["10"]["texto"]).startswith("antigo A") and vis(prompts["11"]["texto"]).startswith("antigo B"), "mexeu em outro prompt"
         assert len(ctx.pages) == antes, "abriu aba nova"
         assert "/agaia/prompts/lista" in usuario.url, usuario.url      # terminou de volta na lista, pronto p/ o próximo
         # 2) cópia de segurança guardada com o texto antigo
         bk = ver.evaluate("chrome.storage.local.get('agaia_prompt_backups').then(x => x.agaia_prompt_backups)")
         assert len(bk) == 1 and bk[0]["tituloAgaia"] == "Fabrício Minha Sentença Cível" and "Texto ANTIGO do Agaia" in bk[0]["texto"] and "segunda linha antiga" in bk[0]["texto"], bk
         rc = env("Outros Área Judicial - Juizado Especial Civel", "so civel"); print("civel x criminal:", rc); assert rc["ok"] and rc["tituloAgaia"] == "Fabrício Juizado Especial Cível", rc
-        assert prompts["12"]["texto"] == "crim" and prompts["13"]["texto"].startswith("so civel"), "confundiu cível com criminal"
+        assert vis(prompts["12"]["texto"]) == "crim" and vis(prompts["13"]["texto"]).startswith("so civel"), "confundiu cível com criminal"
         # 3) título que não existe: avisa, sem criar nada
         n0 = len(prompts); r2 = env("Não existe", "x")
         print("inexistente:", r2); assert not r2["ok"] and r2.get("naoEncontrado") and "Não existe" in r2["erro"], r2
         assert len(prompts) == n0
         # 4) título duplicado: não escolhe no escuro
         r3 = env("Duplicado", "y"); print("duplicado:", r3); assert not r3["ok"] and "2 prompts" in r3["erro"], r3
-        assert prompts["90"]["texto"] == "d1" and prompts["91"]["texto"] == "d2"
+        assert vis(prompts["90"]["texto"]) == "d1" and vis(prompts["91"]["texto"]) == "d2"
         rt = env("Outros Área Judicial - Come Tags", "<prompt><titulo>X</titulo>\nregra</prompt>"); print("engole tags:", rt)
         assert not rt["ok"] and rt.get("alterado") and "Devolvi o texto antigo" in rt["erro"], rt
-        assert prompts["14"]["texto"].strip() == "texto original sem marcas", repr(prompts["14"]["texto"])
+        assert vis(prompts["14"]["texto"]).strip() == "texto original sem marcas", repr(vis(prompts["14"]["texto"]))
         # 5) vários seguidos (fila): cada um na sua vez
         r4 = ver.evaluate("""async () => await Promise.all([
           chrome.runtime.sendMessage({ acao: 'agaia-prompt-enviar', titulo: 'Prompt Outro A', texto: 'novo A' }),
           chrome.runtime.sendMessage({ acao: 'agaia-prompt-enviar', titulo: 'Prompt Outro B', texto: 'novo B' })])""")
         print("fila:", r4); assert all(x["ok"] for x in r4), r4
-        assert prompts["10"]["texto"].strip() == "novo A\n\nTexto fornecido: {}" and prompts["11"]["texto"].strip() == "novo B\n\nTexto fornecido: {}", (prompts["10"], prompts["11"])
+        assert vis(prompts["10"]["texto"]).strip() == "novo A\n\nTexto fornecido: {}" and vis(prompts["11"]["texto"]).strip() == "novo B\n\nTexto fornecido: {}", (prompts["10"], prompts["11"])
         # 6) restaurar a cópia do primeiro envio
         bk = ver.evaluate("chrome.storage.local.get('agaia_prompt_backups').then(x => x.agaia_prompt_backups)")
         orig = [x for x in bk if "Texto ANTIGO do Agaia" in x["texto"]][0]
         r5 = ver.evaluate("async (b) => await chrome.runtime.sendMessage({ acao: 'agaia-prompt-restaurar', titulo: b.tituloAgaia, texto: b.texto })", orig)
         print("restaurar:", r5); assert r5["ok"], r5
-        assert prompts["77"]["texto"].strip() == orig["texto"].strip(), repr(prompts["77"]["texto"])
+        assert vis(prompts["77"]["texto"]).strip() == orig["texto"].strip(), repr(vis(prompts["77"]["texto"]))
         bk2 = ver.evaluate("chrome.storage.local.get('agaia_prompt_backups').then(x => x.agaia_prompt_backups)")
         assert len(bk2) == len(bk), "restaurar não deve criar outra cópia"
         # 7) página das cópias abre e lista
@@ -112,6 +118,9 @@ def main():
         usuario.goto(f"http://localhost:{PORTA}/agaia/prompts/edit/77"); usuario.wait_for_selector("#ed"); __import__("time").sleep(1)
         pg.click("#diag"); pg.wait_for_function("document.getElementById('diagtxt').value.length > 50")
         dg = pg.evaluate("document.getElementById('diagtxt').value"); assert '"editores"' in dg and "note-editable" in dg, dg[:300]
+        usuario.goto(f"http://localhost:{PORTA}/agaia/prompts/edit/77"); usuario.wait_for_selector("#ed"); __import__("time").sleep(1)
+        pg.click("#bruto"); pg.wait_for_function("document.getElementById('brutotxt').value.length > 10")
+        assert "Texto fornecido" in pg.evaluate("document.getElementById('brutotxt').value") and "caracteres" in pg.evaluate("document.getElementById('brutoinfo').textContent")
         n = pg.locator(".item").count(); pg.locator("button", has_text="Apagar esta cópia").first.click(); pg.locator("button", has_text="Clique de novo").first.click()
         pg.wait_for_function(f"document.querySelectorAll('.item').length == {n - 1}")
         ctx.close()
