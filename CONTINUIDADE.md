@@ -196,3 +196,9 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 
 ## 5.0.0 — "Inicie aqui" abrível pelo Studio (19/11, regra do usuário: depois de 4.0.10 vem 5.0.0)
 - `manifest.json`: `iniciar.html` entra em `web_accessible_resources` (antes só painel/pauta; o Chrome bloqueava a aba do "Inicie aqui" aberta pelo Studio). `studio-base.js` anuncia o recurso `inicie-web`. Inclui tudo da 4.0.10 (passo 3 com todos, Dias, ordem decrescente). O 5.0.0 substitui o 4.0.10 na loja.
+
+## 5.0.1 — Enviar prompt do Studio ao Agaia (pedido do usuário, 21/11)
+- Studio: ícone nuvem (`enviar-agaia-<id>`) em cada prompt do Gerenciador de Prompts → `src/utils/enviarPromptAgaia.ts` (fila, um por vez) → `studio-base.js` (`__projudi:"agaia-prompt"`, recurso `agaia-prompt`) → `background.js` → `agaia-prompts-bg.js` (`agaiaPromptSubstituir`) + `agaia-prompt.js` (script na página do Agaia).
+- Regras do usuário: o prompt do Agaia é achado pelo MESMO TÍTULO (não achou → avisa, nunca cria; 2 iguais → erro); novo texto = prompt do Studio terminando em `Texto fornecido: {}`; antes de trocar, cópia do texto antigo em `chrome.storage.local.agaia_prompt_backups` (60 últimas), página `agaia-prompts.html` (baixar / devolver ao Agaia); depois de Salvar a extensão reabre a edição e confere; termina na lista de prompts.
+- Teste: `tests/e2e_agaia_prompt.py` (Agaia simulado; o DOM real do editor NÃO foi visto — se falhar no teste real, pedir ao usuário o HTML do editor e do botão Salvar e ajustar `editores()`/`botaoSalvar()` em `agaia-prompt.js`).
+- Studio: commit local; publicar só após "Pode publicar". Extensão 5.0.1 empacotada; usuário envia à loja.

@@ -1,0 +1,18 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Cópias dos prompts do Agaia — Conclusões Projudi</title>
+<style>
+  body { font: 14px system-ui, sans-serif; margin: 0; padding: 16px 24px; max-width: 860px; color: #222; }
+  h1 { font-size: 18px; margin: 0 0 4px; } .dica { color: #666; font-size: 12px; }
+  .item { border: 1px solid #ccc; border-radius: 8px; padding: 10px 12px; margin: 10px 0; }
+  .item b { display: block; } .item small { color: #666; }
+  .acoes { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; } button { cursor: pointer; padding: 5px 10px; }
+  #status { margin: 10px 0; font-weight: 600; } .erro { color: #b00020; }
+  @media (prefers-color-scheme: dark) { body { background: #1c1d21; color: #e6e6e6; } .dica, .item small { color: #aaa; } .item { border-color: #444; } }
+</style>
+<link rel="stylesheet" href="tema.css">
+<h1>Cópias dos prompts do Agaia</h1>
+<p class="dica">Toda vez que o Studio troca um prompt do Agaia, a extensão guarda aqui o texto que estava antes (as últimas 60 cópias). Você pode baixar o texto ou devolvê-lo ao Agaia.</p>
+<div id="status"></div>
+<div id="lista"></div>
+<script src="agaia-prompts.js"></script>

@@ -3,7 +3,7 @@
 (() => {
   if (window.__projudiStudioBase) return;
   window.__projudiStudioBase = true;
-  try { document.documentElement.dataset.assessorExtensao = chrome.runtime.getManifest().version; document.documentElement.dataset.assessorExtensaoRecursos = "pdf,sv,modelos,modelos-atualizar,minuta-lancada,minuta-serventia,refazer-parcial,inicie-web"; document.documentElement.dataset.assessorExtensaoId = chrome.runtime.id; } catch (e) { /* sem manifest */ }      // o app mostra a tarja “instale a extensão” só quando este aviso não existe
+  try { document.documentElement.dataset.assessorExtensao = chrome.runtime.getManifest().version; document.documentElement.dataset.assessorExtensaoRecursos = "pdf,sv,modelos,modelos-atualizar,minuta-lancada,minuta-serventia,refazer-parcial,inicie-web,agaia-prompt"; document.documentElement.dataset.assessorExtensaoId = chrome.runtime.id; } catch (e) { /* sem manifest */ }      // o app mostra a tarja “instale a extensão” só quando este aviso não existe
   // Perfil de quem está logado no Studio (o app publica em data-assessor-perfil): guardado para a página "Inicie aqui" mostrar a Lupa do Magistrado só para magistrado.
   // Só grava quando o app informa um perfil (não apaga ao sair da conta nem enquanto a página ainda carrega).
   try {
@@ -919,6 +919,20 @@
     try {
       chrome.runtime.sendMessage({ acao: "refazer-parcial", reqId: d.reqId, processo: String(d.processo || ""), de: String(d.de || ""), prompt: String(d.prompt || ""), serventiaUrl: typeof d.serventiaUrl === "string" ? d.serventiaUrl : "" }, (r) => {
         if (chrome.runtime.lastError || !r?.ok) resp({ tipo: "fim", ok: false, erro: String(chrome.runtime.lastError?.message || r?.erro || "a extensão não respondeu") });
+      });
+    } catch (e) { resp({ tipo: "fim", ok: false, erro: String(e?.message || e) }); }
+  });
+
+  // ----- Prompt do Studio → Agaia: o app pede (um prompt por vez); a extensão troca o texto do prompt de mesmo título no Agaia e devolve o resultado -----
+  addEventListener("message", (ev) => {
+    const d = ev.data; if (ev.source !== window || ev.origin !== window.location.origin || !d || d.__projudi !== "agaia-prompt" || typeof d.reqId !== "string") return;
+    const resp = (o) => window.postMessage({ __projudiResp: "agaia-prompt", reqId: d.reqId, ...o }, window.location.origin);
+    try {
+      const acao = d.fase === "copias" ? "agaia-prompt-copias" : d.fase === "enviar" ? "agaia-prompt-enviar" : "";
+      if (!acao) return;
+      chrome.runtime.sendMessage({ acao, titulo: String(d.titulo || "").slice(0, 300), texto: String(d.texto || "").slice(0, 400000) }, (r) => {
+        if (chrome.runtime.lastError) return resp({ tipo: "fim", ok: false, erro: String(chrome.runtime.lastError.message || "a extensão não respondeu") });
+        resp({ tipo: "fim", ok: !!r?.ok, erro: r?.erro || "", naoEncontrado: !!r?.naoEncontrado });
       });
     } catch (e) { resp({ tipo: "fim", ok: false, erro: String(e?.message || e) }); }
   });

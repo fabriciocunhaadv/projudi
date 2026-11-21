@@ -223,7 +223,7 @@ async function capturarEAbrir(tabId) {
 chrome.commands.onCommand.addListener((c) => c === "capturar-tela" && capturarEAbrir().catch(console.error));
 
 // Pede ao Projudi (aba "Navegação de Arquivos") para abrir a janela "Gerar PDF"; lá o gerarpdf.js marca os arquivos e gera.
-importScripts("tabs-retry.js", "gerar-util.js", "projudi-quadro.js", "lancar-projudi.js");
+importScripts("tabs-retry.js", "gerar-util.js", "projudi-quadro.js", "lancar-projudi.js", "agaia-prompts-bg.js");
 async function abrirGerarPdf(tabId) {
   if (!tabId) return false;
   const r = await GerarUtil.capturarGerar(tabId);
@@ -288,6 +288,11 @@ chrome.runtime.onMessage.addListener((m, s, responder) => {
       .then((aba) => { chrome.tabs.update(aba.id, { autoDiscardable: false }).catch(() => {}); responder({ ok: true }); }, (e) => responder({ ok: false, erro: String(e.message || e) }));
     return true;
   }
+  if (m?.acao === "agaia-prompt-enviar" || m?.acao === "agaia-prompt-restaurar") {       // Studio → Agaia: troca o texto do prompt do Agaia (mesmo título) pelo do Studio; “restaurar” devolve uma cópia de segurança
+    agaiaPromptSubstituir({ titulo: String(m.titulo || ""), texto: String(m.texto || ""), restaurar: m.acao === "agaia-prompt-restaurar" }).then(responder, (e) => responder({ ok: false, erro: String(e?.message || e) }));
+    return true;
+  }
+  if (m?.acao === "agaia-prompt-copias") { chrome.tabs.create({ url: chrome.runtime.getURL("agaia-prompts.html") }).then(() => responder({ ok: true }), (e) => responder({ ok: false, erro: String(e?.message || e) })); return true; }
   if (m?.acao === "minha-aba") { responder({ tabId: s.tab ? s.tab.id : null }); return false; }
   if (m?.acao === "esteira-abrir") {       // garante a aba que roda a fila de minutas
     const url = chrome.runtime.getURL("esteira.html");
