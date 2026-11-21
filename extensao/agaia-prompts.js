@@ -49,6 +49,9 @@ $("bruto").onclick = async () => {
     const r = await chrome.tabs.sendMessage(aba.id, { acao: "agaia-prompt-bruto" });
     if (!r?.ok) { i.textContent = r?.erro || "não consegui ler"; return; }
     t.value = r.texto;
+    const c = (re) => (r.texto.match(re) || []).length;
+    const sig = { titulo: r.titulo, url: r.url, caracteres: r.texto.length, linhasReais: c(/\n/g), menorQue: c(/</g), entidadeLt: c(/&lt;/g), entidadeNbsp: c(/&nbsp;/g), div: c(/<div/gi), br: c(/<br/gi), p: c(/<p[ >]/gi), cdataLiteral: c(/<!\[CDATA\[/g), comentarioAbre: c(/<!--/g), inicio: r.texto.slice(0, 220), meio: r.texto.slice(Math.floor(r.texto.length / 2), Math.floor(r.texto.length / 2) + 160), fim: r.texto.slice(-200) };
+    try { await navigator.clipboard.writeText(JSON.stringify(sig, null, 1)); $("status").textContent = "Resumo copiado: cole na conversa."; } catch (e) { $("status").textContent = JSON.stringify(sig); }
     const linhas = r.texto.split("\n"), fim = linhas.filter((l) => l.trim()).slice(-1)[0] || "";
     i.textContent = `Título: ${r.titulo} · ${r.texto.length.toLocaleString("pt-BR")} caracteres · ${linhas.length.toLocaleString("pt-BR")} linhas · última linha: “${fim.slice(0, 80)}” · termina com “Texto fornecido: {}”: ${/Texto fornecido:\s*\{\}\s*$/.test(r.texto) ? "SIM" : "NÃO"}`;
   } catch (e) { i.textContent = "Não consegui: " + (e?.message || e) + " (recarregue a aba do Agaia e tente de novo)"; }
