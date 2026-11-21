@@ -97,9 +97,13 @@ def main():
         r5 = ver.evaluate("async (b) => await chrome.runtime.sendMessage({ acao: 'agaia-prompt-restaurar', titulo: b.tituloAgaia, texto: b.texto })", orig)
         print("restaurar:", r5); assert r5["ok"], r5
         assert prompts["77"]["texto"].strip() == orig["texto"].strip(), repr(prompts["77"]["texto"])
+        bk2 = ver.evaluate("chrome.storage.local.get('agaia_prompt_backups').then(x => x.agaia_prompt_backups)")
+        assert len(bk2) == len(bk), "restaurar não deve criar outra cópia"
         # 7) página das cópias abre e lista
         pg = ctx.new_page(); pg.goto(base + "agaia-prompts.html"); pg.wait_for_selector(".item")
         assert pg.locator(".item").count() >= 3 and pg.locator("button", has_text="Devolver ao Agaia").count() >= 3
+        n = pg.locator(".item").count(); pg.locator("button", has_text="Apagar esta cópia").first.click(); pg.locator("button", has_text="Clique de novo").first.click()
+        pg.wait_for_function(f"document.querySelectorAll('.item').length == {n - 1}")
         ctx.close()
     print("OK e2e_agaia_prompt")
 main()

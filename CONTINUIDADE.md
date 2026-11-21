@@ -205,3 +205,7 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 
 ## 5.0.2 — Enviar prompt ao Agaia: título PARECIDO basta (pedido do usuário, 21/11)
 - No Agaia os prompts têm prefixo (ex.: "Fabrício Execução Fiscal Estadual" ↔ Studio "Outros Área Judicial - Execução Fiscal Estadual"). `achar()` em `agaia-prompt.js` compara o trecho depois do último " - " do título do Studio: igual ao título > termina com o trecho > contém o trecho; vence o mais curto; empate → erro listando os parecidos (nunca escolhe no escuro). Cível ≠ Criminal (testado). Cópia guarda `tituloAgaia`.
+
+## 5.0.3 — Cópias do Agaia: devolver não duplica + apagar cópia (pedido do usuário, 21/11)
+- "Devolver ao Agaia" não cria nova cópia; botão "Apagar esta cópia" (2 cliques). 
+- ABERTO: o usuário testou o envio real: o prompt do Studio (XML com `<tags>`) apareceu no editor do Agaia SEM as tags e sem quebras (Agaia trata o conteúdo como HTML). Aguardando o outerHTML do editor e do Salvar do Agaia (pedido enviado ao usuário) para corrigir a forma de gravar em `escrever()` de `agaia-prompt.js`.
