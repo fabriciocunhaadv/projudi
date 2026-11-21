@@ -9,7 +9,9 @@ PORTA = 8793
 prompts = {  # id -> dados guardados "no servidor"
     "10": {"titulo": "Prompt Outro A", "texto": "antigo A\nTexto fornecido: {}", "unidade": "1ª Vara"},
     "11": {"titulo": "Prompt Outro B", "texto": "antigo B\nTexto fornecido: {}", "unidade": "1ª Vara"},
-    "77": {"titulo": "Minha Sentença Cível", "texto": "Texto ANTIGO do Agaia\nsegunda linha antiga\n\nTexto fornecido: {}", "unidade": "Juizado"},
+    "77": {"titulo": "Fabrício Minha Sentença Cível", "texto": "Texto ANTIGO do Agaia\nsegunda linha antiga\n\nTexto fornecido: {}", "unidade": "Juizado"},
+    "12": {"titulo": "Fabrício Juizado Especial Criminal", "texto": "crim", "unidade": "Vara"},
+    "13": {"titulo": "Fabrício Juizado Especial Cível", "texto": "civ", "unidade": "Vara"},
     "90": {"titulo": "Duplicado", "texto": "d1", "unidade": "Vara X"},
     "91": {"titulo": "Duplicado", "texto": "d2", "unidade": "Vara Y"},
 }
@@ -64,7 +66,7 @@ def main():
         env = lambda titulo, texto: ver.evaluate("async ([t, x]) => await chrome.runtime.sendMessage({ acao: 'agaia-prompt-enviar', titulo: t, texto: x })", [titulo, texto])
         # 1) troca, título só difere em maiúsculas/acentos; o prompt do Studio já traz a linha final no meio: sai uma só, no fim
         studio = "Você é um assessor.\n\nTexto fornecido: {}\nRegra 1\nRegra 2 <b>&</b>"
-        r = env("minha sentenca civel", studio)
+        r = env("Outros Área Judicial - Minha sentenca civel", studio)
         print("troca:", r, repr(prompts["77"]["texto"]), salvos); assert r["ok"], r
         esperado = "Você é um assessor.\n\nRegra 1\nRegra 2 <b>&</b>\n\nTexto fornecido: {}"
         assert prompts["77"]["texto"].strip() == esperado, repr(prompts["77"]["texto"])
@@ -73,7 +75,9 @@ def main():
         assert "/agaia/prompts/lista" in usuario.url, usuario.url      # terminou de volta na lista, pronto p/ o próximo
         # 2) cópia de segurança guardada com o texto antigo
         bk = ver.evaluate("chrome.storage.local.get('agaia_prompt_backups').then(x => x.agaia_prompt_backups)")
-        assert len(bk) == 1 and bk[0]["titulo"] == "minha sentenca civel" and "Texto ANTIGO do Agaia" in bk[0]["texto"] and "segunda linha antiga" in bk[0]["texto"], bk
+        assert len(bk) == 1 and bk[0]["tituloAgaia"] == "Fabrício Minha Sentença Cível" and "Texto ANTIGO do Agaia" in bk[0]["texto"] and "segunda linha antiga" in bk[0]["texto"], bk
+        rc = env("Outros Área Judicial - Juizado Especial Civel", "so civel"); print("civel x criminal:", rc); assert rc["ok"] and rc["tituloAgaia"] == "Fabrício Juizado Especial Cível", rc
+        assert prompts["12"]["texto"] == "crim" and prompts["13"]["texto"].startswith("so civel"), "confundiu cível com criminal"
         # 3) título que não existe: avisa, sem criar nada
         n0 = len(prompts); r2 = env("Não existe", "x")
         print("inexistente:", r2); assert not r2["ok"] and r2.get("naoEncontrado") and "Não existe" in r2["erro"], r2
@@ -90,7 +94,7 @@ def main():
         # 6) restaurar a cópia do primeiro envio
         bk = ver.evaluate("chrome.storage.local.get('agaia_prompt_backups').then(x => x.agaia_prompt_backups)")
         orig = [x for x in bk if "Texto ANTIGO do Agaia" in x["texto"]][0]
-        r5 = ver.evaluate("async (b) => await chrome.runtime.sendMessage({ acao: 'agaia-prompt-restaurar', titulo: b.titulo, texto: b.texto })", orig)
+        r5 = ver.evaluate("async (b) => await chrome.runtime.sendMessage({ acao: 'agaia-prompt-restaurar', titulo: b.tituloAgaia, texto: b.texto })", orig)
         print("restaurar:", r5); assert r5["ok"], r5
         assert prompts["77"]["texto"].strip() == orig["texto"].strip(), repr(prompts["77"]["texto"])
         # 7) página das cópias abre e lista

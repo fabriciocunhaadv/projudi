@@ -202,3 +202,6 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 - Regras do usuário: o prompt do Agaia é achado pelo MESMO TÍTULO (não achou → avisa, nunca cria; 2 iguais → erro); novo texto = prompt do Studio terminando em `Texto fornecido: {}`; antes de trocar, cópia do texto antigo em `chrome.storage.local.agaia_prompt_backups` (60 últimas), página `agaia-prompts.html` (baixar / devolver ao Agaia); depois de Salvar a extensão reabre a edição e confere; termina na lista de prompts.
 - Teste: `tests/e2e_agaia_prompt.py` (Agaia simulado; o DOM real do editor NÃO foi visto — se falhar no teste real, pedir ao usuário o HTML do editor e do botão Salvar e ajustar `editores()`/`botaoSalvar()` em `agaia-prompt.js`).
 - Studio: commit local; publicar só após "Pode publicar". Extensão 5.0.1 empacotada; usuário envia à loja.
+
+## 5.0.2 — Enviar prompt ao Agaia: título PARECIDO basta (pedido do usuário, 21/11)
+- No Agaia os prompts têm prefixo (ex.: "Fabrício Execução Fiscal Estadual" ↔ Studio "Outros Área Judicial - Execução Fiscal Estadual"). `achar()` em `agaia-prompt.js` compara o trecho depois do último " - " do título do Studio: igual ao título > termina com o trecho > contém o trecho; vence o mais curto; empate → erro listando os parecidos (nunca escolhe no escuro). Cível ≠ Criminal (testado). Cópia guarda `tituloAgaia`.

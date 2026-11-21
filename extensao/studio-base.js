@@ -932,7 +932,7 @@
       if (!acao) return;
       chrome.runtime.sendMessage({ acao, titulo: String(d.titulo || "").slice(0, 300), texto: String(d.texto || "").slice(0, 400000) }, (r) => {
         if (chrome.runtime.lastError) return resp({ tipo: "fim", ok: false, erro: String(chrome.runtime.lastError.message || "a extensão não respondeu") });
-        resp({ tipo: "fim", ok: !!r?.ok, erro: r?.erro || "", naoEncontrado: !!r?.naoEncontrado });
+        resp({ tipo: "fim", ok: !!r?.ok, erro: r?.erro || "", naoEncontrado: !!r?.naoEncontrado, tituloAgaia: r?.tituloAgaia || "" });
       });
     } catch (e) { resp({ tipo: "fim", ok: false, erro: String(e?.message || e) }); }
   });

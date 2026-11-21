@@ -28,25 +28,28 @@
 
   async function achar(titulo) {
     const alvo = sem(titulo);
+    const cauda = sem(String(titulo).split(" - ").pop());      // “Outros Área Judicial - Execução Fiscal Estadual” → “execução fiscal estadual”: no Agaia vem com prefixo (ex.: “Fabrício Execução Fiscal Estadual”)
+    const candidatas = [];
     let vistos = [];
     for (let pag = 0; pag < 30; pag++) {
       for (let i = 0; i < 20 && !linhasDaTabela().length; i++) await dorme(300);      // a lista pode carregar depois (DataTables)
       const linhas = linhasDaTabela();
       vistos = vistos.concat(linhas.map((l) => l.titulo));
-      const achadas = linhas.filter((l) => sem(l.titulo) === alvo && l.editar);
-      if (achadas.length === 1) {
-        if (!achadas[0].editar.getAttribute("href")) return { ok: false, erro: "o botão Editar do Agaia não tem endereço (mudou o layout?)" };
-        const e = achadas[0].editar, href = e.getAttribute("href") || "";
-        const id = (href.match(/\/prompts\/edit\/([^/?#]+)/) || [])[1] || "";
-        return { ok: true, href: href ? new URL(href, location.href).href : "", id, unidade: achadas[0].unidade, privacidade: achadas[0].privacidade };
-      }
-      if (achadas.length > 1) return { ok: false, erro: `há ${achadas.length} prompts com o título “${titulo}” no Agaia (${achadas.map((a) => a.unidade || "sem unidade").join("; ")}). Deixe só um com esse nome para eu saber qual trocar.` };
+      const pontua = (l) => { const x = sem(l.titulo); return x === alvo ? 3 : (x === cauda || x.endsWith(" " + cauda)) ? 2 : (cauda.length >= 6 && x.includes(cauda)) ? 1 : 0; };
+      for (const l of linhas) if (l.editar && pontua(l)) candidatas.push({ l, p: pontua(l) });
       const prox = proximaPagina(); if (!prox) break;
       const antes = linhas.map((l) => l.titulo).join("|");
       prox.click(); await dorme(900);
       if (linhasDaTabela().map((l) => l.titulo).join("|") === antes) break;      // o clique não mudou a lista: acabou
     }
-    return { ok: false, naoEncontrado: true, erro: `não achei no Agaia um prompt com o título “${titulo}” (vi ${vistos.length} prompts na lista). O título no Agaia precisa ser igual ao do Studio.` };
+    if (candidatas.length) {
+      const melhor = Math.max(...candidatas.map((c) => c.p)), top = candidatas.filter((c) => c.p === melhor);
+      const menor = Math.min(...top.map((c) => c.l.titulo.length)), fim = top.filter((c) => c.l.titulo.length === menor);
+      if (fim.length === 1) { const e = fim[0].l, href = e.editar.getAttribute("href") || ""; if (!href) return { ok: false, erro: "o botão Editar do Agaia não tem endereço (mudou o layout?)" };
+        return { ok: true, href: new URL(href, location.href).href, id: (href.match(/\/prompts\/edit\/([^/?#]+)/) || [])[1] || "", unidade: e.unidade, privacidade: e.privacidade, tituloAgaia: e.titulo }; }
+      return { ok: false, erro: `há ${fim.length} prompts parecidos com “${titulo}” no Agaia (${fim.map((c) => `“${c.l.titulo}” — ${c.l.unidade || "sem unidade"}`).join("; ")}). Não sei qual trocar; deixe só um com esse nome.` };
+    }
+    return { ok: false, naoEncontrado: true, erro: `não achei no Agaia um prompt parecido com “${titulo}” (vi ${vistos.length} prompts na lista; procurei por “${String(titulo).split(" - ").pop()}” no título).` };
   }
 
   // ---------- Editor da página de edição ----------

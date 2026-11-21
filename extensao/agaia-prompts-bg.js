@@ -58,12 +58,10 @@ function agaiaPromptSubstituir(pedido) {
       const atual = await chrome.tabs.sendMessage(aba.id, { acao: "agaia-prompt-ler" });
       if (!atual?.ok) return { ok: false, erro: atual?.erro || "não consegui ler o prompt atual do Agaia" };
       if (!atual.salvarOk) return { ok: false, erro: "não achei o botão Salvar na página de edição do Agaia" };
-      if (atual.titulo && atual.titulo.trim().toLowerCase() !== titulo.toLowerCase() && !pedido.restaurar) {
-        const sn = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
-        if (sn(atual.titulo) !== sn(titulo)) return { ok: false, erro: `a página de edição mostra o título “${atual.titulo}”, diferente de “${titulo}”; não troquei nada` };
-      }
+      const sn = (x) => String(x || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+      if (atual.titulo && a.tituloAgaia && sn(atual.titulo) !== sn(a.tituloAgaia)) return { ok: false, erro: `a página de edição mostra o título “${atual.titulo}”, diferente do da lista (“${a.tituloAgaia}”); não troquei nada` };
       // cópia de segurança ANTES de trocar
-      const backup = { id: "b" + Date.now(), titulo, agaiaId: a.id || "", unidade: a.unidade || "", texto: atual.texto || "", html: atual.html || "", tipo: atual.tipo, em: Date.now(), origem: pedido.restaurar ? "antes-de-restaurar" : "antes-de-enviar" };
+      const backup = { id: "b" + Date.now(), titulo, tituloAgaia: a.tituloAgaia || "", agaiaId: a.id || "", unidade: a.unidade || "", texto: atual.texto || "", html: atual.html || "", tipo: atual.tipo, em: Date.now(), origem: pedido.restaurar ? "antes-de-restaurar" : "antes-de-enviar" };
       await agaiaGuardarBackup(backup);
       const g = await chrome.tabs.sendMessage(aba.id, { acao: "agaia-prompt-gravar", texto: novoTexto, html: null });
       if (!g?.ok) return { ok: false, erro: g?.erro || "o Agaia não aceitou o texto", backupId: backup.id };
@@ -75,7 +73,7 @@ function agaiaPromptSubstituir(pedido) {
       const n = (s) => String(s || "").replace(/ /g, " ").replace(/[ \t]+/g, " ").replace(/\s*\n\s*/g, "\n").trim();
       if (!depois?.ok || n(depois.texto) !== n(novoTexto)) { await agaiaAbrir(aba.id, AGAIA_PROMPTS_LISTA).catch(() => {}); return { ok: false, erro: "o Agaia não guardou o texto novo (conferi depois de Salvar). O texto antigo está na cópia de segurança.", backupId: backup.id }; }
       await agaiaAbrir(aba.id, AGAIA_PROMPTS_LISTA).catch(() => {});      // volta à lista, pronta para o próximo
-      return { ok: true, backupId: backup.id, agaiaId: a.id || "" };
+      return { ok: true, backupId: backup.id, agaiaId: a.id || "", tituloAgaia: a.tituloAgaia || "" };
     } catch (e) {
       return { ok: false, erro: "falha da extensão no Agaia: " + String(e?.message || e) };
     }
