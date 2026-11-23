@@ -3,7 +3,7 @@
 (() => {
   if (window.__projudiStudioBase) return;
   window.__projudiStudioBase = true;
-  try { document.documentElement.dataset.assessorExtensao = chrome.runtime.getManifest().version; document.documentElement.dataset.assessorExtensaoRecursos = "pdf,sv,modelos,modelos-atualizar,minuta-lancada,minuta-serventia,refazer-parcial,inicie-web,agaia-prompt,pauta-studio"; document.documentElement.dataset.assessorExtensaoId = chrome.runtime.id; } catch (e) { /* sem manifest */ }      // o app mostra a tarja “instale a extensão” só quando este aviso não existe
+  try { document.documentElement.dataset.assessorExtensao = chrome.runtime.getManifest().version; document.documentElement.dataset.assessorExtensaoRecursos = "pdf,sv,modelos,modelos-atualizar,minuta-lancada,minuta-serventia,refazer-parcial,inicie-web,agaia-prompt,pauta-studio,agaia-esteira"; document.documentElement.dataset.assessorExtensaoId = chrome.runtime.id; } catch (e) { /* sem manifest */ }      // o app mostra a tarja “instale a extensão” só quando este aviso não existe
   // Perfil de quem está logado no Studio (o app publica em data-assessor-perfil): guardado para a página "Inicie aqui" mostrar a Lupa do Magistrado só para magistrado.
   // Só grava quando o app informa um perfil (não apaga ao sair da conta nem enquanto a página ainda carrega).
   try {
@@ -941,6 +941,22 @@
       function terminar(o) { if (fim) return; fim = true; clearTimeout(t0); try { chrome.storage.onChanged.removeListener(ouvir); chrome.storage.local.remove(chave); } catch (e) { /* extensão recarregada */ } resp({ tipo: "fim", ok: !!o.ok, erro: o.erro || "", serventias: o.serventias, linhas: o.linhas }); }
       chrome.storage.onChanged.addListener(ouvir);
       chrome.runtime.sendMessage({ acao: "pauta-ler", reqId: d.reqId, fase: d.fase, serventiaHref: typeof d.serventiaHref === "string" ? d.serventiaHref : "", serventiaNome: typeof d.serventiaNome === "string" ? d.serventiaNome : "", tipo: typeof d.tipo === "string" ? d.tipo : "", fluxo: d.fluxo === "1" ? "1" : "2" }, (r) => {
+        if (chrome.runtime.lastError || !r?.ok) terminar({ ok: false, erro: String(chrome.runtime.lastError?.message || r?.erro || "a extensão não respondeu") });
+      });
+    } catch (e) { resp({ tipo: "fim", ok: false, erro: String(e?.message || e) }); }
+  });
+
+  // ----- Minuta do Studio → esteira no modo Agaia: o app pede (um processo); a extensão o põe na fila e a esteira manda ao Agaia e devolve a minuta ao Histórico -----
+  addEventListener("message", (ev) => {
+    const d = ev.data; if (ev.source !== window || ev.origin !== window.location.origin || !d || d.__projudi !== "agaia-esteira" || d.fase !== "enviar" || typeof d.reqId !== "string") return;
+    const resp = (o) => window.postMessage({ __projudiResp: "agaia-esteira", reqId: d.reqId, ...o }, window.location.origin);
+    try {
+      const chave = "agaiaest_res_" + d.reqId.replace(/[^\w-]/g, "").slice(0, 60);
+      let fim = false; const t0 = setTimeout(() => terminar({ ok: false, erro: "A extensão não respondeu a tempo. Tente de novo." }), 60000);
+      const ouvir = (mud, area) => { if (area === "local" && mud[chave]?.newValue) terminar(mud[chave].newValue); };
+      function terminar(o) { if (fim) return; fim = true; clearTimeout(t0); try { chrome.storage.onChanged.removeListener(ouvir); chrome.storage.local.remove(chave); } catch (e) { /* extensão recarregada */ } resp({ tipo: "fim", ok: !!o.ok, erro: o.erro || "", jaNaFila: !!o.jaNaFila }); }
+      chrome.storage.onChanged.addListener(ouvir);
+      chrome.runtime.sendMessage({ acao: "agaia-esteira-enviar", reqId: d.reqId, processo: String(d.processo || ""), prompt: String(d.prompt || ""), serventia: String(d.serventia || ""), serventiaUrl: typeof d.serventiaUrl === "string" ? d.serventiaUrl : "" }, (r) => {
         if (chrome.runtime.lastError || !r?.ok) terminar({ ok: false, erro: String(chrome.runtime.lastError?.message || r?.erro || "a extensão não respondeu") });
       });
     } catch (e) { resp({ tipo: "fim", ok: false, erro: String(e?.message || e) }); }
