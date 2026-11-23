@@ -235,3 +235,9 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 ## Studio (21/11) — "Distribuir vários" prompts (pedido do usuário, superadmin)
 - `PromptManagerModal`: botão "Distribuir vários" (só superadmin, ao lado de Backup/Restaurar) → caixinhas nos prompts + "Marcar/Desmarcar todos" → "Escolher gabinetes" (mesma lista do envio individual, "Selecionar Todos") → confirmação ("Enviar N prompt(s) para todos os X gabinetes?", avisa que prompt de mesmo id é SUBSTITUÍDO) → envio um a um (`src/utils/distribuirPrompts.ts`, usa `broadcastPromptToTenants`); falha de um não impede os outros; os que falharam ficam marcados.
 - Testes: `testes/teste_distribuir_prompts.ts`, `testes/teste_prompts_lote.py` (stubs `_stubs/firestoreutils_prompts.ts`, `vite.prompts.config.ts`). Studio commitado (local); publicar só após "Pode publicar".
+
+## Segurança (23/11) — melhorias feitas no Studio a pedido do usuário
+- Corpo de pedido: sem token de sessão com assinatura válida o limite é 2 MB (antes 200 MB para todos); com token válido segue 200 MB (`tokenAssinadoValido` em `authRoutes.ts`, parsers em `server.ts`).
+- Cadastros de usuários: cada pessoa vê só os do próprio gabinete (super admin vê todos; cadastro pendente só o super admin); telefone e chaves só para o próprio, administrador do gabinete e super admin (`veCadastro` em `docsRoutes.ts`).
+- Cabeçalhos de proteção (nosniff, X-Frame-Options, frame-ancestors, Referrer-Policy, HSTS em https), sem `x-powered-by`, `trust proxy` = 1 (variável `TRUST_PROXY=0` desliga); freios de login (e-mail+IP, e-mail, IP) e de cadastro (5/h por IP).
+- Teste: `testes/servidor/rodar_seguranca.mjs` (+ `preload_mysql_seguranca.cjs`). O relatório completo da auditoria foi dado ao usuário na conversa (NÃO registrar pontos de segurança pendentes neste repositório, que é público).
