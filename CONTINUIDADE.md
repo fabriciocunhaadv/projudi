@@ -288,3 +288,9 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 - Cadastro **exige** gabinete (servidor recusa sem). Texto digitado é limpo de `< >` e limitado.
 - Super admin (`AprovacaoUsuarios.tsx`): cada pedido mostra "Gabinete informado"; existente já vem selecionado; novo tem o botão "Criar este gabinete" (cria `tenants/<id>`, `gabinetes/<id>/settings/profile` e `units`) e o gabinete já fica escolhido; a aprovação continua manual.
 - Testes: `testes/servidor/rodar_cadastro_gabinete.mjs`, `testes/teste_cadastro_gabinete.py`; atualizados `rodar_seguranca.mjs` e `teste_login_cadastro.py`.
+
+
+## Legislação pelo Novo Portal (23/11) e LEMBRETE FIXO
+- O Novo Portal da Legislação (`https://portaldalegislacao.presidencia.gov.br/`, mesmos caminhos `ccivil_03/...`) já era a fonte principal, com o Planalto como reserva (`espelhoLegislacao.ts`, disjuntor de 3 falhas/10 min). Toda busca de artigo (inclusive a citação automática e "lei sem artigo") passa por `baixarLinhas`. Ajuste desta data: `trechoDoArtigo` agora ignora o **sumário** do portal novo ("Art 1º", "Art 2º"…) e pega a ocorrência com texto de verdade. Teste: `testes/teste_trecho_sumario.ts`.
+- **LEMBRETE (pedido do usuário): sempre lembrar o usuário de que falta continuar o painel da SEEU** (adiado). Ao final de cada resposta/etapa, lembrar disso.
+- Extensão 5.0.11 já enviada à loja pelo usuário. Cadastro com gabinete publicado; citação automática conferida pelo usuário numa minuta real (deu certo).
