@@ -1,12 +1,28 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Pauta de audiências</title>
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Pauta de audiências — Conclusões Projudi</title>
 <style>
-body{font:14px Arial,sans-serif;margin:0;background:#f3f4f6;color:#111}
-.barra{background:#fff;border-bottom:1px solid #ddd;padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:end;position:sticky;top:0;z-index:5}
-.barra label{display:flex;flex-direction:column;font-size:12px;color:#555;gap:2px}.barra select,.barra input{padding:5px;font-size:13px}
-button{padding:6px 12px;cursor:pointer}.pri{background:#4f46e5;color:#fff;border:0;border-radius:4px}
-#msg{padding:6px 16px;color:#555;font-size:13px}
-.folha{background:#fff;max-width:980px;margin:14px auto;padding:26px 30px;box-shadow:0 1px 4px rgba(0,0,0,.15)}
-h2.dia{text-align:center;font-size:17pt;margin:4px 0 14px;font-weight:normal}
+:root{--bg:#f4f6fb;--card:#fff;--fg:#1c2433;--mut:#6b7587;--line:#e3e8f1;--ac:#2f5bea;--ac2:#e8eefe;--ok:#16a34a;--warn2:#fff4dd;--warn:#7a4a00;--sh:0 1px 2px rgba(16,24,40,.06),0 4px 14px rgba(16,24,40,.07)}
+@media (prefers-color-scheme:dark){:root{--bg:#11141b;--card:#1a1e28;--fg:#e8ebf3;--mut:#97a1b5;--line:#2a3040;--ac:#7d9cff;--ac2:#222c4a;--ok:#4cd1a1;--warn2:#3a2c12;--warn:#f2b05a;--sh:0 1px 2px rgba(0,0,0,.4),0 8px 22px rgba(0,0,0,.3)}button.pri{color:#0d1220}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 "Inter","Segoe UI",system-ui,sans-serif}
+.w2{max-width:1040px;margin:0 auto;padding:20px 24px 48px}
+.hd{display:flex;align-items:center;gap:10px;margin-bottom:16px}.logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#2f5bea,#7a5cf0);flex:none}
+h1{font-size:18px;margin:0}h1 small{color:var(--mut);font-weight:600}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--sh);padding:20px 24px;margin:0 0 14px}
+.card h2{font-size:16px;margin:0 0 4px;display:flex;align-items:center;gap:10px}.card h2 b{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--ac);color:#fff;font-size:13px;flex:none}
+.sub{color:var(--mut);font-size:13.5px;margin:0 0 14px}
+.filtros{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px}
+.filtros label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--mut)}
+select,input[type=date]{font:inherit;font-size:14px;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 10px;width:100%;min-width:0}
+select:focus,input:focus{outline:0;border-color:var(--ac);box-shadow:0 0 0 3px var(--ac2)}
+.acoes{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.acoes .sep{width:1px;align-self:stretch;background:var(--line);margin:0 4px}
+button{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--card);color:var(--fg);padding:9px 14px;border-radius:10px;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+button:hover:not(:disabled){border-color:var(--ac);box-shadow:0 0 0 3px var(--ac2)}button:disabled{opacity:.45;cursor:not-allowed}
+button.pri{background:var(--ac);border-color:var(--ac);color:#fff}button.pri:hover:not(:disabled){box-shadow:0 0 0 3px var(--ac2);filter:brightness(1.06)}
+.grupo{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap}.grupo.dir{margin-left:auto}.grupo select{width:auto;max-width:260px}
+#msg{margin:0 0 14px;padding:10px 14px;border-radius:12px;background:var(--ac2);color:var(--fg);border:1px solid var(--line);font-size:13.5px}
+#msg:empty{display:none}
+.rotulo{font-size:12px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin:0 0 8px}
+.folha{background:#fff;color:#111;max-width:980px;margin:14px auto;padding:26px 30px;border-radius:6px;box-shadow:var(--sh);font-family:Arial,sans-serif}
+h2.dia{text-align:center;font-size:17pt;margin:4px 0 14px;font-weight:normal;display:block}
 table.p{width:100%;border-collapse:collapse;table-layout:fixed}
 table.p th,table.p td{border:1px solid #222;padding:4px 6px;vertical-align:top;text-align:left;font-size:11pt}
 table.p th{font-weight:normal;font-size:12pt}
@@ -16,18 +32,31 @@ td.h{font-size:12pt}.nome{font-weight:bold;text-transform:uppercase}
 .dest{background:#ffff00;padding:0 2px}.alerta{background:#ffb347;padding:0 2px}
 .sel{width:16px;height:16px}.nao-imprimir{font-size:11px;color:#555}
 .sug{font-size:9pt;color:#7a4b00}
-@media print{.barra,#msg,.nao-imprimir{display:none}body{background:#fff}.folha{box-shadow:none;margin:0;padding:0;max-width:none}h2.dia{page-break-before:always}h2.dia:first-of-type{page-break-before:auto}tr{break-inside:avoid}table.p{font-size:10pt}}
-</style></head><body>
-<div class="barra">
+@media (max-width:720px){.w2{padding:14px 12px 40px}.card{padding:16px}.acoes .sep{display:none}.folha{padding:14px 10px;overflow-x:auto}}
+@media print{body{background:#fff}.hd,.card,#msg,.nao-imprimir{display:none}.w2{max-width:none;padding:0}.folha{box-shadow:none;margin:0;padding:0;max-width:none;border-radius:0}h2.dia{page-break-before:always}h2.dia:first-of-type{page-break-before:auto}}
+</style></head><body><div class="w2">
+<div class="hd"><div class="logo"></div><h1>Conclusões Projudi <small>· Pauta de audiências</small></h1></div>
+<section class="card">
+ <h2><b>1</b> Escolha o que buscar no Projudi</h2>
+ <p class="sub">Entre no Projudi (em outra aba) com a sua conta. Escolha a serventia e, se quiser, o tipo e o período.</p>
+ <div class="filtros">
  <label>Serventia<select id="serv"><option value="">(serventia atual da sessão)</option></select></label>
  <label>Tipo de audiência<select id="tipo"><option value="">Todas</option><option value="2">Conciliação</option><option value="7">Instrução</option><option value="10">Preliminar</option><option value="11">Una</option><option value="8">Instrução e Julgamento</option></select></label>
  <label>Situação<select id="fluxo"><option value="2">Pendentes</option><option value="1">Para hoje</option></select></label>
  <label>De<input type="date" id="de"></label><label>Até<input type="date" id="ate"></label>
- <button class="pri" id="gerar">1. Ler a lista</button>
-
+ </div>
+ <div class="acoes"><button class="pri" id="gerar">1. Ler a lista</button></div>
+</section>
+<div id="msg">Entre no Projudi, escolha a serventia e clique em “Ler a lista”. Depois marque os processos para usar “2. Enviar marcados à Mesa de Audiência” (baixa o PDF, faz o OCR e envia ao Studio) ou imprima/copie a pauta.</div>
+<section class="card">
+ <h2><b>2</b> O que fazer com os processos marcados</h2>
+ <p class="sub">Marque, na pauta abaixo, os processos que interessam. Depois escolha uma ação.</p>
+ <div class="acoes">
  <button class="pri" id="mesa" disabled title="Baixa o PDF de cada processo marcado, faz o OCR e entrega à Mesa de Audiência do Studio (nova audiência + PDF)">2. Enviar marcados à Mesa de Audiência</button>
- <span style="white-space:nowrap"><select id="promptVideo" title="Deixe em “prompt da serventia” para usar o prompt cadastrado para cada serventia (Painel) ou a sugestão pelo nome. Escolhendo um prompt, ele vale para todos os marcados." style="max-width:260px"><option value="">— prompt da serventia —</option></select><button type="button" id="promptVideoRec" title="Recarregar a lista de prompts do Studio">↻</button> <button class="pri" id="video" disabled title="Para processos que tiveram audiência de instrução com vídeo: baixa o PDF e os vídeos de cada processo marcado e o Studio degrava a audiência e redige a sentença (um processo por vez)">Sentenciar com o vídeo da audiência</button></span>
+ <span class="grupo"><select id="promptVideo" title="Deixe em “prompt da serventia” para usar o prompt cadastrado para cada serventia (Painel) ou a sugestão pelo nome. Escolhendo um prompt, ele vale para todos os marcados." style="max-width:260px"><option value="">— prompt da serventia —</option></select><button type="button" id="promptVideoRec" title="Recarregar a lista de prompts do Studio">↻</button> <button class="pri" id="video" disabled title="Para processos que tiveram audiência de instrução com vídeo: baixa o PDF e os vídeos de cada processo marcado e o Studio degrava a audiência e redige a sentença (um processo por vez)">Sentenciar com o vídeo da audiência</button></span>
  <button class="pri" id="analisar" hidden style="display:none" disabled title="Consulta a Mesa de Audiência do Studio (Briefing, Roteiro, Deliberações, Sentença, Ata) de cada processo marcado e monta a pauta">3. Analisar processos marcados (consulta a Mesa)</button>
- <button id="imprimir">Imprimir / PDF</button><button id="copiar">Copiar texto</button>
-</div><div id="msg">Entre no Projudi, escolha a serventia e clique em “Ler a lista”. Depois marque os processos para usar “2. Enviar marcados à Mesa de Audiência” (baixa o PDF, faz o OCR e envia ao Studio) ou imprima/copie a pauta.</div><div id="saida"></div>
+ <span class="grupo dir"><button id="imprimir">Imprimir / PDF</button><button id="copiar">Copiar texto</button></span>
+ </div>
+</section>
+<div id="saida"></div></div>
 <script src="parser.js"></script><script src="sugestoes.js"></script><script type="module" src="pauta.js"></script></body></html>
