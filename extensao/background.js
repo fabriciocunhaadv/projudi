@@ -293,6 +293,26 @@ chrome.runtime.onMessage.addListener((m, s, responder) => {
     return true;
   }
   if (m?.acao === "agaia-prompt-copias") { chrome.tabs.create({ url: chrome.runtime.getURL("agaia-prompts.html") }).then(() => responder({ ok: true }), (e) => responder({ ok: false, erro: String(e?.message || e) })); return true; }
+  if (m?.acao === "pauta-ler") {       // Studio → extensão: lê serventias ou a lista de audiências do Projudi numa aba escondida (resultado volta pelo storage "pauta_res_<id>")
+    const id = String(m.reqId || "").replace(/[^\w-]/g, "").slice(0, 60);
+    if (!id) { responder({ ok: false, erro: "pedido sem identificação" }); return false; }
+    const fase = m.fase === "serventias" ? "serventias" : "ler";
+    chrome.storage.local.set({ ["pauta_req_" + id]: { fase, serventiaHref: String(m.serventiaHref || "").slice(0, 300), serventiaNome: String(m.serventiaNome || "").slice(0, 200), tipo: String(m.tipo || "").replace(/\D/g, "").slice(0, 3), fluxo: m.fluxo === "1" ? "1" : "2" } })
+      .then(() => chrome.tabs.create({ url: chrome.runtime.getURL("pauta-ler.html?id=" + id), active: false }))
+      .then((aba) => { chrome.tabs.update(aba.id, { autoDiscardable: false }).catch(() => {}); responder({ ok: true }); }, (e) => responder({ ok: false, erro: String(e?.message || e) }));
+    return true;
+  }
+  if (m?.acao === "pauta-enviar") {       // Studio → extensão: baixa o PDF (com OCR) dos processos marcados e a esteira entrega à Mesa de Audiência (igual ao botão da página Pauta)
+    const itens = (Array.isArray(m.itens) ? m.itens : []).slice(0, 120).map((l) => ({ processo: String(l.processo || "").slice(0, 40), url: String(l.url || "").slice(0, 400), classificador: "pauta", serventia: String(l.serventiaNome || "").slice(0, 200), serventiaUrl: String(l.serventiaUrl || "").slice(0, 300), situacao: "",
+      audData: String(l.data || "").slice(0, 10), audHora: String(l.hora || "").slice(0, 5), audPromovente: String(l.promovente || "").slice(0, 300), audPromovido: String(l.promovido || "").slice(0, 300), audTipo: String(l.audTipo || "").slice(0, 80) })).filter((i) => i.processo && /^(\/|Processo|Audiencia|BuscaProcesso|[A-Za-z]+\?)/.test(i.url) && !/^https?:|^\/\//i.test(i.url));
+    if (!itens.length) { responder({ ok: false, erro: "nenhum processo com link do Projudi na seleção" }); return false; }
+    const id = "pautamesa" + Date.now();
+    chrome.storage.local.set({ pauta_mesa_ata: false, ["lote_" + id]: { itens, pasta: "Projudi/Pauta", opcoes: { studio: { ativo: true, modo: "mesa", docs: false } } } })
+      .then(() => chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + id), active: false }))
+      .then((aba) => { chrome.tabs.update(aba.id, { autoDiscardable: false }).catch(() => {}); responder({ ok: true, n: itens.length }); }, (e) => responder({ ok: false, erro: String(e?.message || e) }));
+    return true;
+  }
+  if (m?.acao === "fechar-minha-aba") { if (s.tab?.id != null && /\/pauta-ler\.html/.test(s.tab.url || "")) chrome.tabs.remove(s.tab.id).catch(() => {}); responder({ ok: true }); return false; }
   if (m?.acao === "minha-aba") { responder({ tabId: s.tab ? s.tab.id : null }); return false; }
   if (m?.acao === "esteira-abrir") {       // garante a aba que roda a fila de minutas
     const url = chrome.runtime.getURL("esteira.html");
