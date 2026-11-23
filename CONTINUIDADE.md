@@ -261,7 +261,7 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 - **Studio:** botão verde/teal "Analisar com o Agaia" ao lado de "Refazer só com alguns eventos" (`MinuteViewer.tsx`, mesma condição: minuta do motor principal; ganha anel quando a minuta é enxuta, < 6.000 caracteres) → `AnalisarAgaiaModal.tsx` → `src/utils/agaiaEsteira.ts` (`enviarMinutaAoAgaia`; exige número com ano).
 - **Extensão:** recurso `agaia-esteira`; `studio-base.js` (`__projudi:"agaia-esteira"`) → `background.js` (`agaia-esteira-enviar`) → aba escondida `agaia-esteira-add.html/js` que enfileira UM item `modo:"agaia"` (`origemStudio:true`, prompt = título do prompt do Studio; o Agaia casa o prompt parecido) na esteira, sem duplicar o que já está ativo, e fecha sozinha. A esteira já abre o Agaia, executa e devolve a minuta ao Histórico (selo Agaia).
 - Testes: `testes/teste_agaia_esteira.ts`, `tests/e2e_agaia_esteira_studio.py`. Studio commitado local; publicar só após "Pode publicar".
-- **PEDIDO NOVO (23/11, mensagem cortada), NÃO feito:** buscar/colocar citação da jurisprudência e dos artigos de lei citados nas minutas (inclusive nas já cadastradas, ao abrir), usando a base do Studio. Aguardando o usuário completar/confirmar.
+- (Pedido da citação automática: feito, ver a seção abaixo.)
 
 
 ## Extensão 5.0.11 — "Analisar com o Agaia": link certo e escolha do prompt
@@ -271,3 +271,11 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 - Segredo de justiça: continua o fluxo antigo da esteira (aviso e confirmação).
 - Layout: barra de botões do topo da minuta reorganizada (Ato em linha própria; Modelos/Exportar/Tela/Excluir na segunda). Publicado.
 - Studio com a telinha: commitado, aguardando "Pode publicar". Extensão 5.0.11 empacotada; o usuário envia à loja.
+
+
+## Citação automática nas minutas (Studio) — feito, aguardando "Pode publicar"
+- Regra do usuário: se a minuta cita súmula, tema (STJ/STF) ou artigo de lei SEM o texto, o sistema procura na base (súmulas/teses cadastradas + legislação do Planalto) e **insere direto** (sem pedir aceite), em bloco de citação logo abaixo do parágrafo. Vale também para minutas já cadastradas, ao abrir.
+- Se NÃO achar (ou o tema está na base sem texto): **aviso destacado** (caixa roxa tracejada, "Aviso do sistema — não faz parte da minuta", fora da folha da minuta) mandando consultar outras bases de jurisprudência. Botão "Entendi, dispensar".
+- Código: `src/utils/completarCitacoes.ts` (núcleo puro), rota `POST /api/completar-citacoes` (exige login), `src/utils/citacoesNaMinuta.ts` (cliente), efeito e painel em `MinuteViewer.tsx`. Campos novos em `MinuteData`: `avisosCitacao`, `citacoesInseridas`, `citacoesConferidasEm`. Nova versão no Histórico ("Citações completadas automaticamente"). Reconfere só se nunca conferida, ou se há avisos e passou 1 dia. Base fora do ar = não marca como conferida (tenta na próxima abertura).
+- Só mexe na Fundamentação (ou no Relatório se não houver Fundamentação). Limite de 8 leis por minuta.
+- Testes: `testes/teste_completar_citacoes.ts`, `testes/servidor/rodar_citacoes.mjs`, `testes/teste_citacoes_minuta.py` (vite na 5198).
