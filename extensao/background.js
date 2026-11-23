@@ -315,7 +315,7 @@ chrome.runtime.onMessage.addListener((m, s, responder) => {
   if (m?.acao === "agaia-esteira-enviar") {       // Studio → extensão: um processo vai para a esteira no modo Agaia (aba escondida agaia-esteira-add.html; resultado em "agaiaest_res_<id>")
     const id = String(m.reqId || "").replace(/[^\w-]/g, "").slice(0, 60);
     if (!id) { responder({ ok: false, erro: "pedido sem identificação" }); return false; }
-    chrome.storage.local.set({ ["agaiaest_req_" + id]: { processo: String(m.processo || "").slice(0, 40), prompt: String(m.prompt || "").slice(0, 300), serventia: String(m.serventia || "").slice(0, 200), serventiaUrl: /^https:\/\/projudi\.tjgo\.jus\.br\//.test(String(m.serventiaUrl || "")) ? String(m.serventiaUrl) : "" } })
+    chrome.storage.local.set({ ["agaiaest_req_" + id]: { fase: m.fase === "opcoes" ? "opcoes" : "", processo: String(m.processo || "").slice(0, 40), prompt: String(m.prompt || "").slice(0, 300), serventia: String(m.serventia || "").slice(0, 200), serventiaUrl: /^https:\/\/projudi\.tjgo\.jus\.br\//.test(String(m.serventiaUrl || "")) ? String(m.serventiaUrl) : "" } })
       .then(() => chrome.tabs.create({ url: chrome.runtime.getURL("agaia-esteira-add.html?id=" + id), active: false }))
       .then((aba) => { chrome.tabs.update(aba.id, { autoDiscardable: false }).catch(() => {}); responder({ ok: true }); }, (e) => responder({ ok: false, erro: String(e?.message || e) }));
     return true;

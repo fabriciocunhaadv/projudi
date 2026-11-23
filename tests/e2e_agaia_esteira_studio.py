@@ -6,8 +6,12 @@ from playwright.sync_api import sync_playwright
 
 RAIZ = Path(__file__).parent.parent / "extensao"
 
+SERVIDOS = []      # endereços que o "Agaia falso" recebeu
 class H(http.server.BaseHTTPRequestHandler):
     def do_GET(s):
+        if s.path.startswith("/agaia/"):
+            SERVIDOS.append(s.path); s.send_response(200); s.send_header("Content-Type", "text/html; charset=utf-8"); s.end_headers()
+            s.wfile.write("<html><body><form id='form_execucao_moderno'><select><option value=''>-- Selecione um prompt --</option><option value='1'>Fabrício Execução Fiscal</option><option value='2'>Outros Área Judicial - Criminal</option></select></form></body></html>".encode()); return
         s.send_response(200); s.send_header("Content-Type", "text/html; charset=utf-8"); s.end_headers(); s.wfile.write(b"<html><head><title>Assessor Judicial</title></head><body>Studio falso</body></html>")
     def log_message(*a): pass
 
@@ -15,12 +19,13 @@ PEDIR = """(extra) => new Promise((ok) => {
   const reqId = 'ae' + Date.now() + Math.random().toString(36).slice(2, 6);
   const f = (ev) => { const d = ev.data; if (ev.source !== window || !d || d.__projudiResp !== 'agaia-esteira' || d.reqId !== reqId || d.tipo !== 'fim') return; window.removeEventListener('message', f); ok(d); };
   window.addEventListener('message', f); window.postMessage({ __projudi: 'agaia-esteira', fase: 'enviar', reqId, ...extra }, location.origin);
-  setTimeout(() => ok({ ok: false, erro: 'sem resposta em 40 s' }), 40000);
+  setTimeout(() => ok({ ok: false, erro: "sem resposta em 100 s" }), 100000);
 })"""
 
 def main():
     tmp = Path(tempfile.mkdtemp()); ext = tmp / "ext"; shutil.copytree(RAIZ, ext)
-    m = ext / "manifest.json"; m.write_text(m.read_text().replace("https://judicial-mysql.assessor.net.br/*", "http://localhost/*"))
+    m = ext / "manifest.json"; m.write_text(m.read_text().replace("https://judicial-mysql.assessor.net.br/*", "http://localhost/*").replace("https://simplesefacil.tjgo.jus.br/agaia/*", "http://localhost/agaia/*"))
+    c = ext / "agaia-cliente.js"; c.write_text(c.read_text().replace("https://simplesefacil.tjgo.jus.br/agaia/", "http://localhost:8796/agaia/"))      # o Agaia de verdade não é tocado
     srv = http.server.HTTPServer(("localhost", 8796), H); threading.Thread(target=srv.serve_forever, daemon=True).start()
     exe = os.environ.get("CHROMIUM_PATH") or glob.glob("/opt/pw-browsers/chromium-*/chrome-linux*/chrome")[0]
     with sync_playwright() as p:
@@ -30,6 +35,11 @@ def main():
         base = f"chrome-extension://{sw.url.split('/')[2]}/"
         pg = ctx.new_page(); pg.goto("http://localhost:8796/"); pg.wait_for_function("document.documentElement.dataset.assessorExtensao", timeout=10000)
         assert "agaia-esteira" in pg.evaluate("document.documentElement.dataset.assessorExtensaoRecursos"), "a extensão anuncia o recurso 'agaia-esteira'"
+        abertos = SERVIDOS
+        ro = pg.evaluate(PEDIR, {"fase": "opcoes", "processo": "5285460-70.2025.8.09.0166"}); print("opções:", ro)
+        assert ro["ok"] and ro["opcoes"] == ["Fabrício Execução Fiscal", "Outros Área Judicial - Criminal"], ro
+        assert any("numero_processo=5285460.70.2025" in u and "tipo_processo=judicial" in u and "acao_id=6" in u and "validado=True" in u for u in abertos), "o endereço aberto não é o do Projudi: " + str(abertos)
+        assert "agaia-opcoes" in pg.evaluate("document.documentElement.dataset.assessorExtensaoRecursos")
         r0 = pg.evaluate(PEDIR, {"processo": "5285460.70", "prompt": "Outros Área Judicial - Criminal"}); print("sem ano:", r0.get("erro"))
         assert not r0["ok"] and "não tem o ano" in r0["erro"], r0
         r1 = pg.evaluate(PEDIR, {"processo": "5285460-70.2025.8.09.0166", "prompt": "Outros Área Judicial - Criminal"}); print("enviar:", r1)

@@ -262,3 +262,12 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 - **Extensão:** recurso `agaia-esteira`; `studio-base.js` (`__projudi:"agaia-esteira"`) → `background.js` (`agaia-esteira-enviar`) → aba escondida `agaia-esteira-add.html/js` que enfileira UM item `modo:"agaia"` (`origemStudio:true`, prompt = título do prompt do Studio; o Agaia casa o prompt parecido) na esteira, sem duplicar o que já está ativo, e fecha sozinha. A esteira já abre o Agaia, executa e devolve a minuta ao Histórico (selo Agaia).
 - Testes: `testes/teste_agaia_esteira.ts`, `tests/e2e_agaia_esteira_studio.py`. Studio commitado local; publicar só após "Pode publicar".
 - **PEDIDO NOVO (23/11, mensagem cortada), NÃO feito:** buscar/colocar citação da jurisprudência e dos artigos de lei citados nas minutas (inclusive nas já cadastradas, ao abrir), usando a base do Studio. Aguardando o usuário completar/confirmar.
+
+
+## Extensão 5.0.11 — "Analisar com o Agaia": link certo e escolha do prompt
+- O Agaia agora abre pelo mesmo endereço que o Projudi usa (`prompts/moderno?numero_processo=…&tipo_processo=judicial&acao_id=6&validado=True`); antes faltavam os três últimos itens e o formulário não abria.
+- Novo pedido da ponte `agaia-esteira` com `fase: "opcoes"` (recurso `agaia-opcoes`): lê os nomes dos prompts do formulário do Agaia, sem executar.
+- Studio: o botão abre uma telinha com o prompt sugerido (da serventia), a lista do Agaia (filtro, atualizar), campo para digitar o nome, e o aviso de que a minuta do Studio é mantida e a do Agaia entra no Histórico como nova minuta. Só envia ao clicar em "Enviar ao Agaia".
+- Segredo de justiça: continua o fluxo antigo da esteira (aviso e confirmação).
+- Layout: barra de botões do topo da minuta reorganizada (Ato em linha própria; Modelos/Exportar/Tela/Excluir na segunda). Publicado.
+- Studio com a telinha: commitado, aguardando "Pode publicar". Extensão 5.0.11 empacotada; o usuário envia à loja.

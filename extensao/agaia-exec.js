@@ -211,6 +211,14 @@
       } catch (e) { responder({ ok: false, erro: String(e?.message || e) }); }
       return false;
     }
+    if (m?.acao === "agaia-opcoes") {      // nomes dos prompts do formulário (para o Studio mostrar a escolha); não executa nada
+      esperar(() => selectPrompt() || naTelaDeLogin(), 30000).then(() => {
+        if (naTelaDeLogin()) return responder({ ok: false, sessao: true, erro: "O Agaia pediu login (sessão expirada). Entre no Agaia e tente de novo." });
+        const sel = selectPrompt(); if (!sel) return responder({ ok: false, erro: "O Agaia não abriu o formulário de execução" + (mensagens()[0] ? ": " + mensagens()[0] : ".") });
+        responder({ ok: true, opcoes: [...sel.options].filter((o) => o.value && !/selecione/i.test(o.text)).map((o) => o.text.replace(/\s+/g, " ").trim()) });
+      });
+      return true;
+    }
     if (m?.acao === "agaia-ping") { responder({ ok: true, pronto: !!document.getElementById("form_execucao_moderno") }); return false; }
     if (m?.acao === "agaia-executar") {
       if (window.__agaiaOcupado) { responder({ ok: false, erro: "a aba do Agaia já está executando outro processo" }); return false; }

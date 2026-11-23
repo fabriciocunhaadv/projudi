@@ -11,7 +11,7 @@ export function numeroAgaia(proc) {
   const d = s.replace(/\D/g, ""); if (d.length >= 13) return `${d.slice(0, 7)}.${d.slice(7, 9)}.${d.slice(9, 13)}`;
   return "";
 }
-export const urlDoProcesso = (numero) => AGAIA_URL + "prompts/moderno?numero_processo=" + encodeURIComponent(numero);
+export const urlDoProcesso = (numero) => AGAIA_URL + "prompts/moderno?numero_processo=" + encodeURIComponent(numero) + "&tipo_processo=judicial&acao_id=6&validado=True";      // o mesmo endereço que o Projudi usa para abrir o Agaia: sem os três últimos itens o formulário não abre
 
 async function abaDoAgaia() {
   const abertas = await chrome.tabs.query({ url: AGAIA_URL + "*" }).catch(() => []);
@@ -31,6 +31,18 @@ async function pronta(tabId, tentativas) {
     await dorme(1000);
   }
   return null;
+}
+
+/** Nomes dos prompts que o formulário do Agaia oferece (a mesma lista em que a esteira escolhe). Abre o processo na aba do Agaia, como na execução, mas não executa nada. */
+export async function listarPromptsAgaia(processo) {
+  const numero = numeroAgaia(processo);
+  if (!numero) return { ok: false, erro: "número do processo sem o ano" };
+  const url = urlDoProcesso(numero);
+  let aba = await abaDoAgaia();
+  if (aba) await chrome.tabs.update(aba.id, { url, active: false }); else aba = await chrome.tabs.create({ url, active: false });
+  await carregou(aba.id);
+  if (!(await pronta(aba.id, 60))) return { ok: false, erro: "a aba do Agaia não respondeu (confira se você está logado no Agaia)" };
+  try { return await chrome.tabs.sendMessage(aba.id, { acao: "agaia-opcoes" }); } catch (e) { return { ok: false, erro: "o Agaia não respondeu (" + e.message + ")" }; }
 }
 
 /** Executa o processo no Agaia. Devolve { ok, minutaHtml, minutaTexto, aproximado } ou { ok:false, erro, sessao?, verificacao? } com o texto que o Agaia mostrou. */
