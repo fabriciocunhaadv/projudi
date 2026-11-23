@@ -294,3 +294,12 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 - O Novo Portal da Legislação (`https://portaldalegislacao.presidencia.gov.br/`, mesmos caminhos `ccivil_03/...`) já era a fonte principal, com o Planalto como reserva (`espelhoLegislacao.ts`, disjuntor de 3 falhas/10 min). Toda busca de artigo (inclusive a citação automática e "lei sem artigo") passa por `baixarLinhas`. Ajuste desta data: `trechoDoArtigo` agora ignora o **sumário** do portal novo ("Art 1º", "Art 2º"…) e pega a ocorrência com texto de verdade. Teste: `testes/teste_trecho_sumario.ts`.
 - **LEMBRETE (pedido do usuário): sempre lembrar o usuário de que falta continuar o painel da SEEU** (adiado). Ao final de cada resposta/etapa, lembrar disso.
 - Extensão 5.0.11 já enviada à loja pelo usuário. Cadastro com gabinete publicado; citação automática conferida pelo usuário numa minuta real (deu certo).
+
+
+## Roteiro da inspeção CNIUPS (meio aberto) — feito, aguardando "Pode publicar"
+- Origem: Ofício Circular 16/2026 – CIJ/TJGO (inspeção semestral dos programas de meio aberto, art. 2º-A da Res. CNJ 77/2009; prazo 31/12/2026, sugerido cadastrar até 15/12/2026; município sem serviço deve marcar a inexistência no CNIUPS) + manuais do CNJ (PDFs que o usuário enviou). O usuário escolheu "Roteiro de inspeção" (NÃO o controle de prazos nem outra coisa).
+- Botão "Inspeção CNIUPS" no menu lateral (`Sidebar.tsx`) → `InspecaoCniupsModal.tsx`. Formulário fiel ao do CNJ em `src/utils/cniups.ts` (11 seções; Seção 1 = município, 1x; seções 2–11 = cada programa/serviço visitado; Seção 10 só se o programa for PSC; perguntas dependentes; totais; orientações do manual). Município "sem programa" = restante do formulário fechado e não conta como pendente. Painel mostra prazo, pendências do semestre, progresso, "Copiar resumo para o CNIUPS" e "Baixar .txt", "Marcar como lançada".
+- Salva por gabinete em `gabinetes/<tenant>/inspecoes_cniups` (`cniupsDb.ts`, com cópia local). O Studio NÃO envia nada ao CNIUPS (site do CNJ exige login por CPF).
+- Observações: no manual o CMDCA e o PPP aparecem os dois como "2.3" (aqui 2.2 e 2.3); a pergunta 8.2 não aparece no manual. Prazo do 1º semestre (30/06 e 15/06) é por analogia.
+- Testes: `testes/teste_cniups.ts`, `testes/teste_cniups_tela.py` (harness `testes/gigantes/_cniups.tsx`).
+- Ideias não feitas (se o usuário pedir): painel de prazos por comarca, preenchimento automático no site do CNIUPS pela extensão, resumo da inspeção por IA.
