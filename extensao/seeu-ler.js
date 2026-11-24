@@ -53,15 +53,17 @@ async function lerConclusoesSeeu() {
   const extrair = (doc) => {
     const tabela = doc.querySelector("table.resultTable"); if (!tabela) return null;
     const processos = [];
-    tabela.querySelectorAll("tr").forEach((tr) => {
-      const cb = tr.querySelector("input[name=idConclusoes]") || tr.querySelector("input[type=checkbox][value]:not([name=todos])"), a = tr.querySelector('a[href*="visualizacaoProcesso.do"]') || [...tr.querySelectorAll("a")].find((x) => /\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/.test(t(x)));
-      if (!cb || !a) return;
-      const numero = (t(a.querySelector("em")) || t(a)).match(/\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/)?.[0] || t(a);
+    tabela.querySelectorAll("tbody tr, tr").forEach((tr) => {
+      if (tr.closest("thead")) return;
+      const cb = tr.querySelector("input[name=idsConclusoesSelecionadas]") || tr.querySelector("input[name=idConclusoes]") || tr.querySelector("input[type=checkbox][value]:not([name=checker]):not([name=todos])");
       const cels = [...tr.children].map(t);
+      const numero = (tr.textContent.match(/\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/) || [""])[0];
+      if (!cb || !numero) return;
       const data = (cels.join(" | ").match(/(?<!\d)\d{2}\/\d{2}\/\d{4}(?:\s+\d{2}:\d{2}(?::\d{2})?)?/) || [""])[0];
       const partes = [...tr.querySelectorAll('a[href*="parteProcesso.do"]')].map(t).filter(Boolean);
       const tipo = (cels.find((c) => /^(DECIS[ÃA]O|DESPACHO|SENTEN[ÇC]A)/i.test(c)) || "").trim();
-      processos.push({ idConclusao: cb.value, numero, urgente: /URGENTE/.test(tr.textContent), reuPreso: !!tr.querySelector('[class*="REU_PRESO"]'), entrada: data, tipo, partes: [...new Set(partes)], linha: cels.filter(Boolean).join(" | ").slice(0, 400) });
+      const analisar = [...tr.querySelectorAll("a")].find((x) => /^analisar$/i.test(t(x)));
+      processos.push({ idConclusao: cb.value, numero, urgente: /URGENTE/.test(tr.textContent), prioridade: !!tr.querySelector("em.attention"), reuPreso: !!tr.querySelector('[class*="REU_PRESO"]'), entrada: data, tipo, partes: [...new Set(partes)], agrupador: (cels[cels.length - 1] || "").trim(), responsavel: cels.find((c, i) => i > 4 && /\(Magistrado|^[A-ZÁÉÍÓÚ][a-záéíóúãõç]+ [A-Za-zÁÉÍÓÚáéíóúãõç ]+$/.test(c) && !/DECIS|DESPACHO|SENTEN|^Sim$|^N[ãa]o$/i.test(c)) || "", temAnalisar: !!analisar, linha: cels.filter(Boolean).join(" | ").slice(0, 400) });
     });
     return processos;
   };
