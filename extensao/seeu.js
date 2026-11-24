@@ -41,7 +41,7 @@ async function lerNaAba(func, serve, args) {
 }
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 let lidos = [], serventiaDaLista = "";
-function mostrarMarcados() { const n = lidos.filter((p) => p.marcado).length; $("marcados").textContent = lidos.length ? `${n} de ${lidos.length} processo(s) marcado(s).` : ""; chrome.storage.local.set({ seeu_marcados: lidos.filter((p) => p.marcado).map((p) => ({ numero: p.numero, idConclusao: p.idConclusao, tipo: p.tipo })) }).catch(() => {}); }
+function mostrarMarcados() { atualizarEnvio(); const n = lidos.filter((p) => p.marcado).length; $("marcados").textContent = lidos.length ? `${n} de ${lidos.length} processo(s) marcado(s).` : ""; chrome.storage.local.set({ seeu_marcados: lidos.filter((p) => p.marcado).map((p) => ({ numero: p.numero, idConclusao: p.idConclusao, tipo: p.tipo })) }).catch(() => {}); }
 function desenharLista() {
   $("lista").innerHTML = lidos.length ? `<table class="l"><tr><th><input type="checkbox" id="todos" title="Marcar todos"></th><th>Processo</th><th>Tipo</th><th>Entrada</th><th>Agrupador / partes</th></tr>` + lidos.map((p, i) => `<tr><td><input type="checkbox" data-i="${i}" ${p.marcado ? "checked" : ""}></td><td>${esc(p.numero)}${p.urgente ? '<span class="tag">URGENTE</span>' : p.prioridade ? '<span class="tag">PRIORIDADE</span>' : ""}${p.reuPreso ? '<span class="tag p">RÉU PRESO</span>' : ""}</td><td>${esc(p.tipo)}</td><td>${esc(p.entrada)}</td><td>${esc(p.partes.length ? p.partes.join("; ") : (p.agrupador || ""))}</td></tr>`).join("") + "</table>" : "";
   $("lista").querySelectorAll("input[data-i]").forEach((c) => { c.onchange = () => { lidos[+c.dataset.i].marcado = c.checked; mostrarMarcados(); }; });
@@ -80,4 +80,65 @@ async function abrirRemetidos() { try {
   lidos = r.processos; serventiaDaLista = atualSeeu; $("resumoLista").innerHTML = `<b>Serventia: ${esc(serventiaDaLista || "?")}</b> — ${r.processos.length} processo(s)${r.total && r.processos.length >= r.total ? " (todas as páginas, numa lista só)" : " nesta página"}. ${esc(r.aviso || "")}`; desenharLista(); msg(`Li ${r.processos.length} processo(s) de ${serventiaDaLista || "sua serventia"}.`, "ok");
 } catch (e) { msg("✖ " + e.message, "erro"); } }
 $("btnRemetidos").onclick = abrirRemetidos;
+
+// ---- Enviar os marcados: Analisar → exportação → PDF → OCR → esteira (um por vez) ----
+const hojeISO = () => new Date().toISOString().slice(0, 10);
+const dorme = (ms) => new Promise((ok) => setTimeout(ok, ms));
+let parar = false, enviando = false;
+function atualizarEnvio() {
+  const n = lidos.filter((p) => p.marcado).length; $("cartaoEnvio").hidden = !lidos.length;
+  $("btnEnviar").disabled = enviando || !n; $("btnEnviar").textContent = n ? `Enviar ${n} processo(s) para a esteira` : "Marque processos na lista";
+  $("lblPrompt").hidden = $("selDestino").value === "pdf";
+}
+$("selDestino").onchange = atualizarEnvio;
+const passo = (t, tipo) => { const d = document.createElement("div"); d.textContent = t; if (tipo) d.className = tipo; $("passos").appendChild(d); d.scrollIntoView({ block: "nearest" }); return d; };
+async function aguardarCarga(tabId) {
+  await new Promise((ok) => { const fim = () => { chrome.tabs.onUpdated.removeListener(f); ok(); }, f = (id, i) => { if (id === tabId && i.status === "complete") fim(); }; chrome.tabs.onUpdated.addListener(f); setTimeout(fim, 40000); chrome.tabs.get(tabId).then((t) => { if (t.status === "complete") fim(); }).catch(() => {}); });
+  await dorme(900);
+}
+async function capturarPedido(exportarUrl) {
+  const aba = await chrome.tabs.create({ url: exportarUrl, active: false });
+  try { await aguardarCarga(aba.id); const [r] = await chrome.scripting.executeScript({ target: { tabId: aba.id }, world: "MAIN", func: capturarExportarSeeu }); return r && r.result; }
+  finally { chrome.tabs.remove(aba.id).catch(() => {}); }
+}
+async function promptPadrao() {
+  const { automacao = {} } = await chrome.storage.sync.get("automacao"), k = (x) => String(x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s*-\s*go\s*$/, "");
+  const ch = Object.keys(automacao).find((n) => k(n) === k(atualSeeu)) || Object.keys(automacao).find((n) => k(atualSeeu) && (k(n).includes(k(atualSeeu)) || k(atualSeeu).includes(k(n))));
+  const salvo = (await chrome.storage.local.get("seeu_prompt_" + atualSeeu))["seeu_prompt_" + atualSeeu];
+  return salvo || (ch && automacao[ch]?.prompt) || "";
+}
+async function enviarMarcados() {
+  const marcados = lidos.filter((p) => p.marcado); if (!marcados.length || enviando) return;
+  const destino = $("selDestino").value, prompt = $("txtPrompt").value.trim(), ehIa = destino.startsWith("ia:"), iaId = ehIa ? destino.slice(3) : "";
+  if (destino !== "pdf" && !prompt) { msg("Escreva o nome do prompt do Studio que a esteira deve usar.", "erro"); $("txtPrompt").focus(); return; }
+  if (ehIa) { let c; try { c = await import("./ia-externa-cliente.js"); } catch (e) { msg("✖ Não consegui carregar o módulo das IAs: " + e.message, "erro"); return; } if (!(await c.temPermissao(iaId))) { const ok = await c.pedirPermissao(iaId).catch(() => false); if (!ok) { msg("Sem a autorização do site dessa IA o Chrome não deixa a extensão usar a aba dela.", "erro"); return; } } }
+  enviando = true; parar = false; atualizarEnvio(); $("btnParar").hidden = false; $("passos").innerHTML = ""; msg("");
+  const serv = atualSeeu; if (prompt) await chrome.storage.local.set({ ["seeu_prompt_" + serv]: prompt });
+  let feitos = 0, falhas = 0;
+  for (const [i, p] of marcados.entries()) {
+    if (parar) { passo("Parado a pedido. Os demais não foram enviados.", "erro"); break; }
+    if (!igual(atualSeeu, serv)) { passo("Você trocou de serventia no SEEU: parei para não misturar os processos.", "erro"); break; }
+    const tag = `(${i + 1}/${marcados.length}) ${p.numero}`; passo(`${tag}: procurando a tela de exportação…`);
+    try {
+      if (!p.analisarHref) throw new Error("a linha não tem o botão Analisar; leia a lista de novo");
+      const ach = await lerNaAba(descobrirExportarSeeu, (x) => x && (x.ok || x.erro), [p.analisarHref]);
+      if (!ach || !ach.ok) throw new Error((ach && ach.erro || "não consegui ler o SEEU") + (ach && ach.paginasVistas ? " Telas vistas: " + ach.paginasVistas.join(", ") : "") + (ach && ach.passos ? " [" + ach.passos.join("; ") + "]" : ""));
+      passo(`${tag}: exportação encontrada; pedindo o PDF ao SEEU…`);
+      const cap = await capturarPedido(ach.exportarUrl); if (!cap || cap.erro) throw new Error((cap && cap.erro) || "sem resposta da tela de exportação"); 
+      const lote = `seeu_${Date.now()}_${i}`;
+      const studio = { ativo: destino !== "pdf", modo: destino === "turbo" ? "turbo" : ehIa ? "ia" : "analise", iaId, docs: false, prompt, tipo: "", minuta: "", url: "", urlPre: "", serventia: serv };
+      const r = await chrome.runtime.sendMessage({ acao: "gerar-pdf-interceptar", url: cap.url, corpo: new URLSearchParams(cap.campos).toString(), metodo: cap.metodo, origem: "seeu", nome: p.numero, pasta: "SEEU/" + hojeISO(), lote, studio });
+      if (!r || r.erro) throw new Error((r && r.erro) || "a extensão não aceitou o pedido");
+      passo(`${tag}: PDF pedido (${cap.via}); aguardando OCR e esteira…`);
+      let fim = null; for (let t = 0; t < 800 && !fim; t++) { await dorme(3000); fim = (await chrome.storage.local.get("lote_fim_" + lote))["lote_fim_" + lote]; if (parar && !fim && t > 5) { /* segue esperando este */ } }
+      if (!fim) throw new Error("o OCR não terminou em 40 minutos");
+      if (!fim.ok) throw new Error(fim.erro || "falhou no OCR");
+      feitos++; passo(`${tag}: pronto (${fim.paginas || "?"} páginas${fim.studio?.fila ? "; na esteira" : ""}).`, "ok");
+    } catch (e) { falhas++; passo(`${tag}: ✖ ${e.message}`, "erro"); }
+  }
+  enviando = false; $("btnParar").hidden = true; atualizarEnvio();
+  msg(`Terminei: ${feitos} enviado(s)${falhas ? `, ${falhas} com erro` : ""}.`, falhas ? "erro" : "ok");
+}
+$("btnEnviar").onclick = enviarMarcados; $("btnParar").onclick = () => { parar = true; $("btnParar").textContent = "Vai parar…"; };
+(async () => { try { $("txtPrompt").value = await promptPadrao(); } catch { /* sem prompt padrão */ } })();
 atualizar().catch((e) => msg("✖ " + e.message, "erro"));

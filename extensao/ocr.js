@@ -148,10 +148,10 @@ async function interceptado(idJob) {
   $("status").textContent = "Pedindo o PDF ao Projudi (pode demorar)…";
   try {
     const ctl = new AbortController(), corte = setTimeout(() => ctl.abort(), 25 * 60000);      // o Projudi pode levar vários minutos para gerar um processo grande
-    const r = await fetch(job.url, { signal: ctl.signal, method: "POST", credentials: "include", cache: "no-store", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: job.corpo });
+    const ehGet = job.metodo === "get"; const r = await fetch(job.url, ehGet ? { signal: ctl.signal, method: "GET", credentials: "include", cache: "no-store" } : { signal: ctl.signal, method: "POST", credentials: "include", cache: "no-store", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: job.corpo });
     const bytes = new Uint8Array(await r.arrayBuffer());
     clearTimeout(corte);
-    if (!r.ok || !ehPdf(bytes)) throw new Error(`o Projudi não devolveu um PDF (HTTP ${r.status}). Use o botão Gerar normal da janela: o OCR automático cuida do arquivo baixado.`);
+    if (!r.ok || !ehPdf(bytes)) throw new Error(`${job.origem === "seeu" ? "o SEEU" : "o Projudi"} não devolveu um PDF (HTTP ${r.status}, ${r.headers.get("content-type") || "sem tipo"}; começo: ${new TextDecoder().decode(bytes.slice(0, 120)).replace(/\s+/g, " ")}). Use o botão Gerar normal da janela: o OCR automático cuida do arquivo baixado.`);
     log(`PDF recebido do Projudi: ${(bytes.length / 1048576).toFixed(1)} MB`);
     const num = (job.nome || "").replace(/[^\w.\-]+/g, "_") || "processo", pasta = job.pasta ? job.pasta.replace(/[<>:"|?*\\]+/g, "_").split("/").map((x) => x.replace(/[\s.]+$/g, "").replace(/^\s+/, "")).filter(Boolean).join("/") + "/" : "";      // cada pasta sem espaço/ponto no fim (o Chrome recusa: “Invalid filename”)
     const semOcr = !!(job.studio?.ativo && job.studio.modo === "agaiapdf");      // Agaia (processo sigiloso): o próprio Agaia extrai o texto; o PDF vai como veio do Projudi, sem OCR

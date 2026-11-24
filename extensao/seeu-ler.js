@@ -63,7 +63,7 @@ async function lerConclusoesSeeu() {
       const partes = [...tr.querySelectorAll('a[href*="parteProcesso.do"]')].map(t).filter(Boolean);
       const tipo = (cels.find((c) => /^(DECIS[ÃA]O|DESPACHO|SENTEN[ÇC]A)/i.test(c)) || "").trim();
       const analisar = [...tr.querySelectorAll("a")].find((x) => /^analisar$/i.test(t(x)));
-      processos.push({ idConclusao: cb.value, numero, urgente: /URGENTE/.test(tr.textContent), prioridade: !!tr.querySelector("em.attention"), reuPreso: !!tr.querySelector('[class*="REU_PRESO"]'), entrada: data, tipo, partes: [...new Set(partes)], agrupador: (cels[cels.length - 1] || "").trim(), responsavel: cels.find((c, i) => i > 4 && /\(Magistrado|^[A-ZÁÉÍÓÚ][a-záéíóúãõç]+ [A-Za-zÁÉÍÓÚáéíóúãõç ]+$/.test(c) && !/DECIS|DESPACHO|SENTEN|^Sim$|^N[ãa]o$/i.test(c)) || "", temAnalisar: !!analisar, linha: cels.filter(Boolean).join(" | ").slice(0, 400) });
+      processos.push({ idConclusao: cb.value, numero, urgente: /URGENTE/.test(tr.textContent), prioridade: !!tr.querySelector("em.attention"), reuPreso: !!tr.querySelector('[class*="REU_PRESO"]'), entrada: data, tipo, partes: [...new Set(partes)], agrupador: (cels[cels.length - 1] || "").trim(), responsavel: cels.find((c, i) => i > 4 && /\(Magistrado|^[A-ZÁÉÍÓÚ][a-záéíóúãõç]+ [A-Za-zÁÉÍÓÚáéíóúãõç ]+$/.test(c) && !/DECIS|DESPACHO|SENTEN|^Sim$|^N[ãa]o$/i.test(c)) || "", temAnalisar: !!analisar, analisarHref: analisar ? analisar.href : "", linha: cels.filter(Boolean).join(" | ").slice(0, 400) });
     });
     return processos;
   };
@@ -75,18 +75,54 @@ async function lerConclusoesSeeu() {
   const form = document.querySelector("#navigator")?.closest("form") || document.querySelector("table.resultTable")?.closest("form");
   const campoPag = form && [...form.elements].find((e) => /PageNumber$/.test(e.name || "")), campoTam = form && [...form.elements].find((e) => /PageSize$/.test(e.name || ""));
   if (total > primeira.length && campoPag && campoTam) {
-    const TAM = 100, paginas = Math.ceil(total / TAM), todos = [];
+    // pede 100 por página; se o SEEU ignorar o tamanho e devolver 20, continua página a página até juntar o total (ou parar de vir linha nova)
+    const vistos = new Set(), todos = [], chave = (p) => p.idConclusao + "|" + p.numero;
     try {
-      for (let n = 1; n <= paginas; n++) {
-        const corpo = new URLSearchParams(new FormData(form)); corpo.set(campoPag.name, String(n)); corpo.set(campoTam.name, String(TAM));
+      for (let n = 1; n <= 80 && vistos.size < total; n++) {
+        const corpo = new URLSearchParams(new FormData(form)); corpo.set(campoPag.name, String(n)); corpo.set(campoTam.name, "100");
         const resp = await fetch(form.action || location.href, { method: "POST", credentials: "include", headers: { "Content-Type": "application/x-www-form-urlencoded;charset=ISO-8859-1" }, body: corpo.toString() });
         const html = new TextDecoder("iso-8859-1").decode(await resp.arrayBuffer());
-        const lista = extrair(new DOMParser().parseFromString(html, "text/html")); if (!lista) throw new Error("página " + n + " sem lista");
-        todos.push(...lista);
+        const lista = extrair(new DOMParser().parseFromString(html, "text/html")); if (!lista) throw new Error("página " + n + " sem lista (HTTP " + resp.status + ")");
+        let novas = 0; for (const p of lista) { if (!vistos.has(chave(p))) { vistos.add(chave(p)); todos.push(p); novas++; } }
+        if (!novas) break;
       }
-      const vistos = new Set(); processos = todos.filter((p) => { const k = p.idConclusao + "|" + p.numero; if (vistos.has(k)) return false; vistos.add(k); return true; });
+      if (todos.length >= primeira.length) processos = todos;
+      if (processos.length < total) aviso = `Li ${processos.length} de ${total} processos; o SEEU parou de devolver páginas.`;
     } catch (e) { aviso = "Não consegui ler todas as páginas (" + e.message + "); mostrando só a página da tela."; processos = primeira; }
   }
   return { ok: true, processos, total, contador, aviso, url: location.href.replace(/(_tj=)[0-9a-zA-Z]+/g, "$1…") };
 }
-if (typeof globalThis !== "undefined") { globalThis.lerAreasSeeu = lerAreasSeeu; globalThis.lerAtuacaoSeeu = lerAtuacaoSeeu; globalThis.lerMenuConclusoesSeeu = lerMenuConclusoesSeeu; globalThis.abrirMenuConclusoesSeeu = abrirMenuConclusoesSeeu; globalThis.lerConclusoesSeeu = lerConclusoesSeeu; }
+
+// Do botão "Analisar" da linha até a tela de exportação do processo: lê as páginas em segundo plano (só leitura) e devolve o endereço da exportação.
+async function descobrirExportarSeeu(analisarHref) {
+  const passos = [], ler = async (u) => { const r = await fetch(u, { credentials: "include" }); const h = new TextDecoder("iso-8859-1").decode(await r.arrayBuffer()); passos.push(`${new URL(u).pathname} → HTTP ${r.status}, ${h.length} caracteres`); return h; };
+  const desescapa = (s) => s.replace(/&amp;/g, "&");
+  const achaExportar = (h) => { const m = h.match(/['"]((?:https?:\/\/[^'"\/]+)?\/seeu\/processo\/exportar\.do\?_tj=[0-9A-Za-z]+[^'"]*)['"]/); return m ? new URL(desescapa(m[1]), location.origin).href : ""; };
+  const links = (h) => [...new Set([...h.matchAll(/(?:href|src|action)=["']([^"']+\.do[^"']*)["']/gi)].map((m) => m[1].split("?")[0]))].slice(0, 30);
+  try {
+    let h = await ler(analisarHref), ex = achaExportar(h);
+    if (ex) return { ok: true, exportarUrl: ex, passos };
+    const p = h.match(/["']((?:https?:\/\/[^'"\/]+)?\/seeu\/(?:processo\/)?visualizacaoProcesso\.do\?[^'"]*_tj=[^'"]+)["']/);
+    if (!p) return { ok: false, erro: "Na tela Analisar não achei o link do processo nem o da exportação.", passos, paginasVistas: links(h) };
+    h = await ler(new URL(desescapa(p[1]), location.origin).href); ex = achaExportar(h);
+    if (ex) return { ok: true, exportarUrl: ex, passos };
+    return { ok: false, erro: "Na tela do processo não achei o botão Processo (exportar).", passos, paginasVistas: links(h) };
+  } catch (e) { return { ok: false, erro: "Falha ao ler o SEEU: " + e.message, passos }; }
+}
+// Roda na PÁGINA (world MAIN) da tela de exportação aberta numa aba: aperta o botão "Exportar" do próprio SEEU, mas intercepta o envio (formulário ou janela nova) e devolve o pedido, em vez de deixar abrir a janela em branco.
+function capturarExportarSeeu() {
+  return new Promise((resolve) => {
+    let cap = null;
+    const guarda = (f, via) => { if (cap) return; const a = f.getAttribute("action") || location.href; cap = { via, url: new URL(a, location.href).href, metodo: (f.getAttribute("method") || "get").toLowerCase(), campos: [...new FormData(f).entries()].filter(([, v]) => typeof v === "string") }; };
+    HTMLFormElement.prototype.submit = function () { guarda(this, "submit()"); };
+    HTMLFormElement.prototype.requestSubmit = function () { guarda(this, "requestSubmit()"); };
+    document.addEventListener("submit", (e) => { guarda(e.target, "evento submit"); e.preventDefault(); e.stopImmediatePropagation(); }, true);
+    window.open = function (u) { if (!cap && u) cap = { via: "window.open", url: new URL(u, location.href).href, metodo: "get", campos: [] }; return { document: { write() {}, close() {} }, close() {}, focus() {}, location: {} }; };
+    window.alert = () => {}; window.confirm = () => true;      // só nesta aba de exportação (aberta pela extensão e fechada logo depois)
+    const btn = [...document.querySelectorAll("input[type=button],input[type=submit],button,a")].find((x) => /^\s*exportar\s*$/i.test(x.value || x.textContent || ""));
+    if (!btn) { resolve({ erro: "Não achei o botão Exportar nesta tela.", botoes: [...document.querySelectorAll("input[type=button],input[type=submit],button")].map((x) => (x.value || x.textContent || "").trim()).filter(Boolean).slice(0, 12) }); return; }
+    btn.click();
+    setTimeout(() => resolve(cap || { erro: "O botão Exportar não enviou nenhum pedido." }), 3000);
+  });
+}
+if (typeof globalThis !== "undefined") { globalThis.lerAreasSeeu = lerAreasSeeu; globalThis.lerAtuacaoSeeu = lerAtuacaoSeeu; globalThis.descobrirExportarSeeu = descobrirExportarSeeu; globalThis.capturarExportarSeeu = capturarExportarSeeu; globalThis.lerMenuConclusoesSeeu = lerMenuConclusoesSeeu; globalThis.abrirMenuConclusoesSeeu = abrirMenuConclusoesSeeu; globalThis.lerConclusoesSeeu = lerConclusoesSeeu; }

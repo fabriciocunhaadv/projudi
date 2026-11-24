@@ -33,7 +33,7 @@ with sync_playwright() as p:
     assert pg.evaluate("lerMenuConclusoesSeeu()")["ok"] and pg.evaluate("abrirMenuConclusoesSeeu()")["ok"]
     # as funções são injetadas UMA A UMA (sem enxergar o resto do arquivo): rodar cada uma isolada numa página sem o seeu-ler.js
     pg.goto("http://seeu.exemplo.test/h"); pg.add_script_tag(content=ler)
-    fontes = {n: pg.evaluate(f"{n}.toString()") for n in ("lerAreasSeeu", "lerAtuacaoSeeu", "lerMenuConclusoesSeeu", "abrirMenuConclusoesSeeu", "lerConclusoesSeeu")}
+    fontes = {n: pg.evaluate(f"{n}.toString()") for n in ("lerAreasSeeu", "lerAtuacaoSeeu", "lerMenuConclusoesSeeu", "abrirMenuConclusoesSeeu", "lerConclusoesSeeu", "descobrirExportarSeeu", "capturarExportarSeeu")}
     pg2 = b.new_page(); pg2.route("**/*", rota); pg2.goto("http://seeu.exemplo.test/h2")
     pg2.evaluate("document.addEventListener('click', (e) => e.preventDefault(), true)")
     assert pg2.evaluate("(" + fontes["lerMenuConclusoesSeeu"] + ")()")["ok"] and pg2.evaluate("(" + fontes["abrirMenuConclusoesSeeu"] + ")()")["ok"]
@@ -57,5 +57,41 @@ with sync_playwright() as p:
     pg.route("**/*", rota2); pg.goto("http://seeu.exemplo.test/p"); pg.add_script_tag(content=ler)
     res = pg.evaluate("lerConclusoesSeeu()"); assert res["total"] == 250 and len(res["processos"]) == 250 and not res["aviso"], (res["total"], len(res["processos"]), res["aviso"])
     assert len({p["numero"] for p in res["processos"]}) == 250 and visto == [("1", "100"), ("2", "100"), ("3", "100")], visto
+    # o SEEU ignora o tamanho pedido e devolve sempre 20 por página: o leitor segue página a página até juntar os 44
+    def pag20(n): 
+        ini = (n - 1) * 20 + 1; fim = min(n * 20, 44)
+        return f'<form id="f" method="post" action="/seeu/processo/conclusao.do"><input type="hidden" name="conclusaoPageNumber" value="{n}"><input type="hidden" name="conclusaoPageSize" value="20"><div id="navigator"><div class="navLeft">44 registro(s) encontrado(s), exibindo de {ini} até {fim}</div></div><table class="resultTable"><tr><th></th></tr>{linhas(ini, fim + 1) if ini <= 44 else ""}</table></form>'
+    def rota3(r):
+        if r.request.method == "POST":
+            from urllib.parse import parse_qs
+            q = parse_qs(r.request.post_data); r.fulfill(body="<html><body>" + pag20(int(q["conclusaoPageNumber"][0])) + "</body></html>", content_type="text/html; charset=iso-8859-1")
+        else: r.fulfill(body="<html><body>" + pag20(1) + "</body></html>", content_type="text/html; charset=utf-8")
+    pg.route("**/*", rota3); pg.goto("http://seeu.exemplo.test/q"); pg.add_script_tag(content=ler)
+    res = pg.evaluate("lerConclusoesSeeu()"); assert res["total"] == 44 and len(res["processos"]) == 44 and not res["aviso"], (len(res["processos"]), res["aviso"])
+    # do botão Analisar até a exportação (fetch em cadeia) e a captura do botão Exportar (formulário e window.open)
+    ANALISAR = '<html><body><a href="/seeu/visualizacaoProcesso.do?_tj=abc123&amp;x=1">Processo 7000035</a></body></html>'
+    PROC = "<html><body><input type=\"button\" id=\"exportarProcessoButton\" value=\"Processo\" onclick=\"disableScreen(); document.location.href='/seeu/processo/exportar.do?_tj=tok999';\"></body></html>"
+    def rota4(r):
+        u = r.request.url
+        if "conclusao.do" in u: r.fulfill(body=ANALISAR, content_type="text/html; charset=iso-8859-1")
+        elif "visualizacaoProcesso" in u: r.fulfill(body=PROC, content_type="text/html; charset=iso-8859-1")
+        else: r.fulfill(body="<html><body>x</body></html>", content_type="text/html")
+    pg.route("**/*", rota4); pg.goto("http://seeu.exemplo.test/z")
+    d = pg.evaluate("(" + fontes["descobrirExportarSeeu"] + ")('http://seeu.exemplo.test/seeu/processo/conclusao.do?_tj=zz')")
+    assert d["ok"] and d["exportarUrl"] == "http://seeu.exemplo.test/seeu/processo/exportar.do?_tj=tok999" and len(d["passos"]) == 2, d
+    PROC_SEM = "<html><body><a href='/seeu/x.do'>nada</a></body></html>"
+    pg.route("**/*", lambda r: r.fulfill(body=PROC_SEM, content_type="text/html")); pg.goto("http://seeu.exemplo.test/z2")
+    d = pg.evaluate("(" + fontes["descobrirExportarSeeu"] + ")('http://seeu.exemplo.test/seeu/processo/conclusao.do?_tj=zz')")
+    assert not d["ok"] and "Analisar" in d["erro"] and "/seeu/x.do" in d["paginasVistas"], d
+    EXP1 = '<form id="processoExportarForm" name="processoExportarForm" method="post" action="/seeu/processo/exportar.do?actionType=visualizar&id=77"><input type="hidden" name="selectedItems" value=""><input type="checkbox" name="arquivos" value="1-0.1" checked><input type="checkbox" name="arquivos" value="2-0.2" checked><input type="radio" name="tarja" value="S" checked><input type="button" value="Exportar" onclick="var f=document.processoExportarForm; f.action=\'/seeu/processo/exportar.do?actionType=exportar&_tj=t1\'; f.target=\'_blank\'; f.submit();"></form>'
+    pg.route("**/*", lambda r: r.fulfill(body="<html><body>" + EXP1 + "</body></html>", content_type="text/html; charset=utf-8")); pg.goto("http://seeu.exemplo.test/e1")
+    c = pg.evaluate("(" + fontes["capturarExportarSeeu"] + ")()")
+    assert c["metodo"] == "post" and c["url"].endswith("actionType=exportar&_tj=t1") and [k for k, v in c["campos"]].count("arquivos") == 2 and ["tarja", "S"] in c["campos"], c
+    EXP2 = '<form id="processoExportarForm"><input type="checkbox" name="arquivos" value="1-0.1" checked></form><a href="#" onclick="window.open(\'/seeu/baixar.do?_tj=t2\'); return false;">Exportar</a>'
+    pg.route("**/*", lambda r: r.fulfill(body="<html><body>" + EXP2 + "</body></html>", content_type="text/html; charset=utf-8")); pg.goto("http://seeu.exemplo.test/e2")
+    c = pg.evaluate("(" + fontes["capturarExportarSeeu"] + ")()")
+    assert c["via"] == "window.open" and c["metodo"] == "get" and c["url"].endswith("/seeu/baixar.do?_tj=t2"), c
+    pg.route("**/*", lambda r: r.fulfill(body="<html><body><button>Voltar</button></body></html>", content_type="text/html")); pg.goto("http://seeu.exemplo.test/e3")
+    c = pg.evaluate("(" + fontes["capturarExportarSeeu"] + ")()"); assert "Não achei o botão Exportar" in c["erro"] and c["botoes"] == ["Voltar"], c
     b.close()
 print("OK")

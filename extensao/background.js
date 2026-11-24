@@ -329,7 +329,7 @@ chrome.runtime.onMessage.addListener((m, s, responder) => {
   }
   if (m?.acao === "gerar-pdf-interceptar") { // a janela "Gerar PDF" entregou o pedido: a extensão busca o PDF, faz OCR e salva
     const id = String(Date.now());
-    chrome.storage.local.set({ ["gerar_" + id]: { url: m.url, corpo: m.corpo, nome: m.nome, pasta: m.pasta, lote: m.lote, studio: m.studio } })
+    chrome.storage.local.set({ ["gerar_" + id]: { url: m.url, corpo: m.corpo, metodo: m.metodo, origem: m.origem, nome: m.nome, pasta: m.pasta, lote: m.lote, studio: m.studio } })
       .then(() => chrome.tabs.create({ url: chrome.runtime.getURL("ocr.html?gerar=" + id), active: !m.lote }))
       .then((aba) => { chrome.tabs.update(aba.id, { autoDiscardable: false }).catch(() => {}); return aba; })      // o Chrome não pode descartar a aba de OCR (Economia de memória) no meio do trabalho
       .then(() => responder({ ok: true }), (e) => responder({ erro: String(e.message || e) }));
