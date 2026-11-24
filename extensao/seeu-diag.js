@@ -8,7 +8,7 @@ function coletarFrameSeeu() {
     c.querySelectorAll("input[type=password]").forEach((e) => { e.removeAttribute("value"); });
     c.querySelectorAll("input[type=hidden]").forEach((e) => { const n = (e.getAttribute("name") || "").toLowerCase(); if (/token|csrf|_tj|senha|password|session/.test(n)) e.setAttribute("value", "…"); });
     let html = c.outerHTML.replace(/\s+/g, " ").replace(/(_tj=)[0-9a-zA-Z]+/g, "$1…").replace(/(jsessionid=)[^&;?"' ]+/gi, "$1…");
-    const total = html.length; if (total > 150000) html = html.slice(0, 150000) + `\n[... cortado: ${total} caracteres no total ...]`;
+    const total = html.length; if (total > 150000) html = html.slice(0, 100000) + `\n[... cortado no meio: ${total} caracteres no total; abaixo vem o FINAL da tela ...]\n` + html.slice(-50000);
     return { url: limpaUrl(location.href), titulo: document.title || "", topo: window === window.top, nome: window.name || "", html };
   } catch (e) { return { url: limpaUrl(location.href), erro: String(e && e.message || e) }; }
 }

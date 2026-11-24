@@ -11,12 +11,13 @@
   .cartao h2 { font-size: 15px; margin: 0 0 6px; }
   button { font: 13px system-ui; padding: 7px 12px; border-radius: 7px; border: 1px solid #6d28d9; background: #6d28d9; color: #fff; cursor: pointer; font-weight: 600; margin: 4px 6px 4px 0; }
   button.s { background: #fff; color: #6d28d9; } button:disabled { opacity: .5; cursor: default; }
+  table.l { border-collapse: collapse; width: 100%; font-size: 12px; } table.l td, table.l th { border-bottom: 1px solid #d4c8f3; padding: 4px 6px; text-align: left; } .tag { font-size: 10px; font-weight: 700; border-radius: 4px; padding: 1px 5px; background: #b00020; color: #fff; margin-left: 4px; } .tag.p { background: #92400e; } #areas div { padding: 3px 0; }
   #msg { margin-top: 8px; font-weight: 600; } .erro { color: #b00020; } .ok { color: #166534; }
   @media (prefers-color-scheme: dark) { body { background: #1c1d21; color: #e6e6e6; } .cartao { background: #261f3a; border-color: #4c3b86; } .dica { color: #aaa; } button.s { background: transparent; color: #c4b5fd; } }
 </style>
 <link rel="stylesheet" href="tema.css">
 <h1>SEEU <span class="selo">novo</span></h1>
-<p class="dica">Painel independente do SEEU (seeu.pje.jus.br). A extensão usa a aba em que você já está logado: ela nunca digita sua senha e nunca confirma nada por você. Em construção: por enquanto este painel verifica o acesso e ajuda a me mostrar as telas do SEEU.</p>
+<p class="dica">Painel independente do SEEU (seeu.pje.jus.br). A extensão usa a aba em que você já está logado: ela nunca digita sua senha e nunca confirma nada por você. Em construção: já lê as serventias e a lista de Conclusões e deixa você marcar os processos; o envio à IA vem na próxima etapa.</p>
 
 <div class="cartao" data-testid="seeu-passo-permissao">
   <h2>1. Autorizar o SEEU</h2>
@@ -38,7 +39,18 @@
   <button id="btnCopiar" data-testid="seeu-copiar">Copiar diagnóstico</button>
   <button id="btnBaixar" class="s" data-testid="seeu-baixar">Baixar como arquivo .txt</button>
 </div>
+<div class="cartao" data-testid="seeu-passo-lista">
+  <h2>4. Serventias e processos</h2>
+  <p class="dica">Só leio o que está na tela da sua aba do SEEU; não clico, não troco de área e não confirmo nada. Para ver as serventias, deixe aberta a tela “Área de atuação”. Para ver os processos, abra Conclusões (Mesa do Assessor → Para Decisão/Despacho…) e filtre como quiser.</p>
+  <button id="btnAreas" class="s" data-testid="seeu-ler-areas">Ler serventias</button>
+  <button id="btnLista" class="s" data-testid="seeu-ler-lista">Ler lista de Conclusões</button>
+  <div id="areas"></div>
+  <div id="resumoLista" class="dica"></div>
+  <div id="lista"></div>
+  <p class="dica" id="marcados"></p>
+</div>
 <div id="msg"></div>
 <script src="seeu-diag.js"></script>
+<script src="seeu-ler.js"></script>
 <script src="seeu.js"></script>
 </html>

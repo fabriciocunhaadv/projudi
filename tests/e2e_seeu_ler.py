@@ -1,0 +1,24 @@
+"""SEEU: leitores de serventias e Conclusões (HTML sintético, sem dados reais). Rodar: /usr/bin/python3.13 tests/e2e_seeu_ler.py"""
+import os
+from playwright.sync_api import sync_playwright
+RAIZ = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "extensao"))
+ler = open(os.path.join(RAIZ, "seeu-ler.js"), encoding="utf-8").read()
+AREAS = """<ul id="listaAreavara"><li><a title="TJXX - Comarca A - Vara 1" href="/seeu/usuario/areaAtuacao.do?_tj=aa11">TJXX - Comarca A - Vara 1</a></li>
+<li><a title="TJXX - Comarca B - Vara 2" href="/seeu/usuario/areaAtuacao.do?_tj=bb22">TJXX - Comarca B</a></li><li><a href="/outra.do">x</a></li></ul>"""
+LISTA = """<div id="navigator"><span class="navLeft">32 registro(s) encontrado(s), exibindo de 1 até 20</span></div><table class="resultTable"><tr><th>Sel</th><th>Processo</th></tr>
+<tr><td><input type="checkbox" name="idConclusoes" value="111"></td><td><a class="link" href="/seeu/visualizacaoProcesso.do?_tj=zz"><em class="attention">0000001-02.2024.8.09.0001</em></a><span class="class_flag_REU_PRESO"></span></td><td>01/02/2025 <em><font>URGENTE</font></em></td><td>DECISÃO (p/ Juiz)</td><td><table class="form"><tr><td><a href="parteProcesso.do?x=1">FULANO TESTE</a></td></tr></table></td></tr>
+<tr><td><input type="checkbox" name="idConclusoes" value="222"></td><td><a class="link" href="/seeu/visualizacaoProcesso.do?_tj=yy"><em class="normal">0000002-03.2024.8.09.0001</em></a></td><td>03/02/2025</td><td>DESPACHO (p/ Juiz)</td><td></td></tr></table>"""
+with sync_playwright() as p:
+    b = p.chromium.launch(executable_path='/opt/pw-browsers/chromium', args=['--no-sandbox']); pg = b.new_page()
+    for html, fn in ((AREAS, "a"), (LISTA, "c")):
+        pg.route("**/*", lambda r, q=None, h=html: r.fulfill(body="<html><body>" + h + "</body></html>", content_type="text/html; charset=utf-8"))
+        pg.goto("http://seeu.exemplo.test/x" + fn); pg.add_script_tag(content=ler)
+        if fn == "a":
+            r = pg.evaluate("lerAreasSeeu()"); assert [a["nome"] for a in r["areas"]] == ["TJXX - Comarca A - Vara 1", "TJXX - Comarca B - Vara 2"], r
+        else:
+            r = pg.evaluate("lerConclusoesSeeu()"); ps = r["processos"]; print(ps)
+            assert r["ok"] and len(ps) == 2 and "32 registro" in r["contador"]
+            assert ps[0]["numero"] == "0000001-02.2024.8.09.0001" and ps[0]["urgente"] and ps[0]["reuPreso"] and ps[0]["idConclusao"] == "111" and ps[0]["entrada"] == "01/02/2025" and ps[0]["partes"] == ["FULANO TESTE"] and ps[0]["tipo"].startswith("DECISÃO")
+            assert not ps[1]["urgente"] and not ps[1]["reuPreso"] and ps[1]["tipo"].startswith("DESPACHO")
+    b.close()
+print("OK")
