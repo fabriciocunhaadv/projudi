@@ -377,3 +377,6 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 - Um só botão de lista: "Processos Remetidos p/ Conclusão" (`/seeu/processo/conclusao.do`, menu Conclusões), que já traz todos. O leitor da lista aceita checkbox sem `name=idConclusoes` e sem links de partes (colunas: Analisar, Dt. Envio, Processo/Classe, Seq., Tipo de conclusão, Privativa, Responsável, Pré-análise, Agrupador).
 - PENDENTE: a lista tem paginação (ex.: 43 registros, 20 por página, "1, 2, 3"); hoje só se lê a página exibida. Também falta: trocar serventia pelo painel, abrir cada processo, exportar (POST do `processoExportarForm`), OCR, envio.
 - Studio: artigos em ícone "§" publicado (af9fc69).
+
+## SEEU — 5.1.6 (todas as páginas numa lista só)
+- A paginação do SEEU é um formulário (`processoConclusaoForm`: campos `conclusaoPageNumber`, `conclusaoPageSize`; select com 20/50/100 por página). `lerConclusoesSeeu` (agora assíncrona) lê o total no `#navigator .navLeft`, e se houver mais registros reenvia o mesmo formulário (POST urlencoded, 100 por página, páginas 1..N) e junta tudo sem repetir. Falha → volta para só a página da tela, com aviso. Teste sintético com 250 registros em `tests/e2e_seeu_ler.py`. NÃO testado no SEEU real (confirmar que o POST devolve a lista; se o SEEU exigir outro campo, ver o formulário no diagnóstico).

@@ -40,22 +40,45 @@ const ACHAR_REMETIDOS = () => { const t = (e) => (e && e.textContent || "").repl
 function lerMenuConclusoesSeeu() { return { ok: !!ACHAR_REMETIDOS() }; }
 // Abre a lista (é o mesmo clique que você daria; não confirma nada).
 function abrirMenuConclusoesSeeu() { const a = ACHAR_REMETIDOS(); if (!a) return { ok: false }; a.click(); return { ok: true }; }
-function lerConclusoesSeeu() {
+// Lista de processos de TODAS as páginas, numa só: lê a página da tela e, se o SEEU diz que há mais registros, pede as outras páginas
+// do mesmo jeito que os botões de página dele (reenvia o formulário da lista com outro número de página e 100 por página). Só leitura.
+async function lerConclusoesSeeu() {
   const t = (e) => (e && e.textContent || "").replace(/\s+/g, " ").trim();
-  const tabela = document.querySelector("table.resultTable");
-  if (!tabela) return { ok: false, erro: "Não achei a lista de Conclusões neste quadro." };
-  const processos = [];
-  tabela.querySelectorAll("tr").forEach((tr) => {
-    const cb = tr.querySelector("input[name=idConclusoes]") || tr.querySelector("input[type=checkbox][value]:not([name=todos])"), a = tr.querySelector('a[href*="visualizacaoProcesso.do"]') || [...tr.querySelectorAll("a")].find((x) => /\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/.test(t(x)));
-    if (!cb || !a) return;
-    const numero = (t(a.querySelector("em")) || t(a)).match(/\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/)?.[0] || t(a);
-    const cels = [...tr.children].map(t);
-    const data = (cels.join(" | ").match(/(?<!\d)\d{2}\/\d{2}\/\d{4}(?:\s+\d{2}:\d{2}(?::\d{2})?)?/) || [""])[0];
-    const partes = [...tr.querySelectorAll('a[href*="parteProcesso.do"]')].map(t).filter(Boolean);
-    const tipo = (cels.find((c) => /^(DECIS[ÃA]O|DESPACHO|SENTEN[ÇC]A)/i.test(c)) || "").trim();
-    processos.push({ idConclusao: cb.value, numero, urgente: /URGENTE/.test(tr.textContent), reuPreso: !!tr.querySelector('[class*="REU_PRESO"]'), entrada: data, tipo, partes: [...new Set(partes)], linha: cels.filter(Boolean).join(" | ").slice(0, 400) });
-  });
-  const contador = t(document.querySelector("#navigator .navLeft")) || (document.body.textContent.match(/\d+\s+registro\(s\)\s+encontrado\(s\)[^.]{0,60}/) || [""])[0];
-  return { ok: true, processos, contador: contador.replace(/\s+/g, " ").trim(), url: location.href.replace(/(_tj=)[0-9a-zA-Z]+/g, "$1…") };
+  const extrair = (doc) => {
+    const tabela = doc.querySelector("table.resultTable"); if (!tabela) return null;
+    const processos = [];
+    tabela.querySelectorAll("tr").forEach((tr) => {
+      const cb = tr.querySelector("input[name=idConclusoes]") || tr.querySelector("input[type=checkbox][value]:not([name=todos])"), a = tr.querySelector('a[href*="visualizacaoProcesso.do"]') || [...tr.querySelectorAll("a")].find((x) => /\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/.test(t(x)));
+      if (!cb || !a) return;
+      const numero = (t(a.querySelector("em")) || t(a)).match(/\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/)?.[0] || t(a);
+      const cels = [...tr.children].map(t);
+      const data = (cels.join(" | ").match(/(?<!\d)\d{2}\/\d{2}\/\d{4}(?:\s+\d{2}:\d{2}(?::\d{2})?)?/) || [""])[0];
+      const partes = [...tr.querySelectorAll('a[href*="parteProcesso.do"]')].map(t).filter(Boolean);
+      const tipo = (cels.find((c) => /^(DECIS[ÃA]O|DESPACHO|SENTEN[ÇC]A)/i.test(c)) || "").trim();
+      processos.push({ idConclusao: cb.value, numero, urgente: /URGENTE/.test(tr.textContent), reuPreso: !!tr.querySelector('[class*="REU_PRESO"]'), entrada: data, tipo, partes: [...new Set(partes)], linha: cels.filter(Boolean).join(" | ").slice(0, 400) });
+    });
+    return processos;
+  };
+  const primeira = extrair(document);
+  if (!primeira) return { ok: false, erro: "Não achei a lista de Conclusões neste quadro." };
+  const contador = (t(document.querySelector("#navigator .navLeft")) || (document.body.textContent.match(/\d+\s+registro\(s\)\s+encontrado\(s\)[^.]{0,60}/) || [""])[0]).replace(/\s+/g, " ").trim();
+  const total = +((contador.match(/(\d+)\s+registro/) || [])[1] || 0);
+  let processos = primeira, aviso = "";
+  const form = document.querySelector("#navigator")?.closest("form") || document.querySelector("table.resultTable")?.closest("form");
+  const campoPag = form && [...form.elements].find((e) => /PageNumber$/.test(e.name || "")), campoTam = form && [...form.elements].find((e) => /PageSize$/.test(e.name || ""));
+  if (total > primeira.length && campoPag && campoTam) {
+    const TAM = 100, paginas = Math.ceil(total / TAM), todos = [];
+    try {
+      for (let n = 1; n <= paginas; n++) {
+        const corpo = new URLSearchParams(new FormData(form)); corpo.set(campoPag.name, String(n)); corpo.set(campoTam.name, String(TAM));
+        const resp = await fetch(form.action || location.href, { method: "POST", credentials: "include", headers: { "Content-Type": "application/x-www-form-urlencoded;charset=ISO-8859-1" }, body: corpo.toString() });
+        const html = new TextDecoder("iso-8859-1").decode(await resp.arrayBuffer());
+        const lista = extrair(new DOMParser().parseFromString(html, "text/html")); if (!lista) throw new Error("página " + n + " sem lista");
+        todos.push(...lista);
+      }
+      const vistos = new Set(); processos = todos.filter((p) => { const k = p.idConclusao + "|" + p.numero; if (vistos.has(k)) return false; vistos.add(k); return true; });
+    } catch (e) { aviso = "Não consegui ler todas as páginas (" + e.message + "); mostrando só a página da tela."; processos = primeira; }
+  }
+  return { ok: true, processos, total, contador, aviso, url: location.href.replace(/(_tj=)[0-9a-zA-Z]+/g, "$1…") };
 }
 if (typeof globalThis !== "undefined") { globalThis.lerAreasSeeu = lerAreasSeeu; globalThis.lerAtuacaoSeeu = lerAtuacaoSeeu; globalThis.lerMenuConclusoesSeeu = lerMenuConclusoesSeeu; globalThis.abrirMenuConclusoesSeeu = abrirMenuConclusoesSeeu; globalThis.lerConclusoesSeeu = lerConclusoesSeeu; }

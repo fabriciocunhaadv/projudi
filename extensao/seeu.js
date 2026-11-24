@@ -50,7 +50,7 @@ function desenharLista() {
 }
 $("btnLista").onclick = async () => { try {
   const r = await lerNaAba(lerConclusoesSeeu, (x) => x.ok); if (!r) throw new Error("Não achei a lista de Conclusões. Abra Conclusões no SEEU (e clique em Filtrar) e tente de novo.");
-  lidos = r.processos; serventiaDaLista = atualSeeu; $("resumoLista").innerHTML = `<b>Serventia: ${esc(serventiaDaLista || "?")}</b> — ${r.processos.length} processo(s) nesta página. ${esc(r.contador)}`; desenharLista(); msg(`Li ${r.processos.length} processo(s).`, "ok");
+  lidos = r.processos; serventiaDaLista = atualSeeu; $("resumoLista").innerHTML = `<b>Serventia: ${esc(serventiaDaLista || "?")}</b> — ${r.processos.length} processo(s)${r.total && r.processos.length >= r.total ? " (todas as páginas, numa lista só)" : " nesta página"}. ${esc(r.aviso || "")}`; desenharLista(); msg(`Li ${r.processos.length} processo(s).`, "ok");
 } catch (e) { msg("✖ " + e.message, "erro"); } };
 let atualSeeu = "";
 const igual = (x, y) => String(x || "").replace(/\s+/g, " ").trim().toLowerCase() === String(y || "").replace(/\s+/g, " ").trim().toLowerCase();
@@ -81,7 +81,7 @@ async function abrirRemetidos() { try {
   const ok = await lerNaAba(abrirMenuConclusoesSeeu, (x) => x.ok); if (!ok) throw new Error("Não achei esse item no menu do SEEU. Abra o SEEU (tela com o menu no alto) e tente de novo.");
   let r = null; for (let k = 0; k < 20 && !r; k++) { await new Promise((s) => setTimeout(s, 1000)); r = await lerNaAba(lerConclusoesSeeu, (x) => x.ok && x.processos.length).catch(() => null); }
   if (!r) throw new Error("A tela abriu, mas não achei processos. Se o SEEU mostra um filtro, clique em Filtrar nele e depois em “Ler lista de Conclusões”.");
-  lidos = r.processos; serventiaDaLista = atualSeeu; $("resumoLista").innerHTML = `<b>Serventia: ${esc(serventiaDaLista || "?")}</b> — ${r.processos.length} processo(s) nesta página. ${esc(r.contador)}`; desenharLista(); msg(`Li ${r.processos.length} processo(s) de ${serventiaDaLista || "sua serventia"}.`, "ok");
+  lidos = r.processos; serventiaDaLista = atualSeeu; $("resumoLista").innerHTML = `<b>Serventia: ${esc(serventiaDaLista || "?")}</b> — ${r.processos.length} processo(s)${r.total && r.processos.length >= r.total ? " (todas as páginas, numa lista só)" : " nesta página"}. ${esc(r.aviso || "")}`; desenharLista(); msg(`Li ${r.processos.length} processo(s) de ${serventiaDaLista || "sua serventia"}.`, "ok");
 } catch (e) { msg("✖ " + e.message, "erro"); } }
 $("btnRemetidos").onclick = abrirRemetidos;
 atualizar().catch((e) => msg("✖ " + e.message, "erro"));
