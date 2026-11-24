@@ -11,6 +11,11 @@
 <h1>Refazer a minuta com alguns eventos</h1>
 <p class="dica">A extensão abre o processo no Projudi e a janela “Gerar PDF”. Lá você marca as movimentações que quer e aperta o botão verde para devolver ao Studio. Pode deixar esta aba aberta.</p>
 <div id="status">Preparando…</div>
+<div id="seletor" hidden style="border:1px solid #888;border-radius:8px;padding:10px;max-width:560px">
+  <label for="selServentia" style="display:block;font-weight:600;margin-bottom:6px">Escolha a serventia onde o processo está no Projudi:</label>
+  <select id="selServentia" style="width:100%;padding:6px;margin-bottom:8px"><option value="">Carregando as serventias…</option></select>
+  <button id="btnServentia" disabled style="padding:6px 12px;font-weight:600;cursor:pointer">Continuar nesta serventia</button>
+</div>
 <script src="tabs-retry.js"></script>
 <script src="gerar-util.js"></script>
 <script type="module" src="refazer.js"></script>

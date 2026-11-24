@@ -48,6 +48,20 @@ async function linkNaLista(tabId, dig) {
     await chrome.storage.local.set({ ["refazer_fim_" + id]: { ...r, ts: Date.now() } });
     if (job?.abaStudio != null) chrome.tabs.sendMessage(job.abaStudio, { acao: "refazer-fim", reqId: job.reqId, ...r }).catch(() => {});
     if (r.ok) setTimeout(() => window.close(), 4000);
+    else if (r.precisaServentia) await mostrarSeletor();
+  };
+  // Quando não se sabe a serventia (ou o processo não está nela): mostra a lista das serventias do usuário aqui mesmo; ao escolher, guarda e recomeça.
+  const mostrarSeletor = async () => {
+    const caixa = $("seletor"), sel = $("selServentia"), btn = $("btnServentia");
+    caixa.hidden = false;
+    let lista = [], sugerida = "";
+    try { const l = await chrome.runtime.sendMessage({ acao: "lancar-serventias", processo: job?.processo || "" }); lista = Array.isArray(l?.serventias) ? l.serventias : []; sugerida = l?.sugerida || ""; } catch (e) { /* sem lista */ }
+    sel.textContent = "";
+    sel.add(new Option(lista.length ? "Escolha a serventia…" : "Nenhuma serventia conhecida: abra o painel da extensão e faça a verificação", ""));
+    for (const x of lista) sel.add(new Option(x.serventia + (x.perfil ? " — " + x.perfil : ""), x.url));
+    if (sugerida && lista.some((x) => x.url === sugerida)) sel.value = sugerida;
+    btn.disabled = !sel.value; sel.onchange = () => { btn.disabled = !sel.value; };
+    btn.onclick = async () => { if (!sel.value) return; btn.disabled = true; await chrome.storage.local.set({ ["refazer_" + id]: { ...job, serventiaUrl: sel.value } }); location.reload(); };
   };
   if (!job) { $("status").textContent = "Peça “Refazer só com alguns eventos” na minuta do Studio."; return; }
   const dig = chaveProc(job.processo);

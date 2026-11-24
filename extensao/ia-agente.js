@@ -8,6 +8,8 @@
   const PERFIS = [
     { id: "chatgpt", nome: "ChatGPT", hosts: /(^|\.)chatgpt\.com$|(^|\.)chat\.openai\.com$/, novaConversa: "https://chatgpt.com/",
       compositor: ["#prompt-textarea", "div[contenteditable='true'][id*='prompt']", "div.ProseMirror[contenteditable='true']", "div[contenteditable='true'][role='textbox']", "textarea"], resposta: ["[data-message-author-role='assistant']", "article[data-testid*='conversation-turn'] .markdown"],
+      concluido: ["button[data-testid='copy-turn-action-button']", "button[data-testid='good-response-turn-action-button']", "button[data-testid='bad-response-turn-action-button']"],      // a barra de ações (copiar, 👍, 👎) só aparece quando a resposta terminou
+
       enviar: ["button[data-testid='send-button']", "#composer-submit-button", "button[data-testid='composer-submit-button']", "button[aria-label*='Enviar prompt' i]", "button[aria-label*='Send prompt' i]", "button[aria-label*='Enviar' i]", "button[aria-label*='Send' i]", "form button[type='submit']"], parar: ["button[data-testid='stop-button']", "button[aria-label*='Parar' i]", "button[aria-label*='Stop' i]"],
       anexar: ["button[data-testid='composer-plus-btn']", "button[aria-label*='Adicionar arquivos' i]", "button[aria-label*='Adicionar fotos' i]", "button[aria-label*='Add files' i]", "button[aria-label*='Anexar' i]", "button[aria-label*='Attach' i]", "[data-testid='composer-leading-actions'] button", "form button[aria-haspopup='menu']"] },
     { id: "gemini", nome: "Gemini", hosts: /(^|\.)gemini\.google\.com$/, novaConversa: "https://gemini.google.com/app",
@@ -165,7 +167,8 @@
       const gerando = !!botaoParar();
       if (gerando || novo) comecou = true;
       if (ult !== ultimo) { ultimo = ult; desde = Date.now(); }
-      if (comecou && novo && !gerando && ult && Date.now() - desde >= estavelMs) {
+      const barraDeAcoes = !gerando && !!perfil().concluido && todosVisiveis(perfil().concluido).length > 0;      // a própria tela avisa que terminou: não precisa esperar tanto
+      if (comecou && novo && !gerando && ult && Date.now() - desde >= (barraDeAcoes ? Math.min(estavelMs, 1500) : estavelMs)) {
         const el = rs[rs.length - 1];
         const cl = conteudoLimpo(el); let texto = cl.texto, html = cl.html, origem = "chat";
         // IAs que entregam a peça num painel lateral (ex.: Jusbrasil “Criou Peça”): o chat só traz um aviso curto; a minuta está no painel
