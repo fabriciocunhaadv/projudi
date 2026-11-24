@@ -4,6 +4,7 @@ const abrir = (arq) => { chrome.tabs.create({ url: chrome.runtime.getURL(arq) })
 $("inicie").onclick = () => abrir("iniciar.html");
 $("painel").onclick = () => abrir("painel.html");
 $("esteira").onclick = () => abrir("esteira.html");
+$("seeu").onclick = () => abrir("seeu.html");
 $("ferramentas").onclick = () => abrir("ferramentas.html");
 $("ocr").onclick = () => abrir("ocr.html");
 $("texto").onclick = () => abrir("texto.html");

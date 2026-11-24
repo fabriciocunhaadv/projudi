@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Conclusões Projudi",
-  "version": "5.0.16",
+  "version": "5.1.0",
   "description": "Confere automaticamente as conclusões não analisadas e pré-analisadas de cada serventia no Projudi/TJGO.",
   "permissions": [
     "activeTab",
@@ -36,7 +36,8 @@
     "https://chat.openai.com/*",
     "https://gemini.google.com/*",
     "https://claude.ai/*",
-    "https://ia.jusbrasil.com.br/*"
+    "https://ia.jusbrasil.com.br/*",
+    "https://seeu.pje.jus.br/*"
   ],
   "host_permissions": [
     "https://*.tjgo.jus.br/*",
@@ -55,8 +56,14 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["painel.html", "pauta.html", "iniciar.html"],
-      "matches": ["https://judicial-mysql.assessor.net.br/*"]
+      "resources": [
+        "painel.html",
+        "pauta.html",
+        "iniciar.html"
+      ],
+      "matches": [
+        "https://judicial-mysql.assessor.net.br/*"
+      ]
     }
   ],
   "commands": {

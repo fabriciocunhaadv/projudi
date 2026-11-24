@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SEEU — Conclusões Projudi</title>
+<style>
+  body { font: 14px system-ui, sans-serif; margin: 0; padding: 16px 24px; max-width: 820px; color: #222; }
+  h1 { font-size: 20px; margin: 0 0 4px; } .dica { color: #666; font-size: 12px; }
+  .selo { display: inline-block; background: #6d28d9; color: #fff; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 10px; margin-left: 8px; vertical-align: middle; }
+  .cartao { border: 1px solid #d4c8f3; background: #faf7ff; border-radius: 10px; padding: 12px 14px; margin: 14px 0; }
+  .cartao h2 { font-size: 15px; margin: 0 0 6px; }
+  button { font: 13px system-ui; padding: 7px 12px; border-radius: 7px; border: 1px solid #6d28d9; background: #6d28d9; color: #fff; cursor: pointer; font-weight: 600; margin: 4px 6px 4px 0; }
+  button.s { background: #fff; color: #6d28d9; } button:disabled { opacity: .5; cursor: default; }
+  #msg { margin-top: 8px; font-weight: 600; } .erro { color: #b00020; } .ok { color: #166534; }
+  @media (prefers-color-scheme: dark) { body { background: #1c1d21; color: #e6e6e6; } .cartao { background: #261f3a; border-color: #4c3b86; } .dica { color: #aaa; } button.s { background: transparent; color: #c4b5fd; } }
+</style>
+<link rel="stylesheet" href="tema.css">
+<h1>SEEU <span class="selo">novo</span></h1>
+<p class="dica">Painel independente do SEEU (seeu.pje.jus.br). A extensão usa a aba em que você já está logado: ela nunca digita sua senha e nunca confirma nada por você. Em construção: por enquanto este painel verifica o acesso e ajuda a me mostrar as telas do SEEU.</p>
+
+<div class="cartao" data-testid="seeu-passo-permissao">
+  <h2>1. Autorizar o SEEU</h2>
+  <p class="dica">O Chrome pede que você autorize a extensão a ler as telas do SEEU. É uma vez só e você pode retirar depois.</p>
+  <div id="permEstado">Verificando…</div>
+  <button id="btnPerm" data-testid="seeu-autorizar">Autorizar o SEEU</button>
+</div>
+
+<div class="cartao" data-testid="seeu-passo-verificar">
+  <h2>2. Verificar a aba do SEEU</h2>
+  <p class="dica">Abra o SEEU (seeu.pje.jus.br), entre com seu certificado/senha como de costume e escolha a área de atuação.</p>
+  <div id="abaEstado">—</div>
+  <button id="btnVerificar" class="s" data-testid="seeu-verificar">Verificar agora</button>
+</div>
+
+<div class="cartao" data-testid="seeu-passo-diagnostico">
+  <h2>3. Copiar o diagnóstico da tela</h2>
+  <p class="dica">Deixe aberta no SEEU a tela que você quer me mostrar (ex.: lista de Conclusões, tela do processo, tela de exportação). Clique em copiar e cole na conversa. O diagnóstico <b>não leva senha nem o token da URL</b>, mas traz o que está na tela, inclusive nomes das partes: confira antes de colar. Faça uma tela por vez.</p>
+  <button id="btnCopiar" data-testid="seeu-copiar">Copiar diagnóstico</button>
+  <button id="btnBaixar" class="s" data-testid="seeu-baixar">Baixar como arquivo .txt</button>
+</div>
+<div id="msg"></div>
+<script src="seeu-diag.js"></script>
+<script src="seeu.js"></script>
+</html>
