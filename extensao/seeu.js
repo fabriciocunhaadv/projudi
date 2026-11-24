@@ -9,12 +9,12 @@ let lendoAreas = false;
 // A permissão do SEEU é opcional (a loja não desativa a extensão ao atualizar); o Chrome só deixa pedir num clique. Pedimos no primeiro clique em qualquer ponto da página.
 document.addEventListener("click", async () => { if (!(await temPermissao())) { try { await chrome.permissions.request({ origins: ORIGENS }); } catch (e) { /* recusou */ } atualizar().catch(() => {}); } }, true);
 async function atualizar() {
-  if (!(await temPermissao())) { $("estadoSeeu").textContent = "Clique em qualquer lugar desta página para liberar o SEEU (o Chrome pergunta uma única vez)."; $("estadoSeeu").className = "dica"; $("btnAbrirSeeu").hidden = true; $("btnCopiar").disabled = $("btnBaixar").disabled = $("btnAreas").disabled = $("btnLista").disabled = true; return; }
+  if (!(await temPermissao())) { $("estadoSeeu").textContent = "Clique em qualquer lugar desta página para liberar o SEEU (o Chrome pergunta uma única vez)."; $("estadoSeeu").className = "dica"; $("btnAbrirSeeu").hidden = true; $("btnCopiar").disabled = $("btnBaixar").disabled = $("btnAreas").disabled = true; return; }
   const abas = await abasSeeu();
   $("estadoSeeu").textContent = abas.length ? `✔ SEEU encontrado (${abas.length} aba(s)).` : "Não achei o SEEU aberto. Abra-o e entre como de costume (a extensão nunca digita sua senha).";
   $("estadoSeeu").className = abas.length ? "dica ok" : "dica";
   $("btnAbrirSeeu").hidden = !!abas.length;
-  $("btnCopiar").disabled = $("btnBaixar").disabled = $("btnAreas").disabled = $("btnLista").disabled = $("btnRemetidos").disabled = !abas.length;
+  $("btnCopiar").disabled = $("btnBaixar").disabled = $("btnAreas").disabled = $("btnRemetidos").disabled = !abas.length;
   if (abas.length && !lendoAreas && !$("areas").innerHTML) { lendoAreas = true; try { await lerAreas(true); } finally { lendoAreas = false; } }
 }
 $("btnAbrirSeeu").onclick = () => chrome.tabs.create({ url: "https://seeu.pje.jus.br/seeu/" });
@@ -48,10 +48,6 @@ function desenharLista() {
   const t = $("todos"); if (t) t.onchange = () => { lidos.forEach((p) => { p.marcado = t.checked; }); desenharLista(); mostrarMarcados(); };
   mostrarMarcados();
 }
-$("btnLista").onclick = async () => { try {
-  const r = await lerNaAba(lerConclusoesSeeu, (x) => x.ok); if (!r) throw new Error("Não achei a lista de Conclusões. Abra Conclusões no SEEU (e clique em Filtrar) e tente de novo.");
-  lidos = r.processos; serventiaDaLista = atualSeeu; $("resumoLista").innerHTML = `<b>Serventia: ${esc(serventiaDaLista || "?")}</b> — ${r.processos.length} processo(s)${r.total && r.processos.length >= r.total ? " (todas as páginas, numa lista só)" : " nesta página"}. ${esc(r.aviso || "")}`; desenharLista(); msg(`Li ${r.processos.length} processo(s).`, "ok");
-} catch (e) { msg("✖ " + e.message, "erro"); } };
 let atualSeeu = "";
 const igual = (x, y) => String(x || "").replace(/\s+/g, " ").trim().toLowerCase() === String(y || "").replace(/\s+/g, " ").trim().toLowerCase();
 async function lerTodosQuadros(func, args) { const abas = await abasSeeu(); if (!abas.length) return []; const aba = abas.find((t) => t.active) || abas[0]; const rs = await chrome.scripting.executeScript({ target: { tabId: aba.id, allFrames: true }, func, args: args || [] }); return rs.map((r) => r.result).filter(Boolean); }
@@ -80,7 +76,7 @@ async function abrirRemetidos() { try {
   msg("Abrindo “Processos Remetidos p/ Conclusão” no SEEU…");
   const ok = await lerNaAba(abrirMenuConclusoesSeeu, (x) => x.ok); if (!ok) throw new Error("Não achei esse item no menu do SEEU. Abra o SEEU (tela com o menu no alto) e tente de novo.");
   let r = null; for (let k = 0; k < 20 && !r; k++) { await new Promise((s) => setTimeout(s, 1000)); r = await lerNaAba(lerConclusoesSeeu, (x) => x.ok && x.processos.length).catch(() => null); }
-  if (!r) throw new Error("A tela abriu, mas não achei processos. Se o SEEU mostra um filtro, clique em Filtrar nele e depois em “Ler lista de Conclusões”.");
+  if (!r) throw new Error("A tela abriu, mas não achei processos. Se o SEEU mostra um filtro, clique em Filtrar nele e depois em “Abrir Processos Remetidos p/ Conclusão” de novo.");
   lidos = r.processos; serventiaDaLista = atualSeeu; $("resumoLista").innerHTML = `<b>Serventia: ${esc(serventiaDaLista || "?")}</b> — ${r.processos.length} processo(s)${r.total && r.processos.length >= r.total ? " (todas as páginas, numa lista só)" : " nesta página"}. ${esc(r.aviso || "")}`; desenharLista(); msg(`Li ${r.processos.length} processo(s) de ${serventiaDaLista || "sua serventia"}.`, "ok");
 } catch (e) { msg("✖ " + e.message, "erro"); } }
 $("btnRemetidos").onclick = abrirRemetidos;
