@@ -33,17 +33,25 @@ document.getElementById('s').onclick=()=>{window.__enviado=ed.innerText;const m=
 PAG_E = """<html><body><div id=msgs></div><textarea id=t aria-label="Pergunte" style="width:300px"></textarea><button aria-label="Adicionar arquivos e mais" id=mais>+</button><button type=submit id=s>Enviar</button><div id=chip></div>
 <script>document.getElementById('mais').onclick=()=>{if(document.getElementById('f'))return;const i=document.createElement('input');i.type='file';i.id='f';i.style.display='none';i.onchange=e=>document.getElementById('chip').textContent=e.target.files[0].name;document.body.appendChild(i);};
 document.getElementById('s').onclick=()=>{window.__enviado=document.getElementById('t').value;const m=document.createElement('div');m.dataset.messageAuthorRole='assistant';m.textContent='Resposta pronta do modelo '.repeat(10);document.getElementById('msgs').appendChild(m);};</script></body></html>"""
+# F: o site mudou e nenhum seletor conhecido acha a resposta; o plano B lê o texto que apareceu na tela depois da nossa mensagem
+PAG_F = """<html><body><main><div id=msgs></div><div id=prompt-textarea contenteditable=true role=textbox style="width:400px;height:40px;border:1px solid"></div>
+<button aria-label="Anexar arquivos" id=bx>+</button><input type=file id=f style="display:none" accept=".pdf"><button data-testid=send-button id=env>Enviar</button><div id=chip></div>
+<footer>O ChatGPT pode cometer erros. Confira informações importantes.</footer></main>
+<script>const ed=document.getElementById('prompt-textarea');
+document.getElementById('f').addEventListener('change',e=>document.getElementById('chip').textContent=e.target.files[0].name);
+document.getElementById('env').onclick=()=>{const txt=ed.innerText;window.__enviado=txt;ed.innerText='';const u=document.createElement('section');u.textContent=txt;document.getElementById('msgs').appendChild(u);
+setTimeout(()=>{const r=document.createElement('section');r.innerHTML='<p>Diante do exposto, determino à serventia que certifique os arquivos da peticao inicial.</p><p>Apos, voltem conclusos para analise da competencia deste Juizado e das providencias cabiveis.</p><p>I.C.</p><button>Copiar</button>';document.getElementById('msgs').appendChild(r);},800);};</script></body></html>"""
 b64 = base64.b64encode(b"%PDF-1.4 fake").decode()
 with sync_playwright() as p:
     b = p.chromium.launch(executable_path='/opt/pw-browsers/chromium', args=['--no-sandbox'], proxy={'server':'http://127.0.0.1:1'})
-    for nome, pag, host in [("A-contenteditable", PAG_A, "chatgpt.com"), ("B-textarea", PAG_B, "chat.exemplo.com"), ("C-painel-lateral", PAG_C, "ia.jusbrasil.com.br"), ("D-gemini-colar", PAG_D, "gemini.google.com"), ("E-botao-mais", PAG_E, "chatgpt.com")]:
+    for nome, pag, host in [("A-contenteditable", PAG_A, "chatgpt.com"), ("B-textarea", PAG_B, "chat.exemplo.com"), ("C-painel-lateral", PAG_C, "ia.jusbrasil.com.br"), ("D-gemini-colar", PAG_D, "gemini.google.com"), ("E-botao-mais", PAG_E, "chatgpt.com"), ("F-sem-seletor", PAG_F, "chatgpt.com")]:
         c = b.new_context(); pg = c.new_page()
         pg.route("**/*", (lambda pag: (lambda r: r.fulfill(body=pag, content_type="text/html")))(pag))
         pg.goto(f"http://{host}/x", wait_until='commit'); pg.wait_for_selector('body'); pg.add_script_tag(content=agente)
         d = pg.evaluate("__projudiIA.diagnosticar()"); print(nome, d)
         assert d["pronto"], d
         pg.evaluate("__projudiIA.anexar('12345-OCR.pdf', %r)" % b64)
-        pg.evaluate("__projudiIA.escrever('Faça a minuta do processo.\\nLinha 2')")
+        pg.evaluate("__projudiIA.escrever(%r)" % ("Faça a minuta do processo, em despacho curto, com as determinações à serventia.\nLinha 2" if nome.startswith("F") else "Faça a minuta do processo.\nLinha 2"))
         pg.evaluate("__projudiIA.enviar()")
         r = pg.evaluate("__projudiIA.esperarResposta(60000, 2500)")
         if nome.startswith("C"):
@@ -51,6 +59,9 @@ with sync_playwright() as p:
             assert "Faça a minuta" not in r["texto"] and "eco da mensagem" not in r["texto"], "capturou o eco do prompt"
             assert "Marca Jusbrasil" not in r["texto"] and "Copiar" not in r["texto"] and "Marca Jusbrasil" not in r["html"], "botões e dicas da tela ficaram na minuta"
             assert "Reescrever" not in r["texto"] and "Buscar julgados" not in r["texto"] and "Baixar" not in r["texto"], "lixo da tela ficou no texto"
+        elif nome.startswith("F"):
+            assert r.get("origem") == "tela" and "determino à serventia" in r["texto"].replace("determino a serventia", "determino à serventia") or "determino" in r["texto"], r
+            assert "Faça a minuta" not in r["texto"] and "pode cometer erros" not in r["texto"], "pegou o prompt ou o rodapé do site"
         else: assert "Minuta parte 4" in r["texto"] or "Resposta pronta" in r["texto"], r
         assert "Faça a minuta" in pg.evaluate("window.__enviado"), "prompt não chegou"
         print(nome, "OK:", r["texto"][:50])

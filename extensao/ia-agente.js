@@ -7,7 +7,7 @@
   const dorme = (ms) => new Promise((ok) => setTimeout(ok, ms));
   const PERFIS = [
     { id: "chatgpt", nome: "ChatGPT", hosts: /(^|\.)chatgpt\.com$|(^|\.)chat\.openai\.com$/, novaConversa: "https://chatgpt.com/",
-      compositor: ["#prompt-textarea", "div[contenteditable='true'][id*='prompt']", "div.ProseMirror[contenteditable='true']", "div[contenteditable='true'][role='textbox']", "textarea"], resposta: ["[data-message-author-role='assistant']", "article[data-testid*='conversation-turn'] .markdown"],
+      compositor: ["#prompt-textarea", "div[contenteditable='true'][id*='prompt']", "div.ProseMirror[contenteditable='true']", "div[contenteditable='true'][role='textbox']", "textarea"], resposta: ["[data-message-author-role='assistant']", "article[data-testid*='conversation-turn'] .markdown", "[data-testid^='conversation-turn-'] .markdown", "div.markdown.prose", "div.markdown"],
       concluido: ["button[data-testid='copy-turn-action-button']", "button[data-testid='good-response-turn-action-button']", "button[data-testid='bad-response-turn-action-button']"],      // a barra de ações (copiar, 👍, 👎) só aparece quando a resposta terminou
 
       enviar: ["button[data-testid='send-button']", "#composer-submit-button", "button[data-testid='composer-submit-button']", "button[aria-label*='Enviar prompt' i]", "button[aria-label*='Send prompt' i]", "button[aria-label*='Enviar' i]", "button[aria-label*='Send' i]", "form button[type='submit']"], parar: ["button[data-testid='stop-button']", "button[aria-label*='Parar' i]", "button[aria-label*='Stop' i]"],
@@ -47,6 +47,18 @@
   // eco = texto que contém (ou é parte de) a mensagem que NÓS enviamos: nunca vale como resposta da IA
   const eco = (t) => { const e = normaliza(window.__projudiIAEnviado || ""), x = normaliza(t); if (e.length < 20 || !x) return false; return x.includes(e.slice(0, 150)) || (x.length > 40 && e.includes(x.slice(0, 150))); };
   const respostas = () => todosVisiveis(perfil().resposta).filter((e) => !eco(textoDe(e)));
+  const respostasBrutas = () => { let n = 0; for (const sel of perfil().resposta) { try { n += document.querySelectorAll(sel).length; } catch { /* seletor inválido */ } } return n; };
+  // Plano B quando o site mudou e os seletores não acham a resposta: lê o que apareceu na tela DEPOIS da nossa mensagem (no balão do usuário) até o rodapé do site.
+  const FIM_DA_TELA = /O ChatGPT pode cometer erros|ChatGPT can make mistakes|Pergunte ao ChatGPT|Ask anything|Message ChatGPT|O Gemini pode cometer erros|Claude can make mistakes|Reply to Claude/i;
+  const respostaPorTexto = () => {
+    const e = String(window.__projudiIAEnviado || "").trim(); if (e.length < 40) return "";
+    const raiz = document.querySelector("main") || document.body, t = raiz.innerText || "";
+    const cauda = e.slice(-70).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+    let ultimo = -1, fimCauda = -1; try { const re = new RegExp(cauda, "g"); let m; while ((m = re.exec(t))) { ultimo = m.index; fimCauda = m.index + m[0].length; } } catch { return ""; }
+    if (ultimo < 0) return "";
+    let r = t.slice(fimCauda).replace(/^\s+/, ""); const f = r.search(FIM_DA_TELA); if (f >= 0) r = r.slice(0, f);
+    return r.replace(/\n(Copiar|Copy|Editar|Edit|Ler em voz alta|Read aloud|Boa resposta|Má resposta|Good response|Bad response|Compartilhar|Share|Mais ações|More actions)\s*(?=\n|$)/g, "").trim();
+  };
   const pedeLogin = () => !compositor() && ([...document.querySelectorAll("a,button")].some((e) => /^(log ?in|entrar|sign ?in|fazer login|login)$/i.test(textoDe(e))) || /\/(login|auth|signin|accounts)/i.test(location.pathname + location.hostname));
   const bloqueio = () => /verifique que (você|voce) é humano|verify you are human|just a moment|captcha/i.test(document.title + " " + (document.body?.innerText || "").slice(0, 400));
 
@@ -158,7 +170,7 @@
   async function esperarResposta(ms = 600000, estavelMs = 6000) {
     if (perfil().painel) return esperarPainel(ms, estavelMs);
     const marca = window.__projudiIAMarca || { antes: 0, textoAntes: "" };
-    const t0 = Date.now(); let ultimo = "", desde = Date.now(), comecou = false;
+    const t0 = Date.now(); let ultimo = "", desde = Date.now(), comecou = false, ultimoAlt = "", desdeAlt = Date.now();
     for (;;) {
       if (Date.now() - t0 > ms) throw new Error("a IA não terminou de responder no tempo limite");
       if (bloqueio()) throw new Error("a IA pediu verificação humana (captcha): resolva na aba dela");
@@ -178,7 +190,15 @@
         }
         return { ok: true, texto, html, origem };
       }
-      if (!comecou && Date.now() - t0 > 90000) throw new Error("a IA não começou a responder (a mensagem pode não ter sido enviada)");
+      // Plano B: depois de 20 s sem enxergar a resposta pelos seletores, lê pelo texto da tela; vale se estabilizou e a IA não está gerando
+      if (!comecou && Date.now() - t0 > 20000) {
+        const alt = respostaPorTexto();
+        if (alt.length > 150) {
+          if (alt !== ultimoAlt) { ultimoAlt = alt; desdeAlt = Date.now(); }
+          if (!botaoParar() && Date.now() - desdeAlt >= estavelMs) return { ok: true, texto: alt, html: "", origem: "tela" };
+        }
+      }
+      if (!comecou && Date.now() - t0 > 90000) throw new Error(`a IA não começou a responder (a mensagem pode não ter sido enviada). Visto na tela: ${respostasBrutas()} elemento(s) de resposta pelos seletores, ${respostas().length} depois do filtro de eco; texto novo na tela: ${respostaPorTexto().length} caracteres`);
       await dorme(1000);
     }
   }
