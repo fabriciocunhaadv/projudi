@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Conclusões Projudi",
-  "version": "5.3.1",
+  "version": "5.3.2",
   "description": "Confere automaticamente as conclusões não analisadas e pré-analisadas de cada serventia no Projudi/TJGO.",
   "permissions": [
     "activeTab",
@@ -38,6 +38,7 @@
     "https://claude.ai/*",
     "https://ia.jusbrasil.com.br/*",
     "https://www.minutaia.com.br/*",
+    "https://minutaia.com.br/*",
     "https://seeu.pje.jus.br/*"
   ],
   "host_permissions": [

@@ -4,7 +4,7 @@ export const SITES_IA = {
   chatgpt: { nome: "ChatGPT", url: "https://chatgpt.com/", padrao: ["https://chatgpt.com/*", "https://chat.openai.com/*"] },
   gemini: { nome: "Gemini", url: "https://gemini.google.com/app", padrao: ["https://gemini.google.com/*"] },
   jusbrasil: { nome: "IA do Jusbrasil", url: "https://ia.jusbrasil.com.br/conversa", padrao: ["https://ia.jusbrasil.com.br/*"] },
-  minutaia: { nome: "Minuta IA", url: "https://www.minutaia.com.br/", padrao: ["https://www.minutaia.com.br/*"] },
+  minutaia: { nome: "Minuta IA", url: "https://minutaia.com.br/", padrao: ["https://www.minutaia.com.br/*", "https://minutaia.com.br/*"] },
   claude: { nome: "Claude", url: "https://claude.ai/new", padrao: ["https://claude.ai/*"] },
 };
 const dorme = (ms) => new Promise((ok) => setTimeout(ok, ms));

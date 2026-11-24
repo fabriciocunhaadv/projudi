@@ -24,7 +24,7 @@
       compositor: ["textarea", "div[contenteditable='true'][role='textbox']", "div[contenteditable='true']"], resposta: ["[data-message-author-role='assistant']", "[class*='assistant' i]", "[class*='answer' i]", "[class*='response' i]"],
       enviar: ["button[type='submit']", "button[aria-label*='Enviar' i]", "button[aria-label*='send' i]"], parar: ["button[aria-label*='Parar' i]", "button[aria-label*='Stop' i]"],
       anexar: ["button[aria-label*='Anexar' i]", "button[aria-label*='arquivo' i]", "button[aria-label*='Upload' i]", "button[aria-label*='Adicionar' i]"] },
-    { id: "minutaia", nome: "Minuta IA", minuta: true, hosts: /(^|\.)minutaia\.com\.br$/, novaConversa: "https://www.minutaia.com.br/",
+    { id: "minutaia", nome: "Minuta IA", minuta: true, hosts: /(^|\.)minutaia\.com\.br$/, novaConversa: "https://minutaia.com.br/",
       comando: "Elabore a minuta do ato conforme o estado dos autos, seguindo as instruções acima.",      // a Minuta IA só trabalha se a instrução trouxer um comando; só as instruções, sem pedido, ela responde perguntando o que fazer
       compositor: ["textarea[aria-label='Instruções para a minuta']", "textarea[id^='chat-input']", "textarea"], resposta: ["div[role='textbox'][aria-label='Conteúdo da minuta']"],
       enviar: ["button[aria-label='Enviar']", "button[aria-label='Enviar mensagem']", "button[aria-label*='Enviar' i]"], parar: ["button[aria-label*='Parar' i]", "button[aria-label*='Stop' i]"],
@@ -125,10 +125,25 @@
     throw new Error("não consegui anexar o PDF na tela da IA (tentei: " + falhas.join("; ") + "). Rode “Diagnosticar tela da IA”.");
   }
 
+  // Botão "Voltar" do aviso "Atenção: nenhum contexto adicionado!" da Minuta IA (sobe do título do aviso até o bloco que tem o botão)
+  const avisoSemContexto = () => {
+    const alvo = [...document.querySelectorAll("h1,h2,h3,h4,div,span,p")].filter((e) => !e.children.length && /nenhum contexto adicionado/i.test(e.textContent || "") && visivel(e)).pop(); if (!alvo) return null;
+    for (let e = alvo, i = 0; e && i < 8; e = e.parentElement, i++) { const v = [...e.querySelectorAll("button")].find((x) => /^\s*voltar\s*$/i.test(x.textContent || "") && visivel(x)); if (v) return v; }
+    return null;
+  };
   async function enviar() {
     const b = await esperarPor(() => { const x = botaoEnviar(); return x && !desabilitado(x) ? x : null; }, 120000, 500);
     const antes = respostas().length, textoAntes = respostas().length ? textoDe(respostas()[respostas().length - 1]) : "";
     if (b) b.click(); else { const c = compositor(); if (!c) throw new Error("não achei o botão de enviar"); for (const t of ["keydown", "keypress", "keyup"]) c.dispatchEvent(new KeyboardEvent(t, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true })); }
+    // Minuta IA: se aparecer "Atenção: nenhum contexto adicionado!", clica em "Voltar" (o PDF já está anexado e o prompt já está no chat) e clica em Enviar de novo
+    if (perfil().minuta) {
+      for (let tent = 0; tent < 3; tent++) {
+        const aviso = await esperarPor(avisoSemContexto, 3500, 250); if (!aviso) break;
+        aviso.click(); await dorme(1200);
+        const de = await esperarPor(() => { const x = botaoEnviar(); return x && !desabilitado(x) ? x : null; }, 15000, 300); if (!de) break;
+        de.click();
+      }
+    }
     window.__projudiIAMarca = { antes, textoAntes };
     return { ok: true, antes };
   }

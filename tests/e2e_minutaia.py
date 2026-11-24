@@ -8,7 +8,8 @@ PAG = """<html><body><div id=chat><textarea aria-label="Instruções para a minu
 <script>const t=document.querySelector('textarea'),s=document.getElementById('s');
 t.addEventListener('input',()=>s.disabled=!t.value.trim());
 document.querySelector('input').onchange=e=>document.getElementById('docs').textContent='Documentos (1) '+e.target.files[0].name;
-s.onclick=()=>{window.__enviado=t.value;document.getElementById('chat').remove();const ed=document.createElement('div');document.body.appendChild(ed);
+s.onclick=()=>{window.__cliques=(window.__cliques||0)+1; if(window.__cliques===1){const d=document.createElement('div');d.id='dlg';d.setAttribute('role','dialog');d.innerHTML='<h2>Atenção: nenhum contexto adicionado!</h2><button id=cont>Continuar sem contexto</button><button id=volta>Voltar</button>';document.body.appendChild(d);document.getElementById('volta').onclick=()=>d.remove();document.getElementById('cont').onclick=()=>{window.__semContexto=true;d.remove();};return;}
+ window.__enviado=t.value;document.getElementById('chat').remove();const ed=document.createElement('div');document.body.appendChild(ed);
  ed.innerHTML='<div role=textbox aria-label="Conteúdo da minuta" contenteditable=true></div><div data-tiptap-ai-chat-messages></div>';
  const tx=ed.firstChild;let i=0;const iv=setInterval(()=>{tx.innerHTML+='<p>Trecho '+(++i)+' da decisão sintética, com texto suficiente para parecer uma minuta de verdade. </p>';
   if(i==12){clearInterval(iv);setTimeout(()=>{const m=document.createElement('div');m.setAttribute('data-tiptap-ai-chat-message-variant','generation-complete');m.textContent='Minuta gerada';ed.lastChild.appendChild(m);},500);}},200);};
@@ -27,6 +28,7 @@ with sync_playwright() as p:
     pg.evaluate("__projudiIA.enviar()")
     r = pg.evaluate("__projudiIA.esperarResposta(60000, 1500)")
     env = pg.evaluate("window.__enviado")
+    assert not pg.evaluate("window.__semContexto") and pg.evaluate("window.__cliques") == 2, "clicou Voltar (não Continuar sem contexto) e enviou de novo"
     assert "Elabore a minuta" in env and env.startswith("Você é assessor"), env
     assert r["origem"] == "editor" and "Trecho 12" in r["texto"] and len(r["texto"]) > 400, r["texto"][:200]
     print("OK"); b.close()
