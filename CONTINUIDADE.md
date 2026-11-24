@@ -328,3 +328,5 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 - CNIUPS (2º alinhamento ao PDF): Seção 1 abre com o cabeçalho do formulário (Data do Preenchimento, Semestre/Ano, Estado, Município, Magistrado); "Orientação do manual" ficou recolhida (clicar para ver); fim da Seção 1 tem "Programas vinculados ao município / Incluir novo programa"; Seção 11 com "Considerações:" e "Encaminhamentos:" sem número (resumo continua 11.1/11.2). Numeração 1.9.x/1.5.4 mantida (igual ao relatório real; o PDF tem erros de digitação).
 
 - CNIUPS (uma tela só, 1 a 11): a tela do município agora segue direto para as Seções 2–11 do programa ("SEÇÃO SOBRE OS PROGRAMAS/SERVIÇOS"), terminando em Considerações/Encaminhamentos com caixas para escrever (Seção 11 sempre aberta). "Incluir novo programa" cria o formulário na mesma tela. Também: "(pule para a questão X)" ao lado das opções e "Copiar respostas da última inspeção" (Sim/Não) no cabeçalho.
+
+- Avisos na tela (toasts do Studio): todos têm um "×" para fechar (componente `src/components/AvisosToaster.tsx`, usado no App); só o aviso de "carregando" não tem. Teste: `testes/teste_avisos_fechar.py`.
