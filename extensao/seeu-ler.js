@@ -97,7 +97,14 @@ async function lerConclusoesSeeu() {
 async function descobrirExportarSeeu(analisarHref) {
   const passos = [], ler = async (u) => { const r = await fetch(u, { credentials: "include" }); const h = new TextDecoder("iso-8859-1").decode(await r.arrayBuffer()); passos.push(`${new URL(u).pathname} → HTTP ${r.status}, ${h.length} caracteres`); return h; };
   const desescapa = (s) => s.replace(/&amp;/g, "&");
-  const achaExportar = (h) => { const m = h.match(/['"]((?:https?:\/\/[^'"\/]+)?\/seeu\/processo\/exportar\.do\?_tj=[0-9A-Za-z]+[^'"]*)['"]/); return m ? new URL(desescapa(m[1]), location.origin).href : ""; };
+  // O botão que interessa é "Processo" (#exportarProcessoButton); o "Capa" (#exportarCapaButton) aponta para outra exportação (só a capa, 1 página) e NÃO serve.
+  const achaExportar = (h) => {
+    const doc = new DOMParser().parseFromString(h, "text/html");
+    const alvo = (el) => { const src = el ? (el.getAttribute("onclick") || el.getAttribute("href") || "") : ""; const m = src.match(/['"]([^'"]*exportar\.do\?_tj=[^'"]*)['"]/); return m ? new URL(desescapa(m[1]), location.origin).href : ""; };
+    let u = alvo(doc.querySelector("#exportarProcessoButton"));
+    if (!u) u = alvo([...doc.querySelectorAll("input[type=button],button,a")].find((x) => /^\s*processo\s*$/i.test(x.value || x.textContent || "") && /exportar\.do/.test(x.getAttribute("onclick") || x.getAttribute("href") || "")));
+    return u;
+  };
   const links = (h) => [...new Set([...h.matchAll(/(?:href|src|action)=["']([^"']+\.do[^"']*)["']/gi)].map((m) => m[1].split("?")[0]))].slice(0, 30);
   try {
     let h = await ler(analisarHref), ex = achaExportar(h);
@@ -106,7 +113,7 @@ async function descobrirExportarSeeu(analisarHref) {
     if (!p) return { ok: false, erro: "Na tela Analisar não achei o link do processo nem o da exportação.", passos, paginasVistas: links(h) };
     h = await ler(new URL(desescapa(p[1]), location.origin).href); ex = achaExportar(h);
     if (ex) return { ok: true, exportarUrl: ex, passos };
-    return { ok: false, erro: "Na tela do processo não achei o botão Processo (exportar).", passos, paginasVistas: links(h) };
+    return { ok: false, erro: "Na tela do processo não achei o botão Exportar ▾ → Processo.", passos, paginasVistas: links(h) };
   } catch (e) { return { ok: false, erro: "Falha ao ler o SEEU: " + e.message, passos }; }
 }
 // Roda na PÁGINA (world MAIN) da tela de exportação aberta numa aba: aperta o botão "Exportar" do próprio SEEU, mas intercepta o envio (formulário ou janela nova) e devolve o pedido, em vez de deixar abrir a janela em branco.

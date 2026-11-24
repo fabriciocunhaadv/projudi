@@ -70,7 +70,7 @@ with sync_playwright() as p:
     res = pg.evaluate("lerConclusoesSeeu()"); assert res["total"] == 44 and len(res["processos"]) == 44 and not res["aviso"], (len(res["processos"]), res["aviso"])
     # do botão Analisar até a exportação (fetch em cadeia) e a captura do botão Exportar (formulário e window.open)
     ANALISAR = '<html><body><a href="/seeu/visualizacaoProcesso.do?_tj=abc123&amp;x=1">Processo 7000035</a></body></html>'
-    PROC = "<html><body><input type=\"button\" id=\"exportarProcessoButton\" value=\"Processo\" onclick=\"disableScreen(); document.location.href='/seeu/processo/exportar.do?_tj=tok999';\"></body></html>"
+    PROC = "<html><body><input type=\"button\" id=\"exportarCapaButton\" value=\"Capa\" onclick=\"disableScreen(); document.location.href='/seeu/processo/exportar.do?_tj=capa111';\"><input type=\"button\" id=\"exportarProcessoButton\" value=\"Processo\" onclick=\"disableScreen(); document.location.href='/seeu/processo/exportar.do?_tj=tok999';\"></body></html>"
     def rota4(r):
         u = r.request.url
         if "conclusao.do" in u: r.fulfill(body=ANALISAR, content_type="text/html; charset=iso-8859-1")
