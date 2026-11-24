@@ -51,10 +51,12 @@ export async function executarNaIa(it, { id, bytes, promptTexto, aoAndamento = (
   try {
     aoAndamento(`abrindo ${s.nome}…`);
     const aba = await abaDaIa(id, true);
-    const diag = await msg(aba, { acao: "ia-diagnosticar" });
+    let diag = await msg(aba, { acao: "ia-diagnosticar" });
+    // o app da IA monta a tela devagar (ChatGPT/Gemini): espera até ~25 s a caixa de mensagem aparecer antes de desistir
+    for (let i = 0; i < 17 && diag.logado && !diag.bloqueio && !diag.compositor; i++) { aoAndamento(`aguardando a tela do ${s.nome} carregar…`); await dorme(1500); diag = await msg(aba, { acao: "ia-diagnosticar" }); }
     if (!diag.logado) return { ok: false, sessao: true, erro: `${s.nome} pediu login: entre na conta na aba dele` };
     if (diag.bloqueio) return { ok: false, sessao: true, erro: `${s.nome} pediu verificação humana (captcha): resolva na aba dele` };
-    if (!diag.compositor) return { ok: false, erro: `não achei a caixa de mensagem do ${s.nome} (tela mudou?): rode “Diagnosticar tela da IA”`, semRetry: true };
+    if (!diag.compositor) return { ok: false, erro: `não achei a caixa de mensagem do ${s.nome} (tela mudou?): rode “Diagnosticar tela da IA”. Campos vistos na tela: ${(diag.campos || []).join(", ") || "nenhum"}`, semRetry: true };
     aoAndamento("enviando o PDF…");
     const b64 = b64De(bytes), tam = 1500000, pid = "ia" + Date.now();
     for (let n = 0, i = 0; i < b64.length; n++, i += tam) await msg(aba, { acao: "ia-parte", id: pid, n, dados: b64.slice(i, i + tam) });

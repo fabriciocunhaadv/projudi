@@ -51,7 +51,8 @@
   function diagnosticar() {
     const p = perfil(), c = compositor(), ba = botaoAnexar(), be = botaoEnviar(), bp = botaoParar(), cf = campoArquivo();
     const d = (e) => (e ? `${e.tagName.toLowerCase()}${e.id ? "#" + e.id : ""}${e.getAttribute("aria-label") ? `[aria-label="${e.getAttribute("aria-label")}"]` : ""}${e.className && typeof e.className === "string" ? "." + e.className.trim().split(/\s+/).slice(0, 2).join(".") : ""}` : null);
-    return { site: location.hostname, perfil: p.id, nome: p.nome, logado: !pedeLogin(), bloqueio: bloqueio(), compositor: d(c), campoArquivo: d(cf), botaoAnexar: d(ba), botaoEnviar: d(be), botaoParar: d(bp), respostas: respostas().length, pronto: !!c && !pedeLogin() && !bloqueio() };
+    return { site: location.hostname, perfil: p.id, nome: p.nome, logado: !pedeLogin(), bloqueio: bloqueio(), compositor: d(c), campoArquivo: d(cf), botaoAnexar: d(ba), botaoEnviar: d(be), botaoParar: d(bp), respostas: respostas().length, pronto: !!c && !pedeLogin() && !bloqueio(),
+      campos: [...document.querySelectorAll("textarea, input[type=text], [contenteditable], [role=textbox]")].slice(0, 8).map((e) => `${e.tagName.toLowerCase()}${e.id ? "#" + e.id : ""}${e.getAttribute("role") ? "[role=" + e.getAttribute("role") + "]" : ""}${e.getAttribute("contenteditable") ? "[ce=" + e.getAttribute("contenteditable") + "]" : ""}${visivel(e) ? "" : "(oculto)"}`) };
   }
 
   async function escrever(texto) {
