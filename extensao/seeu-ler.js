@@ -2,23 +2,48 @@
 // lerAreasSeeu: tela "Área de atuação" (ul#listaAreavara). lerConclusoesSeeu: lista de Conclusões (.resultTable).
 async function lerAreasSeeu() {
   const t = (e) => (e && e.textContent || "").replace(/\s+/g, " ").trim();
-  const doDoc = (doc) => {
+  const doDoc = (doc, solta) => {
     const vistos = new Set(), areas = [];
-    const add = (nome, atual) => { nome = (nome || "").replace(/\s+/g, " ").trim(); if (!nome || vistos.has(nome)) return; vistos.add(nome); areas.push({ nome, atual: !!atual }); };
-    // 1) tela "Área de atuação" (lista completa)
+    const add = (nome) => { nome = (nome || "").replace(/\s+/g, " ").trim(); if (!nome || vistos.has(nome)) return; vistos.add(nome); areas.push({ nome }); };
     [...doc.querySelectorAll("#listaAreavara li a, #listaAreasAtuacaoVisitadas li a, #areasAtuacaoVisitadas li a")].filter((a) => /areaAtuacao\.do/.test(a.getAttribute("href") || "")).forEach((a) => add(a.getAttribute("title") || t(a)));
-    // 2) menu suspenso do topo ("Últimas visitadas"): itens com cara de nome de vara/serventia
-    if (!areas.length) [...doc.querySelectorAll("a, li, div, span, button")].filter((e) => !e.querySelector("a, li, div, button") && /^[A-ZÇÃÕ]{2,6}\s+-\s+\S/.test(t(e)) && t(e).length < 160 && /vara|ju[ií]zo|serventia|corregedoria|comarca|execu[cç][aã]o|presidio|presídio/i.test(t(e))).forEach((e) => add(t(e)));
+    if (!areas.length && solta) [...doc.querySelectorAll("li > a[href*='areaAtuacao.do']")].filter((a) => t(a).length > 5).forEach((a) => add(a.getAttribute("title") || t(a)));
     return areas;
   };
+  // atuação atual: bloco "Atuação:" do cabeçalho do usuário
+  const atual = [...document.querySelectorAll("#userinfo .group")].map((g) => (/Atua[cç][aã]o/i.test(t(g.querySelector(".userinfo_label"))) ? (g.querySelector("span[title]:not(.userinfo_label)")?.getAttribute("title") || "") : "")).find(Boolean) || "";
   let areas = doDoc(document), fonte = "tela";
-  // 3) não está na tela: acha o link "Alterar atuação" do próprio SEEU e lê a página em segundo plano (só leitura, sem clicar nem trocar nada)
-  if (areas.length < 2) {
-    const link = [...document.querySelectorAll("a[href]")].find((a) => /areaAtuacao\.do|alterarAtuacao|AlterarAtua[cç][aã]o/i.test(a.getAttribute("href") || "") && !/areaAtuacao\.do\?[^#]*(idArea|codigoArea|id=)/i.test(a.getAttribute("href") || ""));
-    if (link) { try { const resp = await fetch(link.href, { credentials: "include" }); const buf = await resp.arrayBuffer(); const html = new TextDecoder("iso-8859-1").decode(buf); const outra = doDoc(new DOMParser().parseFromString(html, "text/html")); if (outra.length > areas.length) { areas = outra; fonte = "página Alterar atuação"; } } catch (e) { /* fica com o que achou */ } }
+  if (!areas.length) {
+    // o ícone "Alterar atuação" guarda o endereço dentro de javascript:openSubmitDialog('...areaAtuacao.do?_tj=...'): lê essa página em segundo plano (só leitura)
+    let u = "";
+    for (const a of document.querySelectorAll("a[href]")) { const m = (a.getAttribute("href") || "").match(/openSubmitDialog\(\s*['"]([^'"]*areaAtuacao\.do[^'"]*)['"]/i); if (m) { u = m[1]; break; } }
+    if (!u) { const l = [...document.querySelectorAll("a[href]")].find((a) => /^\/?(seeu\/)?usuario\/areaAtuacao\.do|^https?:.*areaAtuacao\.do/i.test(a.getAttribute("href") || "")); if (l) u = l.getAttribute("href"); }
+    if (u) { try { const resp = await fetch(new URL(u, location.href).href, { credentials: "include" }); const html = new TextDecoder("iso-8859-1").decode(await resp.arrayBuffer()); areas = doDoc(new DOMParser().parseFromString(html, "text/html"), true); fonte = "página Alterar atuação"; } catch (e) { /* sem resultado */ } }
   }
-  const atual = t(document.querySelector("[class*=atuacao i] [class*=selected i], #areaAtuacaoAtual, .area-atuacao-atual"));
-  return { areas, fonte, atual, url: location.href.replace(/(_tj=)[0-9a-zA-Z]+/g, "$1…") };
+  if (!areas.length) {
+    // cabeçalho novo do SEEU (<seeu-header>, componente com shadow DOM): lê os itens "TJGO - ... Vara/Corregedoria..." do menu suspenso, se já estiverem montados
+    const raizes = [], ach = (no) => { for (const e of no.querySelectorAll("*")) if (e.shadowRoot) { raizes.push(e.shadowRoot); ach(e.shadowRoot); } }; ach(document);
+    const vistos = new Set();
+    raizes.forEach((rz) => [...rz.querySelectorAll("*")].filter((e) => !e.children.length && /^[A-Z]{2,6}\s+-\s+\S/.test(t(e)) && t(e).length < 160 && /vara|ju[ií]zo|serventia|corregedoria|comarca|execu[cç][aã]o/i.test(t(e))).forEach((e) => { const n = t(e); if (!vistos.has(n)) { vistos.add(n); areas.push({ nome: n }); } }));
+    if (areas.length) fonte = "menu do cabeçalho";
+  }
+  if (!areas.length && atual) { areas = [{ nome: atual }]; fonte = "só a atuação atual"; }
+  return { areas, atual, fonte, url: location.href.replace(/(_tj=)[0-9a-zA-Z]+/g, "$1…") };
+}
+// Menu "Conclusões" da barra do SEEU (quadro da moldura): devolve os itens que abrem listas (conclusaoJuiz.do).
+function lerMenuConclusoesSeeu() {
+  const t = (e) => (e && e.textContent || "").replace(/\s+/g, " ").trim();
+  const topo = [...document.querySelectorAll("#main-menu > li")].find((li) => /^Conclus[õo]es/i.test(t(li.firstElementChild)));
+  if (!topo) return { ok: false };
+  const itens = [...topo.querySelectorAll("ul a[href]")].filter((a) => /conclusaoJuiz\.do/.test(a.getAttribute("href") || "")).map((a) => t(a));
+  return { ok: itens.length > 0, itens };
+}
+// Abre no SEEU o item do menu "Conclusões" (é o mesmo clique que você daria; não confirma nada).
+function abrirMenuConclusoesSeeu(nome) {
+  const t = (e) => (e && e.textContent || "").replace(/\s+/g, " ").trim();
+  const topo = [...document.querySelectorAll("#main-menu > li")].find((li) => /^Conclus[õo]es/i.test(t(li.firstElementChild)));
+  const a = topo && [...topo.querySelectorAll("ul a[href]")].find((x) => t(x) === nome && /conclusaoJuiz\.do/.test(x.getAttribute("href") || ""));
+  if (!a) return { ok: false };
+  a.click(); return { ok: true };
 }
 function lerConclusoesSeeu() {
   const t = (e) => (e && e.textContent || "").replace(/\s+/g, " ").trim();
@@ -38,4 +63,4 @@ function lerConclusoesSeeu() {
   const contador = t(document.querySelector("#navigator .navLeft")) || (document.body.textContent.match(/\d+\s+registro\(s\)\s+encontrado\(s\)[^.]{0,60}/) || [""])[0];
   return { ok: true, processos, contador: contador.replace(/\s+/g, " ").trim(), url: location.href.replace(/(_tj=)[0-9a-zA-Z]+/g, "$1…") };
 }
-if (typeof globalThis !== "undefined") { globalThis.lerAreasSeeu = lerAreasSeeu; globalThis.lerConclusoesSeeu = lerConclusoesSeeu; }
+if (typeof globalThis !== "undefined") { globalThis.lerAreasSeeu = lerAreasSeeu; globalThis.lerMenuConclusoesSeeu = lerMenuConclusoesSeeu; globalThis.abrirMenuConclusoesSeeu = abrirMenuConclusoesSeeu; globalThis.lerConclusoesSeeu = lerConclusoesSeeu; }

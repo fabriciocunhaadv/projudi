@@ -33,10 +33,10 @@ async function diagnostico() {
 $("btnCopiar").onclick = async () => { try { const d = await diagnostico(); await navigator.clipboard.writeText(d.texto); msg(`Diagnóstico copiado (${d.quadros} quadro(s), ${Math.round(d.texto.length / 1000)} mil caracteres). Cole na conversa.`, "ok"); } catch (e) { msg("✖ " + e.message, "erro"); } };
 $("btnBaixar").onclick = async () => { try { const d = await diagnostico(); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([d.texto], { type: "text/plain;charset=utf-8" })); a.download = "diagnostico-seeu.txt"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 3000); msg("Arquivo baixado. Anexe na conversa.", "ok"); } catch (e) { msg("✖ " + e.message, "erro"); } };
 // Executa um leitor em todos os quadros da aba e devolve o primeiro resultado que serve.
-async function lerNaAba(func, serve) {
+async function lerNaAba(func, serve, args) {
   const abas = await abasSeeu(); if (!abas.length) throw new Error("Abra o SEEU em uma aba e tente de novo.");
   const aba = abas.find((t) => t.active) || abas[0];
-  const rs = await chrome.scripting.executeScript({ target: { tabId: aba.id, allFrames: true }, func });
+  const rs = await chrome.scripting.executeScript({ target: { tabId: aba.id, allFrames: true }, func, args: args || [] });
   return rs.map((r) => r.result).find((r) => r && serve(r));
 }
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -57,4 +57,18 @@ async function lerAreas(silencioso) { try {
   $("areas").innerHTML = r.areas.map((a) => `<div>• ${esc(a.nome)}</div>`).join(""); if (!silencioso) msg(`${r.areas.length} serventia(s) encontrada(s) (${r.fonte}).`, "ok");
 } catch (e) { if (!silencioso) msg("✖ " + e.message, "erro"); } }
 $("btnAreas").onclick = () => lerAreas(false);
+// Menu "Conclusões" do SEEU: botões para abrir cada lista e já ler os processos
+async function carregarMenu() { try {
+  const m = await lerNaAba(lerMenuConclusoesSeeu, (x) => x.ok); const alvo = $("menuConclusoes"); if (!m) { alvo.innerHTML = ""; return; }
+  const uteis = m.itens.filter((n) => /^Para (Despacho|Decisão|Sentença|Homologação)$|Urgência/.test(n));
+  alvo.innerHTML = '<div class="dica">Abrir no SEEU e ler:</div>' + uteis.map((n, i) => `<button class="s" data-menu="${i}">${esc(n)}</button>`).join("");
+  alvo.querySelectorAll("button[data-menu]").forEach((b) => { b.onclick = async () => { const nome = uteis[+b.dataset.menu]; try {
+    msg(`Abrindo “${nome}” no SEEU…`);
+    const ok = await lerNaAba(abrirMenuConclusoesSeeu, (x) => x.ok, [nome]); if (!ok) throw new Error("Não consegui abrir esse item do menu do SEEU.");
+    let r = null; for (let k = 0; k < 20 && !r; k++) { await new Promise((s) => setTimeout(s, 1000)); r = await lerNaAba(lerConclusoesSeeu, (x) => x.ok && x.processos.length).catch(() => null); }
+    if (!r) throw new Error("A tela abriu, mas não achei processos. Se o SEEU mostra um filtro, clique em Filtrar nele e depois em “Ler lista de Conclusões”.");
+    lidos = r.processos; $("resumoLista").textContent = `${nome}: ${r.processos.length} processo(s) nesta página. ${r.contador}`; desenharLista(); msg(`Li ${r.processos.length} processo(s).`, "ok");
+  } catch (e) { msg("✖ " + e.message, "erro"); } }; });
+} catch (e) { /* sem menu */ } }
+setTimeout(() => carregarMenu(), 1500);
 atualizar().catch((e) => msg("✖ " + e.message, "erro"));
