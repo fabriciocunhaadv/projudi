@@ -19,29 +19,18 @@
 <h1>SEEU <span class="selo">novo</span></h1>
 <p class="dica">Painel independente do SEEU (seeu.pje.jus.br). A extensão usa a aba em que você já está logado: ela nunca digita sua senha e nunca confirma nada por você. Em construção: já lê as serventias e a lista de Conclusões e deixa você marcar os processos; o envio à IA vem na próxima etapa.</p>
 
-<div class="cartao" data-testid="seeu-passo-permissao">
-  <h2>1. Autorizar o SEEU</h2>
-  <p class="dica">O Chrome pede que você autorize a extensão a ler as telas do SEEU. É uma vez só e você pode retirar depois.</p>
-  <div id="permEstado">Verificando…</div>
-  <button id="btnPerm" data-testid="seeu-autorizar">Autorizar o SEEU</button>
-</div>
-
-<div class="cartao" data-testid="seeu-passo-verificar">
-  <h2>2. Verificar a aba do SEEU</h2>
-  <p class="dica">Abra o SEEU (seeu.pje.jus.br), entre com seu certificado/senha como de costume e escolha a área de atuação.</p>
-  <div id="abaEstado">—</div>
-  <button id="btnVerificar" class="s" data-testid="seeu-verificar">Verificar agora</button>
-</div>
+<div id="estadoSeeu" class="dica" data-testid="seeu-estado">Procurando o SEEU…</div>
+<button id="btnAbrirSeeu" class="s" hidden>Abrir o SEEU</button>
 
 <div class="cartao" data-testid="seeu-passo-diagnostico">
-  <h2>3. Copiar o diagnóstico da tela</h2>
+  <h2>Copiar o diagnóstico da tela</h2>
   <p class="dica">Deixe aberta no SEEU a tela que você quer me mostrar (ex.: lista de Conclusões, tela do processo, tela de exportação). Clique em copiar e cole na conversa. O diagnóstico <b>não leva senha nem o token da URL</b>, mas traz o que está na tela, inclusive nomes das partes: confira antes de colar. Faça uma tela por vez.</p>
   <button id="btnCopiar" data-testid="seeu-copiar">Copiar diagnóstico</button>
   <button id="btnBaixar" class="s" data-testid="seeu-baixar">Baixar como arquivo .txt</button>
 </div>
 <div class="cartao" data-testid="seeu-passo-lista">
-  <h2>4. Serventias e processos</h2>
-  <p class="dica">Só leio o que está na tela da sua aba do SEEU; não clico, não troco de área e não confirmo nada. Para ver as serventias, deixe aberta a tela “Área de atuação”. Para ver os processos, abra Conclusões (Mesa do Assessor → Para Decisão/Despacho…) e filtre como quiser.</p>
+  <h2>Serventias e processos</h2>
+  <p class="dica">Só leio o que está na tela da sua aba do SEEU; não clico, não troco de área e não confirmo nada. As serventias são encontradas sozinhas, em qualquer tela do SEEU. Para ver os processos, abra Conclusões (Mesa do Assessor → Para Decisão/Despacho…) e filtre como quiser.</p>
   <button id="btnAreas" class="s" data-testid="seeu-ler-areas">Ler serventias</button>
   <button id="btnLista" class="s" data-testid="seeu-ler-lista">Ler lista de Conclusões</button>
   <div id="areas"></div>

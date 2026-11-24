@@ -20,5 +20,16 @@ with sync_playwright() as p:
             assert r["ok"] and len(ps) == 2 and "32 registro" in r["contador"]
             assert ps[0]["numero"] == "0000001-02.2024.8.09.0001" and ps[0]["urgente"] and ps[0]["reuPreso"] and ps[0]["idConclusao"] == "111" and ps[0]["entrada"] == "01/02/2025" and ps[0]["partes"] == ["FULANO TESTE"] and ps[0]["tipo"].startswith("DECISÃO")
             assert not ps[1]["urgente"] and not ps[1]["reuPreso"] and ps[1]["tipo"].startswith("DESPACHO")
+    # menu suspenso do topo (sem a tela de áreas)
+    MENU = '<div><span>ÚLTIMAS VISITADAS</span><ul><li><a href="#">TJXX - Corregedoria dos Presídios de Cidade</a></li><li><a href="#">TJXX - Cidade - Vara de Execução Penal Meio Aberto</a></li><li><a href="#">TJXX - Cidade - Vara de Execução Penal Meio Fechado</a></li></ul></div>'
+    pg.route("**/*", lambda r: r.fulfill(body="<html><body>" + MENU + "</body></html>", content_type="text/html; charset=utf-8")); pg.goto("http://seeu.exemplo.test/m"); pg.add_script_tag(content=ler)
+    r = pg.evaluate("lerAreasSeeu()"); assert len(r["areas"]) == 3 and r["areas"][0]["nome"].startswith("TJXX - Corregedoria"), r
+    # tela comum com só 1 item no menu + link "Alterar atuação": lê a página em segundo plano
+    HOME = '<a href="/seeu/usuario/areaAtuacao.do?_tj=tok">Alterar Atuação</a><ul><li><a href="#">TJXX - Cidade - Vara 1 de Execução</a></li></ul>'
+    def rota(r):
+        if "areaAtuacao.do" in r.request.url: r.fulfill(body="<html><body>" + AREAS + "</body></html>", content_type="text/html; charset=iso-8859-1")
+        else: r.fulfill(body="<html><body>" + HOME + "</body></html>", content_type="text/html; charset=utf-8")
+    pg.route("**/*", rota); pg.goto("http://seeu.exemplo.test/h"); pg.add_script_tag(content=ler)
+    r = pg.evaluate("lerAreasSeeu()"); assert r["fonte"] == "página Alterar atuação" and len(r["areas"]) == 2, r
     b.close()
 print("OK")

@@ -24,6 +24,11 @@
       compositor: ["textarea", "div[contenteditable='true'][role='textbox']", "div[contenteditable='true']"], resposta: ["[data-message-author-role='assistant']", "[class*='assistant' i]", "[class*='answer' i]", "[class*='response' i]"],
       enviar: ["button[type='submit']", "button[aria-label*='Enviar' i]", "button[aria-label*='send' i]"], parar: ["button[aria-label*='Parar' i]", "button[aria-label*='Stop' i]"],
       anexar: ["button[aria-label*='Anexar' i]", "button[aria-label*='arquivo' i]", "button[aria-label*='Upload' i]", "button[aria-label*='Adicionar' i]"] },
+    { id: "minutaia", nome: "Minuta IA", minuta: true, hosts: /(^|\.)minutaia\.com\.br$/, novaConversa: "https://www.minutaia.com.br/",
+      comando: "Elabore a minuta do ato conforme o estado dos autos, seguindo as instruções acima.",      // a Minuta IA só trabalha se a instrução trouxer um comando; só as instruções, sem pedido, ela responde perguntando o que fazer
+      compositor: ["textarea[aria-label='Instruções para a minuta']", "textarea[id^='chat-input']", "textarea"], resposta: ["div[role='textbox'][aria-label='Conteúdo da minuta']"],
+      enviar: ["button[aria-label='Enviar']", "button[aria-label='Enviar mensagem']", "button[aria-label*='Enviar' i]"], parar: ["button[aria-label*='Parar' i]", "button[aria-label*='Stop' i]"],
+      anexar: ["button[aria-label*='Anexar' i]", "button[aria-label*='arquivo' i]"] },
   ];
   const GENERICO = { id: "generico", nome: "IA", compositor: ["textarea", "div[contenteditable='true'][role='textbox']", "div[contenteditable='true']"], resposta: ["[data-message-author-role='assistant']", "[class*='assistant' i]", "[class*='response' i]", "[class*='answer' i]"],
     enviar: ["button[type='submit']", "button[aria-label*='send' i]", "button[aria-label*='enviar' i]"], parar: ["button[aria-label*='stop' i]", "button[aria-label*='parar' i]"], anexar: ["button[aria-label*='attach' i]", "button[aria-label*='anexar' i]", "button[aria-label*='upload' i]"] };
@@ -37,7 +42,7 @@
   const compositor = () => primeiro(perfil().compositor);
   const botaoEnviar = () => primeiro(perfil().enviar) || [...document.querySelectorAll("button")].filter(visivel).find((b) => /^(enviar|send)( mensagem| message)?$/i.test((b.getAttribute("aria-label") || b.title || textoDe(b)).trim()));
   const botaoParar = () => primeiro(perfil().parar) || [...document.querySelectorAll("button")].filter(visivel).find((b) => /^(parar|stop)( gera[cç][aã]o| generating| streaming| resposta)?\b/i.test((b.getAttribute("aria-label") || b.title || "").trim()));
-  const campoArquivo = () => [...document.querySelectorAll("input[type='file']")].find((i) => !i.accept || /pdf|\*|application|\.pdf/i.test(i.accept)) || document.querySelector("input[type='file']");
+  const campoArquivo = () => document.querySelector("input[type='file'][aria-label='Selecionar arquivos do processo']") || [...document.querySelectorAll("input[type='file']")].find((i) => !i.accept || /pdf|\*|application|\.pdf/i.test(i.accept)) || document.querySelector("input[type='file']");
   const ROTULO_ANEXAR = /anex|attach|upload|adicion|add (file|photo|content)|arquivo|\bfile|\bmais\b|\bmore\b|ferramenta|^\+$/i, NAO_ANEXAR = /enviar|send|microfone|mic\b|voz|voice|ditar|dictat|gravar|record|modelo|model|flash|pro\b|pensar|think|parar|stop/i;
   const rotuloDe = (b) => (b.getAttribute("aria-label") || b.title || "").trim() || textoDe(b).slice(0, 30);
   // área da caixa de mensagem: sobe a partir dela até um contêiner que tenha botões (para achar o "+" mesmo sem rótulo conhecido)
@@ -70,6 +75,7 @@
   }
 
   async function escrever(texto) {
+    const cmd = perfil().comando; if (cmd && !texto.includes(cmd)) texto = texto.replace(/\s+$/, "") + "\n\n" + cmd;
     window.__projudiIAEnviado = texto;
     const c = await esperarPor(compositor, 15000);
     if (!c) throw new Error("não achei a caixa de mensagem da IA (rode “Diagnosticar tela da IA”)");
@@ -167,7 +173,23 @@
       await dorme(1000);
     }
   }
+  // Minuta IA: depois de enviar, ela pesquisa, pensa e abre um editor em tela cheia; a minuta é o texto do editor, pronta quando aparece "Minuta gerada".
+  async function esperarMinuta(ms, estavelMs) {
+    const t0 = Date.now(); let ultimo = "", desde = Date.now();
+    const editor = () => document.querySelector("div[role='textbox'][aria-label='Conteúdo da minuta']");
+    const pronta = () => !!document.querySelector("[data-tiptap-ai-chat-message-variant='generation-complete']");
+    for (;;) {
+      if (Date.now() - t0 > ms) throw new Error("a Minuta IA não terminou de gerar no tempo limite");
+      if (bloqueio()) throw new Error("a Minuta IA pediu verificação humana (captcha): resolva na aba dela");
+      const e = editor(), t = e ? textoDe(e) : "";
+      if (t !== ultimo) { ultimo = t; desde = Date.now(); }
+      if (e && t.length > 400 && (pronta() || Date.now() - desde >= estavelMs * 3) && Date.now() - desde >= Math.min(estavelMs, 3000)) return { ok: true, texto: t, html: e.innerHTML, origem: "editor" };
+      if (!e && Date.now() - t0 > 240000) throw new Error("o editor com a minuta não abriu (a Minuta IA pode ter respondido só no chat, pedindo um comando)");
+      await dorme(1000);
+    }
+  }
   async function esperarResposta(ms = 600000, estavelMs = 6000) {
+    if (perfil().minuta) return esperarMinuta(ms, estavelMs);
     if (perfil().painel) return esperarPainel(ms, estavelMs);
     const marca = window.__projudiIAMarca || { antes: 0, textoAntes: "" };
     const t0 = Date.now(); let ultimo = "", desde = Date.now(), comecou = false, ultimoAlt = "", desdeAlt = Date.now();

@@ -15,7 +15,7 @@ const podeLupa = () => perfilStudio === "magistrado" || perfilStudio === "supera
 let passo = 1, modo = "studio", verTodas = false, verOcultas = false, aviso = "", ocupado = false;
 // passo 3 (escolher os processos): o que o usuário desmarcou, filtros e opções do passo 4
 let excl = new Set(), incluirFeitos = false, filtroTexto = "", selSit = { naoAnalisadas: true, preAnalisadas: true }, iaId = "chatgpt", entrada = "pdf";
-const SITES_IA = { chatgpt: "ChatGPT", gemini: "Gemini", claude: "Claude", jusbrasil: "IA do Jusbrasil" };
+const SITES_IA = { chatgpt: "ChatGPT", gemini: "Gemini", claude: "Claude", jusbrasil: "IA do Jusbrasil", minutaia: "Minuta IA" };
 const MODOS_STUDIO = ["studio", "lupa", "turbo", "ia"];      // modos que baixam o PDF e mandam para o Studio (o lote)
 const MODO_LOTE = { studio: "analise", lupa: "lupa", turbo: "turbo", ia: "ia" };
 const PRECISA_PROMPT = ["studio", "lupa", "ia"];      // o turbo detecta sozinho; Agaia tem o campo próprio; "só PDF" não usa prompt

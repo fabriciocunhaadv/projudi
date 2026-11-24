@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const SITES_IA = { chatgpt: { nome: "ChatGPT" }, gemini: { nome: "Gemini" }, claude: { nome: "Claude" }, jusbrasil: { nome: "IA do Jusbrasil" } };      // (o resto vive em ia-externa-cliente.js, carregado só no clique)
+const SITES_IA = { chatgpt: { nome: "ChatGPT" }, gemini: { nome: "Gemini" }, claude: { nome: "Claude" }, jusbrasil: { nome: "IA do Jusbrasil" }, minutaia: { nome: "Minuta IA" } };      // (o resto vive em ia-externa-cliente.js, carregado só no clique)
 const iaCliente = () => import("./ia-externa-cliente.js");
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const sa = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();

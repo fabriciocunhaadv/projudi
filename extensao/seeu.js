@@ -5,16 +5,21 @@ const msg = (t, tipo) => { const m = $("msg"); m.textContent = t; m.className = 
 const temPermissao = () => chrome.permissions.contains({ origins: ORIGENS });
 const abasSeeu = async () => (await chrome.tabs.query({ url: ORIGENS })).filter((t) => !!t.id);
 
+let lendoAreas = false;
+// A permissão do SEEU é opcional (a loja não desativa a extensão ao atualizar); o Chrome só deixa pedir num clique. Pedimos no primeiro clique em qualquer ponto da página.
+document.addEventListener("click", async () => { if (!(await temPermissao())) { try { await chrome.permissions.request({ origins: ORIGENS }); } catch (e) { /* recusou */ } atualizar().catch(() => {}); } }, true);
 async function atualizar() {
-  const ok = await temPermissao();
-  $("permEstado").textContent = ok ? "✔ Autorizado" : "Ainda não autorizado.";
-  $("permEstado").className = ok ? "ok" : "";
-  $("btnPerm").disabled = ok;
-  const abas = ok ? await abasSeeu() : [];
-  $("abaEstado").textContent = !ok ? "Autorize o SEEU primeiro." : abas.length ? `✔ ${abas.length} aba(s) do SEEU aberta(s).` : "Não achei nenhuma aba do SEEU aberta. Abra o SEEU e clique em “Verificar agora”.";
-  $("abaEstado").className = abas.length ? "ok" : "";
+  if (!(await temPermissao())) { $("estadoSeeu").textContent = "Clique em qualquer lugar desta página para liberar o SEEU (o Chrome pergunta uma única vez)."; $("estadoSeeu").className = "dica"; $("btnAbrirSeeu").hidden = true; $("btnCopiar").disabled = $("btnBaixar").disabled = $("btnAreas").disabled = $("btnLista").disabled = true; return; }
+  const abas = await abasSeeu();
+  $("estadoSeeu").textContent = abas.length ? `✔ SEEU encontrado (${abas.length} aba(s)).` : "Não achei o SEEU aberto. Abra-o e entre como de costume (a extensão nunca digita sua senha).";
+  $("estadoSeeu").className = abas.length ? "dica ok" : "dica";
+  $("btnAbrirSeeu").hidden = !!abas.length;
   $("btnCopiar").disabled = $("btnBaixar").disabled = $("btnAreas").disabled = $("btnLista").disabled = !abas.length;
+  if (abas.length && !lendoAreas && !$("areas").innerHTML) { lendoAreas = true; try { await lerAreas(true); } finally { lendoAreas = false; } }
 }
+$("btnAbrirSeeu").onclick = () => chrome.tabs.create({ url: "https://seeu.pje.jus.br/seeu/" });
+chrome.tabs.onUpdated.addListener((id, info, tab) => { if (info.status === "complete" && /seeu\.pje\.jus\.br/.test(tab.url || "")) atualizar().catch(() => {}); });
+chrome.tabs.onRemoved.addListener(() => atualizar().catch(() => {}));
 
 async function diagnostico() {
   const abas = await abasSeeu(); if (!abas.length) throw new Error("Abra o SEEU em uma aba e tente de novo.");
@@ -25,8 +30,6 @@ async function diagnostico() {
   return { texto: `DIAGNÓSTICO DO SEEU — ${quadros.length} quadro(s)\n\n` + partes.join("\n\n"), quadros: quadros.length };
 }
 
-$("btnPerm").onclick = async () => { try { const g = await chrome.permissions.request({ origins: ORIGENS }); msg(g ? "SEEU autorizado." : "Você não autorizou. Sem isso a extensão não consegue ver as telas do SEEU.", g ? "ok" : "erro"); } catch (e) { msg("✖ " + e.message, "erro"); } await atualizar(); };
-$("btnVerificar").onclick = async () => { await atualizar(); msg("Verificado.", "ok"); };
 $("btnCopiar").onclick = async () => { try { const d = await diagnostico(); await navigator.clipboard.writeText(d.texto); msg(`Diagnóstico copiado (${d.quadros} quadro(s), ${Math.round(d.texto.length / 1000)} mil caracteres). Cole na conversa.`, "ok"); } catch (e) { msg("✖ " + e.message, "erro"); } };
 $("btnBaixar").onclick = async () => { try { const d = await diagnostico(); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([d.texto], { type: "text/plain;charset=utf-8" })); a.download = "diagnostico-seeu.txt"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 3000); msg("Arquivo baixado. Anexe na conversa.", "ok"); } catch (e) { msg("✖ " + e.message, "erro"); } };
 // Executa um leitor em todos os quadros da aba e devolve o primeiro resultado que serve.
@@ -49,8 +52,9 @@ $("btnLista").onclick = async () => { try {
   const r = await lerNaAba(lerConclusoesSeeu, (x) => x.ok); if (!r) throw new Error("Não achei a lista de Conclusões. Abra Conclusões no SEEU (e clique em Filtrar) e tente de novo.");
   lidos = r.processos; $("resumoLista").textContent = `${r.processos.length} processo(s) nesta página. ${r.contador}`; desenharLista(); msg(`Li ${r.processos.length} processo(s).`, "ok");
 } catch (e) { msg("✖ " + e.message, "erro"); } };
-$("btnAreas").onclick = async () => { try {
-  const r = await lerNaAba(lerAreasSeeu, (x) => x.areas && x.areas.length); if (!r) throw new Error("Não achei a lista de serventias. Deixe aberta a tela “Área de atuação” (menu: Alterar Atuação) e tente de novo.");
-  $("areas").innerHTML = r.areas.map((a) => `<div>• ${esc(a.nome)}</div>`).join(""); msg(`${r.areas.length} serventia(s) encontrada(s).`, "ok");
-} catch (e) { msg("✖ " + e.message, "erro"); } };
+async function lerAreas(silencioso) { try {
+  const r = await lerNaAba(lerAreasSeeu, (x) => x.areas && x.areas.length); if (!r) throw new Error("Ainda não achei as serventias. Entre no SEEU (faça o login) e clique em “Ler serventias” de novo.");
+  $("areas").innerHTML = r.areas.map((a) => `<div>• ${esc(a.nome)}</div>`).join(""); if (!silencioso) msg(`${r.areas.length} serventia(s) encontrada(s) (${r.fonte}).`, "ok");
+} catch (e) { if (!silencioso) msg("✖ " + e.message, "erro"); } }
+$("btnAreas").onclick = () => lerAreas(false);
 atualizar().catch((e) => msg("✖ " + e.message, "erro"));
