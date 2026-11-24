@@ -7,9 +7,9 @@
   const dorme = (ms) => new Promise((ok) => setTimeout(ok, ms));
   const PERFIS = [
     { id: "chatgpt", nome: "ChatGPT", hosts: /(^|\.)chatgpt\.com$|(^|\.)chat\.openai\.com$/, novaConversa: "https://chatgpt.com/",
-      compositor: ["#prompt-textarea", "div[contenteditable='true'][id*='prompt']", "textarea"], resposta: ["[data-message-author-role='assistant']"],
-      enviar: ["button[data-testid='send-button']", "button[aria-label*='Enviar' i]", "button[aria-label*='Send' i]"], parar: ["button[data-testid='stop-button']", "button[aria-label*='Parar' i]", "button[aria-label*='Stop' i]"],
-      anexar: ["button[aria-label*='Anexar' i]", "button[aria-label*='Attach' i]", "button[aria-label*='Adicionar arquivos' i]", "button[data-testid='composer-plus-btn']"] },
+      compositor: ["#prompt-textarea", "div[contenteditable='true'][id*='prompt']", "div.ProseMirror[contenteditable='true']", "div[contenteditable='true'][role='textbox']", "textarea"], resposta: ["[data-message-author-role='assistant']", "article[data-testid*='conversation-turn'] .markdown"],
+      enviar: ["button[data-testid='send-button']", "#composer-submit-button", "button[data-testid='composer-submit-button']", "button[aria-label*='Enviar prompt' i]", "button[aria-label*='Send prompt' i]", "button[aria-label*='Enviar' i]", "button[aria-label*='Send' i]", "form button[type='submit']"], parar: ["button[data-testid='stop-button']", "button[aria-label*='Parar' i]", "button[aria-label*='Stop' i]"],
+      anexar: ["button[data-testid='composer-plus-btn']", "button[aria-label*='Adicionar arquivos' i]", "button[aria-label*='Adicionar fotos' i]", "button[aria-label*='Add files' i]", "button[aria-label*='Anexar' i]", "button[aria-label*='Attach' i]", "[data-testid='composer-leading-actions'] button", "form button[aria-haspopup='menu']"] },
     { id: "gemini", nome: "Gemini", hosts: /(^|\.)gemini\.google\.com$/, novaConversa: "https://gemini.google.com/app",
       compositor: ["rich-textarea .ql-editor", "div.ql-editor[contenteditable='true']", "div[contenteditable='true'][role='textbox']", "textarea"], resposta: ["message-content", ".model-response-text", "[data-test-id='model-response']"],
       enviar: ["button.send-button", "button[aria-label*='Enviar' i]", "button[aria-label*='Send' i]"], parar: ["button[aria-label*='Parar' i]", "button[aria-label*='Stop' i]", "button.stop"],
