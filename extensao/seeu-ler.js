@@ -29,29 +29,24 @@ async function lerAreasSeeu() {
   if (!areas.length && atual) { areas = [{ nome: atual }]; fonte = "só a atuação atual"; }
   return { areas, atual, fonte, url: location.href.replace(/(_tj=)[0-9a-zA-Z]+/g, "$1…") };
 }
-// Menu "Conclusões" da barra do SEEU (quadro da moldura): devolve os itens que abrem listas (conclusaoJuiz.do).
-function lerMenuConclusoesSeeu() {
+// Atuação (serventia) em que o usuário está logado agora: só lê o cabeçalho do usuário na tela.
+function lerAtuacaoSeeu() {
   const t = (e) => (e && e.textContent || "").replace(/\s+/g, " ").trim();
-  const topo = [...document.querySelectorAll("#main-menu > li")].find((li) => /^Conclus[õo]es/i.test(t(li.firstElementChild)));
-  if (!topo) return { ok: false };
-  const itens = [...topo.querySelectorAll("ul a[href]")].filter((a) => /conclusaoJuiz\.do/.test(a.getAttribute("href") || "")).map((a) => t(a));
-  return { ok: itens.length > 0, itens };
+  const atual = [...document.querySelectorAll("#userinfo .group")].map((g) => (/Atua[cç][aã]o/i.test(t(g.querySelector(".userinfo_label"))) ? (g.querySelector("span[title]:not(.userinfo_label)")?.getAttribute("title") || "") : "")).find(Boolean) || "";
+  return { atual };
 }
-// Abre no SEEU o item do menu "Conclusões" (é o mesmo clique que você daria; não confirma nada).
-function abrirMenuConclusoesSeeu(nome) {
-  const t = (e) => (e && e.textContent || "").replace(/\s+/g, " ").trim();
-  const topo = [...document.querySelectorAll("#main-menu > li")].find((li) => /^Conclus[õo]es/i.test(t(li.firstElementChild)));
-  const a = topo && [...topo.querySelectorAll("ul a[href]")].find((x) => t(x) === nome && /conclusaoJuiz\.do/.test(x.getAttribute("href") || ""));
-  if (!a) return { ok: false };
-  a.click(); return { ok: true };
-}
+// Item "Processos Remetidos p/ Conclusão" do menu Conclusões (quadro da barra do SEEU). Só existe nesse quadro.
+const ACHAR_REMETIDOS = () => { const t = (e) => (e && e.textContent || "").replace(/\s+/g, " ").trim(); return [...document.querySelectorAll("#main-menu a[href]")].find((a) => /Processos Remetidos p\/? ?Conclus[ãa]o/i.test(t(a)) && /processo\/conclusao\.do/.test(a.getAttribute("href") || "")); };
+function lerMenuConclusoesSeeu() { return { ok: !!ACHAR_REMETIDOS() }; }
+// Abre a lista (é o mesmo clique que você daria; não confirma nada).
+function abrirMenuConclusoesSeeu() { const a = ACHAR_REMETIDOS(); if (!a) return { ok: false }; a.click(); return { ok: true }; }
 function lerConclusoesSeeu() {
   const t = (e) => (e && e.textContent || "").replace(/\s+/g, " ").trim();
   const tabela = document.querySelector("table.resultTable");
   if (!tabela) return { ok: false, erro: "Não achei a lista de Conclusões neste quadro." };
   const processos = [];
   tabela.querySelectorAll("tr").forEach((tr) => {
-    const cb = tr.querySelector("input[name=idConclusoes]"), a = tr.querySelector('a[href*="visualizacaoProcesso.do"]');
+    const cb = tr.querySelector("input[name=idConclusoes]") || tr.querySelector("input[type=checkbox][value]:not([name=todos])"), a = tr.querySelector('a[href*="visualizacaoProcesso.do"]') || [...tr.querySelectorAll("a")].find((x) => /\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/.test(t(x)));
     if (!cb || !a) return;
     const numero = (t(a.querySelector("em")) || t(a)).match(/\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/)?.[0] || t(a);
     const cels = [...tr.children].map(t);
@@ -63,4 +58,4 @@ function lerConclusoesSeeu() {
   const contador = t(document.querySelector("#navigator .navLeft")) || (document.body.textContent.match(/\d+\s+registro\(s\)\s+encontrado\(s\)[^.]{0,60}/) || [""])[0];
   return { ok: true, processos, contador: contador.replace(/\s+/g, " ").trim(), url: location.href.replace(/(_tj=)[0-9a-zA-Z]+/g, "$1…") };
 }
-if (typeof globalThis !== "undefined") { globalThis.lerAreasSeeu = lerAreasSeeu; globalThis.lerMenuConclusoesSeeu = lerMenuConclusoesSeeu; globalThis.abrirMenuConclusoesSeeu = abrirMenuConclusoesSeeu; globalThis.lerConclusoesSeeu = lerConclusoesSeeu; }
+if (typeof globalThis !== "undefined") { globalThis.lerAreasSeeu = lerAreasSeeu; globalThis.lerAtuacaoSeeu = lerAtuacaoSeeu; globalThis.lerMenuConclusoesSeeu = lerMenuConclusoesSeeu; globalThis.abrirMenuConclusoesSeeu = abrirMenuConclusoesSeeu; globalThis.lerConclusoesSeeu = lerConclusoesSeeu; }

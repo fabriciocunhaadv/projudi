@@ -22,14 +22,18 @@ with sync_playwright() as p:
             assert not ps[1]["urgente"] and not ps[1]["reuPreso"] and ps[1]["tipo"].startswith("DESPACHO")
     # tela real: ícone "Alterar atuação" com javascript:openSubmitDialog('...') e menu Conclusões
     HOME = '<table id="userinfo"><tr><td><div class="group"><span class="userinfo_label">Atuação:</span> <span title="TJXX - Cidade - Vara 1">TJXX - Cidade - Vara 1</span> <a id="alterarAreaAtuacao" href="javascript:openSubmitDialog(\'/seeu/usuario/areaAtuacao.do?_tj=tok\', \'Alterar Atuação\', 0, 0);"><img></a></div></td></tr></table>'
-    MENU2 = '<nav><ul id="main-menu"><li><a href="#">Processos</a></li><li><a href="#">Conclusões</a><ul><li><a href="/seeu/processo/conclusaoJuiz.do?_tj=a" target="userMainFrame">Para Despacho</a></li><li><a href="/seeu/processo/conclusaoJuiz.do?_tj=b">Para Decisão</a></li><li><a href="/seeu/processo/buscaPreAnaliseConclusoesRealizadas.do?_tj=c">Buscar Pré-Análises</a></li></ul></li></ul></nav>'
+    MENU2 = '<nav><ul id="main-menu"><li><a href="#">Conclusões</a><ul><li><a href="/seeu/processo/conclusaoJuiz.do?_tj=a">Para Despacho</a></li><li><a href="/seeu/processo/conclusao.do?_tj=c">Processos Remetidos p/ Conclusão</a></li></ul></li></ul></nav>'
     def rota(r):
         if "areaAtuacao.do" in r.request.url: r.fulfill(body="<html><body>" + AREAS + "</body></html>", content_type="text/html; charset=iso-8859-1")
         else: r.fulfill(body="<html><body>" + HOME + MENU2 + "</body></html>", content_type="text/html; charset=utf-8")
     pg.route("**/*", rota); pg.goto("http://seeu.exemplo.test/h"); pg.add_script_tag(content=ler)
     r = pg.evaluate("lerAreasSeeu()"); assert r["fonte"] == "página Alterar atuação" and len(r["areas"]) == 2 and r["atual"] == "TJXX - Cidade - Vara 1", r
-    m = pg.evaluate("lerMenuConclusoesSeeu()"); assert m["itens"] == ["Para Despacho", "Para Decisão"], m
+    assert pg.evaluate("lerAtuacaoSeeu()")["atual"] == "TJXX - Cidade - Vara 1"
     pg.evaluate("document.addEventListener('click', (e) => e.preventDefault(), true)")
-    assert pg.evaluate("abrirMenuConclusoesSeeu('Para Decisão')")["ok"] and not pg.evaluate("abrirMenuConclusoesSeeu('Buscar Pré-Análises')")["ok"]
+    assert pg.evaluate("lerMenuConclusoesSeeu()")["ok"] and pg.evaluate("abrirMenuConclusoesSeeu()")["ok"]
+    # lista de "Processos Remetidos": checkbox sem o nome idConclusoes e sem links de partes
+    REM = '<table class="resultTable"><tr><th></th><th>Processo</th></tr><tr><td><input type="checkbox" value="9"></td><td>17/11/2026 14:13</td><td><a href="/seeu/x.do?_tj=1">0000035-12.2024.8.09.0117</a></td><td>DESPACHO</td><td>Fulano de Tal</td></tr></table>'
+    pg.route("**/*", lambda r: r.fulfill(body="<html><body>" + REM + "</body></html>", content_type="text/html; charset=utf-8")); pg.goto("http://seeu.exemplo.test/r"); pg.add_script_tag(content=ler)
+    ps = pg.evaluate("lerConclusoesSeeu()")["processos"]; assert len(ps) == 1 and ps[0]["numero"] == "0000035-12.2024.8.09.0117" and ps[0]["tipo"] == "DESPACHO" and ps[0]["entrada"].startswith("17/11/2026"), ps
     b.close()
 print("OK")
