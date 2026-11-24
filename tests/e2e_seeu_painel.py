@@ -6,7 +6,7 @@ html = open(os.path.join(RAIZ, "seeu.html"), encoding="utf-8").read()
 for n in ("seeu-diag.js", "seeu-ler.js", "seeu.js"): html = html.replace(f'<script src="{n}"></script>', "<script>" + open(os.path.join(RAIZ, n), encoding="utf-8").read() + "</script>")
 FALSO = """
 window.__msgs = []; const st = { seeu_marcados: null };
-const proc = { ok: true, processos: [{ idConclusao: '1', numero: '7000035-12.2024.8.09.0117', urgente: false, prioridade: true, reuPreso: true, entrada: '17/11/2026', tipo: 'DESPACHO', partes: [], agrupador: '', temAnalisar: true, analisarHref: 'https://seeu.pje.jus.br/seeu/processo/conclusao.do?_tj=t' }], total: 1, contador: '1 registro(s)', aviso: '' };
+const proc = { ok: true, processos: [{ idConclusao: '1', numero: '7000035-12.2024.8.09.0117', urgente: false, prioridade: true, reuPreso: true, entrada: '17/11/2026', tipo: 'DESPACHO', partes: [], agrupador: '', temAnalisar: true, analisarHref: 'https://seeu.pje.jus.br/seeu/processo/conclusao.do?_tj=t' }, { idConclusao: '2', numero: '7000001-01.2020.8.09.0117', urgente: false, prioridade: false, reuPreso: false, entrada: '01/09/2026 17:23', tipo: 'DECISÃO', partes: [], agrupador: '', temAnalisar: true, analisarHref: 'https://seeu.pje.jus.br/seeu/processo/conclusao.do?_tj=u' }], total: 2, contador: '1 registro(s)', aviso: '' };
 const quadro = { areas: [{ nome: 'TJXX - Vara A' }, { nome: 'TJXX - Vara B' }], atual: 'TJXX - Vara A', fonte: 'tela' };
 window.chrome = {
   permissions: { contains: async () => true, request: async () => true },
@@ -34,7 +34,8 @@ with sync_playwright() as p:
     assert "TJXX - Vara A" in pg.inner_text("#areas") and "LOGADO AQUI" in pg.inner_text("#areas")
     pg.click("#btnRemetidos"); pg.wait_for_selector("#lista table", timeout=15000)
     assert pg.locator("#cartaoEnvio").is_visible() and pg.locator("#btnEnviar").is_disabled()
-    pg.check("input[data-i='0']"); assert pg.locator("#btnEnviar").is_enabled()
+    ordem = pg.locator("#lista table tr td:nth-child(2)").all_inner_texts(); assert ordem[0].startswith("7000001-01.2020") and ordem[1].startswith("7000035-12.2024"), ordem      # mais antigo primeiro
+    pg.check("input[data-i='1']"); assert pg.locator("#btnEnviar").is_enabled()
     pg.fill("#txtPrompt", ""); pg.click("#btnEnviar"); pg.wait_for_timeout(200); assert "nome do prompt" in pg.inner_text("#msg") and not pg.evaluate("window.__msgs.length")
     pg.fill("#txtPrompt", "Decisão — execução penal"); pg.click("#btnEnviar"); pg.wait_for_selector("#passos .ok", timeout=20000)
     m = pg.evaluate("window.__msgs"); assert len(m) == 1, m

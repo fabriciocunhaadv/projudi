@@ -48,6 +48,9 @@ function desenharLista() {
   const t = $("todos"); if (t) t.onchange = () => { lidos.forEach((p) => { p.marcado = t.checked; }); desenharLista(); mostrarMarcados(); };
   mostrarMarcados();
 }
+// Do mais antigo para o mais novo (data de envio da conclusão); sem data vai para o fim.
+const tempoDe = (s) => { const m = String(s || "").match(/(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?/); return m ? new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0)).getTime() : Infinity; };
+const ordenarMaisAntigoPrimeiro = (ps) => ps.map((p, i) => ({ p, i })).sort((a, b) => tempoDe(a.p.entrada) - tempoDe(b.p.entrada) || a.i - b.i).map((x) => x.p);
 let atualSeeu = "";
 const igual = (x, y) => String(x || "").replace(/\s+/g, " ").trim().toLowerCase() === String(y || "").replace(/\s+/g, " ").trim().toLowerCase();
 async function lerTodosQuadros(func, args) { const abas = await abasSeeu(); if (!abas.length) return []; const aba = abas.find((t) => t.active) || abas[0]; const rs = await chrome.scripting.executeScript({ target: { tabId: aba.id, allFrames: true }, func, args: args || [] }); return rs.map((r) => r.result).filter(Boolean); }
@@ -77,7 +80,7 @@ async function abrirRemetidos() { try {
   const ok = await lerNaAba(abrirMenuConclusoesSeeu, (x) => x.ok); if (!ok) throw new Error("Não achei esse item no menu do SEEU. Abra o SEEU (tela com o menu no alto) e tente de novo.");
   let r = null; for (let k = 0; k < 20 && !r; k++) { await new Promise((s) => setTimeout(s, 1000)); r = await lerNaAba(lerConclusoesSeeu, (x) => x.ok && x.processos.length).catch(() => null); }
   if (!r) throw new Error("A tela abriu, mas não achei processos. Se o SEEU mostra um filtro, clique em Filtrar nele e depois em “Abrir Processos Remetidos p/ Conclusão” de novo.");
-  lidos = r.processos; serventiaDaLista = atualSeeu; $("resumoLista").innerHTML = `<b>Serventia: ${esc(serventiaDaLista || "?")}</b> — ${r.processos.length} processo(s)${r.total && r.processos.length >= r.total ? " (todas as páginas, numa lista só)" : " nesta página"}. ${esc(r.aviso || "")}`; desenharLista(); msg(`Li ${r.processos.length} processo(s) de ${serventiaDaLista || "sua serventia"}.`, "ok");
+  lidos = ordenarMaisAntigoPrimeiro(r.processos); serventiaDaLista = atualSeeu; $("resumoLista").innerHTML = `<b>Serventia: ${esc(serventiaDaLista || "?")}</b> — ${r.processos.length} processo(s)${r.total && r.processos.length >= r.total ? " (todas as páginas, numa lista só)" : " nesta página"}. ${esc(r.aviso || "")}`; desenharLista(); msg(`Li ${r.processos.length} processo(s) de ${serventiaDaLista || "sua serventia"}.`, "ok");
 } catch (e) { msg("✖ " + e.message, "erro"); } }
 $("btnRemetidos").onclick = abrirRemetidos;
 
