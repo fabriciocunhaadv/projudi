@@ -35,11 +35,17 @@ function lerAtuacaoSeeu() {
   const atual = [...document.querySelectorAll("#userinfo .group")].map((g) => (/Atua[cç][aã]o/i.test(t(g.querySelector(".userinfo_label"))) ? (g.querySelector("span[title]:not(.userinfo_label)")?.getAttribute("title") || "") : "")).find(Boolean) || "";
   return { atual };
 }
-// Item "Processos Remetidos p/ Conclusão" do menu Conclusões (quadro da barra do SEEU). Só existe nesse quadro.
-const ACHAR_REMETIDOS = () => { const t = (e) => (e && e.textContent || "").replace(/\s+/g, " ").trim(); return [...document.querySelectorAll("#main-menu a[href]")].find((a) => /Processos Remetidos p\/? ?Conclus[ãa]o/i.test(t(a)) && /processo\/conclusao\.do/.test(a.getAttribute("href") || "")); };
-function lerMenuConclusoesSeeu() { return { ok: !!ACHAR_REMETIDOS() }; }
+// Item "Processos Remetidos p/ Conclusão" do menu Conclusões (quadro da barra do SEEU). Funções AUTOCONTIDAS: são injetadas uma a uma, não enxergam nada fora delas.
+function lerMenuConclusoesSeeu() {
+  const t = (e) => (e && e.textContent || "").replace(/\s+/g, " ").trim();
+  return { ok: !![...document.querySelectorAll("#main-menu a[href]")].find((a) => /Processos Remetidos p\/? ?Conclus[ãa]o/i.test(t(a)) && /processo\/conclusao\.do/.test(a.getAttribute("href") || "")) };
+}
 // Abre a lista (é o mesmo clique que você daria; não confirma nada).
-function abrirMenuConclusoesSeeu() { const a = ACHAR_REMETIDOS(); if (!a) return { ok: false }; a.click(); return { ok: true }; }
+function abrirMenuConclusoesSeeu() {
+  const t = (e) => (e && e.textContent || "").replace(/\s+/g, " ").trim();
+  const a = [...document.querySelectorAll("#main-menu a[href]")].find((x) => /Processos Remetidos p\/? ?Conclus[ãa]o/i.test(t(x)) && /processo\/conclusao\.do/.test(x.getAttribute("href") || ""));
+  if (!a) return { ok: false }; a.click(); return { ok: true };
+}
 // Lista de processos de TODAS as páginas, numa só: lê a página da tela e, se o SEEU diz que há mais registros, pede as outras páginas
 // do mesmo jeito que os botões de página dele (reenvia o formulário da lista com outro número de página e 100 por página). Só leitura.
 async function lerConclusoesSeeu() {

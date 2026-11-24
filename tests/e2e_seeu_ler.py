@@ -31,6 +31,13 @@ with sync_playwright() as p:
     assert pg.evaluate("lerAtuacaoSeeu()")["atual"] == "TJXX - Cidade - Vara 1"
     pg.evaluate("document.addEventListener('click', (e) => e.preventDefault(), true)")
     assert pg.evaluate("lerMenuConclusoesSeeu()")["ok"] and pg.evaluate("abrirMenuConclusoesSeeu()")["ok"]
+    # as funções são injetadas UMA A UMA (sem enxergar o resto do arquivo): rodar cada uma isolada numa página sem o seeu-ler.js
+    pg.goto("http://seeu.exemplo.test/h"); pg.add_script_tag(content=ler)
+    fontes = {n: pg.evaluate(f"{n}.toString()") for n in ("lerAreasSeeu", "lerAtuacaoSeeu", "lerMenuConclusoesSeeu", "abrirMenuConclusoesSeeu", "lerConclusoesSeeu")}
+    pg2 = b.new_page(); pg2.route("**/*", rota); pg2.goto("http://seeu.exemplo.test/h2")
+    pg2.evaluate("document.addEventListener('click', (e) => e.preventDefault(), true)")
+    assert pg2.evaluate("(" + fontes["lerMenuConclusoesSeeu"] + ")()")["ok"] and pg2.evaluate("(" + fontes["abrirMenuConclusoesSeeu"] + ")()")["ok"]
+    assert pg2.evaluate("(" + fontes["lerAtuacaoSeeu"] + ")()")["atual"] and len(pg2.evaluate("(" + fontes["lerAreasSeeu"] + ")()")["areas"]) == 2
     # lista de "Processos Remetidos": checkbox sem o nome idConclusoes e sem links de partes
     REM = '<table class="resultTable"><tr><th></th><th>Processo</th></tr><tr><td><input type="checkbox" value="9"></td><td>17/11/2026 14:13</td><td><a href="/seeu/x.do?_tj=1">0000035-12.2024.8.09.0117</a></td><td>DESPACHO</td><td>Fulano de Tal</td></tr></table>'
     pg.route("**/*", lambda r: r.fulfill(body="<html><body>" + REM + "</body></html>", content_type="text/html; charset=utf-8")); pg.goto("http://seeu.exemplo.test/r"); pg.add_script_tag(content=ler)
