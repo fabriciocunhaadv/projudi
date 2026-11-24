@@ -87,7 +87,7 @@
     sh.innerHTML = `<style>.w{position:fixed;left:6px;bottom:8px;z-index:2147483647;font:12px system-ui,sans-serif;display:flex;flex-direction:column;gap:4px;align-items:flex-start}
       button{font:12px system-ui;padding:5px 9px;border:1px solid #1a56a0;background:#1a56a0;color:#fff;border-radius:5px;cursor:pointer}button.s{background:#fff;color:#1a56a0}
       .m{background:#fffbe6;border:1px solid #e0c36a;border-radius:4px;padding:3px 6px;color:#333;display:none}.r{display:flex;flex-direction:column;gap:4px;align-items:flex-start}.r[hidden]{display:none}.rt{background:#e8f6ec;border:1px solid #16803c;border-radius:4px;padding:4px 7px;color:#14532d;max-width:420px}</style>
-      <div class="w"><div class="m"></div><div class="r" hidden><div class="rt">↩ Refazer a minuta no Studio: marque só as movimentações que quer e aperte o botão verde.</div><button data-a="refazer" style="background:#16803c;border-color:#16803c;font-weight:700">↩ Devolver ao Studio e refazer a minuta</button></div><button data-a="todos">⬇ Gerar e baixar tudo (extensão)</button><button data-a="turbo" style="background:#d9780a;border-color:#d9780a">⚡ Gerar e enviar à Análise Turbo</button><button class="s" data-a="diag">Copiar diagnóstico</button></div>`;
+      <div class="w"><div class="m"></div><div class="r" hidden><div class="rt">↩ Refazer a minuta no Studio: marque só as movimentações que quer e aperte o botão verde.</div><button data-a="refazer" style="background:#16803c;border-color:#16803c;font-weight:700">↩ Devolver ao Studio e refazer a minuta</button></div><button data-a="todos">⬇ Gerar e baixar tudo (extensão)</button><button data-a="esteira" style="background:#0e7490;border-color:#0e7490">📥 Gerar e jogar na esteira (Studio)</button><button data-a="turbo" style="background:#d9780a;border-color:#d9780a">⚡ Gerar e enviar à Análise Turbo</button><button class="s" data-a="diag">Copiar diagnóstico</button></div>`;
     const msg = (t) => { const m = sh.querySelector(".m"); m.textContent = t; m.style.display = "block"; };
     window.__projudiMsg = msg;
     const botaoTodos = sh.querySelector('[data-a="todos"]');
@@ -115,7 +115,16 @@
       const c = await contexto(), { opcoesLote: o = {} } = await chrome.storage.sync.get("opcoesLote");
       const seguir = !!o.studio && o.modo !== "lupa";
       const r = await executar({ ...modoDoBotao(), processo: c.cnj, studio: seguir ? { ativo: true, modo: "analise", prompt: c.prompt, tipo: "", minuta: "", url: c.url, urlPre: "", docs: false } : null });
-      msg(r.erro ? "✖ " + r.erro : r.interceptado ? `PDF pedido (${r.arquivos} arquivo(s) em ${r.movimentacoes} movimentação(ões)); a extensão faz o OCR e salva em Downloads.${seguir ? " Depois segue para a esteira de minutas (Studio)" + (c.cnj ? " — " + c.cnj : "") + (c.prompt ? ", prompt: " + c.prompt : " — prompt não definido (atualize a tela do processo)") + "." : ""}` : "Gerando o PDF do Projudi…");
+      msg(r.erro ? "✖ " + r.erro : r.interceptado ? `PDF pedido (${r.arquivos} arquivo(s) em ${r.movimentacoes} movimentação(ões)); a extensão faz o OCR e salva em Downloads.${!seguir ? " Este botão só baixa: para mandar para a esteira do Studio use o botão “Gerar e jogar na esteira (Studio)”." : ""}${seguir ? " Depois segue para a esteira de minutas (Studio)" + (c.cnj ? " — " + c.cnj : "") + (c.prompt ? ", prompt: " + c.prompt : " — prompt não definido (atualize a tela do processo)") + "." : ""}` : "Gerando o PDF do Projudi…");
+    };
+    // Botão da esteira: baixa com OCR e SEMPRE segue para a esteira de minutas do Studio (modo Análise), com o prompt da serventia — sem depender da opção do painel.
+    const botaoEsteira = sh.querySelector('[data-a="esteira"]');
+    const rotuloE = () => { const n = marcadasPeloUsuario(), todos = document.getElementById("todos"); botaoEsteira.textContent = n && !(todos && todos.checked) ? `📥 Gerar só os ${n} marcados e jogar na esteira (Studio)` : "📥 Gerar tudo e jogar na esteira (Studio)"; };
+    rotuloE(); setInterval(rotuloE, 600);
+    botaoEsteira.onclick = async () => {
+      const c = await contexto();
+      const r = await executar({ ...modoDoBotao(), processo: c.cnj, studio: { ativo: true, modo: "analise", prompt: c.prompt, tipo: "", minuta: "", url: c.url, urlPre: "", docs: false } });
+      msg(r.erro ? "✖ " + r.erro : `PDF pedido (${r.arquivos ?? r.marcadas} arquivo(s)) de ${c.cnj || "processo não identificado"}${c.prompt ? " — prompt: " + c.prompt : " — prompt não definido (atualize a tela do processo no Projudi)"}; depois do OCR ele vai para a esteira de minutas do Studio. Deixe o Studio aberto e acompanhe pela aba “Esteira” da extensão.`);
     };
     const botaoTurbo = sh.querySelector('[data-a="turbo"]');
     const rotuloT = () => { const n = marcadasPeloUsuario(), todos = document.getElementById("todos"); botaoTurbo.textContent = n && !(todos && todos.checked) ? `⚡ Gerar só os ${n} marcados e enviar à Análise Turbo` : "⚡ Gerar tudo e enviar à Análise Turbo"; };
@@ -136,7 +145,7 @@
     chrome.storage.local.get("refazer_pedido").then(({ refazer_pedido: rp }) => {
       if (!rp || Date.now() - rp.ts > 3600000) return;
       blocoRefazer.hidden = false;
-      for (const a of ["todos", "turbo"]) sh.querySelector(`[data-a="${a}"]`).style.display = "none";      // neste caminho só vale devolver ao Studio
+      for (const a of ["todos", "esteira", "turbo"]) sh.querySelector(`[data-a="${a}"]`).style.display = "none";      // neste caminho só vale devolver ao Studio
       botaoRefazer.onclick = async () => {
         const f = faixaMarcada();
         if (!f.n) { msg("Marque ao menos uma movimentação (ou arquivo) na lista antes de devolver ao Studio."); return; }

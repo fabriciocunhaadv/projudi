@@ -122,6 +122,15 @@ def main():
             man.wait_for_timeout(500)
         assert len(CORPOS) > n0, (n0, len(CORPOS), [c[:80] for c in CORPOS])
         q2 = pq(CORPOS[-1]); print(q2); assert q2["codigosArquivos"] == ["102;"] and q2["codigosMovimentacoes"] == ["11;"], q2
+        rotE = man.evaluate("document.querySelector('[data-projudi-ext=gerarpdf]').shadowRoot.querySelector('[data-a=esteira]').textContent")
+        print(rotE); assert "só os 2 marcados" in rotE and "esteira" in rotE, rotE      # botão que sempre joga na esteira do Studio
+        n1 = len(CORPOS); man.locator("[data-projudi-ext=gerarpdf] [data-a=esteira]").click()
+        for _ in range(120):
+            if len(CORPOS) > n1: break
+            man.wait_for_timeout(500)
+        assert len(CORPOS) > n1, "o botão da esteira pediu o PDF"
+        txtm = man.evaluate("document.querySelector('[data-projudi-ext=gerarpdf]').shadowRoot.querySelector('.m').textContent")
+        print(txtm); assert "esteira de minutas do Studio" in txtm, txtm
         print("OK")
         ctx.close()
 
