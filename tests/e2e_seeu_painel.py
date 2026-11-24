@@ -28,20 +28,26 @@ window.chrome = {
 with sync_playwright() as p:
     b = p.chromium.launch(executable_path='/opt/pw-browsers/chromium', args=['--no-sandbox']); pg = b.new_page(); erros = []
     pg.on("pageerror", lambda e: erros.append(str(e)[:200]))
-    pg.route("**/*", lambda r: r.fulfill(body=open(os.path.join(RAIZ, r.request.url.split("/")[-1]), encoding="utf-8").read(), content_type="text/javascript") if r.request.url.endswith(".js") else r.fulfill(body=html, content_type="text/html; charset=utf-8")); pg.add_init_script(FALSO)
+    STUB = "export async function lerPromptDoStudio() { throw Object.assign(new Error('x'), { opcoes: ['Decisão — execução penal', 'Despacho — execução penal'] }); }"
+    pg.route("**/*", lambda r: r.fulfill(body=STUB, content_type="text/javascript") if r.request.url.endswith("studio-cliente.js") else r.fulfill(body=open(os.path.join(RAIZ, r.request.url.split("/")[-1]), encoding="utf-8").read(), content_type="text/javascript") if r.request.url.endswith(".js") else r.fulfill(body=html, content_type="text/html; charset=utf-8")); pg.add_init_script(FALSO)
     pg.goto("http://painel.test/seeu.html"); pg.wait_for_timeout(600)
-    assert not pg.locator("#cartaoEnvio").is_visible()
+    assert pg.locator("#p1").is_visible() and not pg.locator("#p3").is_visible() and pg.locator("#go1").is_enabled()
+    pg.click("#go1"); assert pg.locator("#p2").is_visible()
     assert "TJXX - Vara A" in pg.inner_text("#areas") and "LOGADO AQUI" in pg.inner_text("#areas")
+    pg.click("#p2 [data-go='3']"); assert pg.locator("#go3").is_disabled()
     pg.click("#btnRemetidos"); pg.wait_for_selector("#lista table", timeout=15000)
-    assert pg.locator("#cartaoEnvio").is_visible() and pg.locator("#btnEnviar").is_disabled()
     ordem = pg.locator("#lista table tr td:nth-child(2)").all_inner_texts(); assert ordem[0].startswith("7000001-01.2020") and ordem[1].startswith("7000035-12.2024"), ordem      # mais antigo primeiro
-    pg.check("input[data-i='1']"); assert pg.locator("#btnEnviar").is_enabled()
-    pg.fill("#txtPrompt", ""); pg.click("#btnEnviar"); pg.wait_for_timeout(200); assert "nome do prompt" in pg.inner_text("#msg") and not pg.evaluate("window.__msgs.length")
-    pg.fill("#txtPrompt", "Decisão — execução penal"); pg.click("#btnEnviar"); pg.wait_for_selector("#passos .ok", timeout=20000)
+    pg.check("input[data-i='1']"); assert pg.locator("#go3").is_enabled()
+    pg.click("#go3"); assert pg.locator("#p4").is_visible()
+    pg.wait_for_function("document.querySelectorAll('#selPrompt option').length > 1")
+    assert [o for o in pg.locator("#selPrompt option").all_inner_texts()][1:] == ["Decisão — execução penal", "Despacho — execução penal"]      # a lista do Studio
+    pg.click("#btnEnviar"); pg.wait_for_timeout(200); assert "Escolha o prompt" in pg.inner_text("#msg") and not pg.evaluate("window.__msgs.length")
+    pg.select_option("#selPrompt", "Decisão — execução penal"); pg.click("#btnEnviar"); pg.wait_for_selector("#passos .ok", timeout=20000)
+    assert pg.locator("#p5").is_visible()
     m = pg.evaluate("window.__msgs"); assert len(m) == 1, m
     m = m[0]; assert m["acao"] == "gerar-pdf-interceptar" and m["origem"] == "seeu" and m["metodo"] == "post" and m["corpo"] == "arquivos=1-0.1&arquivos=2-0.2" and m["nome"] == "7000035-12.2024.8.09.0117", m
     assert m["studio"]["ativo"] and m["studio"]["modo"] == "analise" and m["studio"]["prompt"] == "Decisão — execução penal" and m["studio"]["serventia"] == "TJXX - Vara A" and m["lote"].startswith("seeu_"), m["studio"]
-    pg.select_option("#selDestino", "ia:minutaia"); pg.click("#btnEnviar"); pg.wait_for_timeout(1500)
+    pg.click("#p5 [data-go='3']"); pg.click("#go3"); pg.click("#opcoes .opt[data-v='ia:minutaia']"); pg.click("#btnEnviar"); pg.wait_for_function("window.__msgs.length >= 2", timeout=20000)
     m2 = pg.evaluate("window.__msgs")[-1]; assert m2["studio"]["modo"] == "ia" and m2["studio"]["iaId"] == "minutaia", m2["studio"]
     assert not erros, erros
     print("OK"); b.close()
