@@ -404,3 +404,6 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 - 5.3.1: exportação pelo botão "Processo" (não "Capa").
 - 5.3.3: o painel do SEEU (seeu.html) passa a ser aberto pelo Studio (tela “O que fazer hoje?”): manifest libera seeu.html em web_accessible_resources para o Studio e studio-base.js anuncia o recurso "seeu-web".
 - 5.3.4: Minuta IA — ao anexar, aparece o diálogo "Importar arquivo(s)" (Documento / Modelo); a extensão mantém "Documento" (contexto) e clica em Continuar (antes o envio seguia com o diálogo aberto e travava). Jusbrasil: relato de que não enviou o prompt e ficou parado numa tela — SEM diagnóstico da tela ainda (pedir o 'Diagnosticar tela da IA' / print).
+
+## Studio — Fontes dos autos (25/11) — pronto no Studio, NÃO publicado
+Ícone ▤ (trecho dos autos grifado) e "!" (sem prova literal) ao lado de cada citação Mov./Arq./Pág. da minuta do Studio; artigos continuam com "§". Guardado num cofre PRÓPRIO do servidor (tabela `fontes_autos`, fora do Histórico/Mapa/Gigantes/esteira), validade de 10 dias com limpeza automática; faixa acima da minuta com "Apagar tudo agora" e "Desligar" (desfazer); `FONTES_AUTOS=off` desliga para todos. Detalhes e testes em `CONTINUIDADE.md` do repositório do Studio. A extensão não mudou.
