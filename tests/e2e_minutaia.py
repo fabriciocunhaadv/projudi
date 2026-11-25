@@ -31,4 +31,17 @@ with sync_playwright() as p:
     assert not pg.evaluate("window.__semContexto") and pg.evaluate("window.__cliques") == 2, "clicou Voltar (não Continuar sem contexto) e enviou de novo"
     assert "Elabore a minuta" in env and env.startswith("Você é assessor"), env
     assert r["origem"] == "editor" and "Trecho 12" in r["texto"] and len(r["texto"]) > 400, r["texto"][:200]
+        # documento GRANDE: depois do "Continuar" abre a "Seleção assistida"; a extensão deixa a seleção e clica em "Importar selecionados" (nunca em "Importar tudo mesmo assim")
+    pg.evaluate("""() => { window.__grande = true; }""")
+    pg2 = b.new_context().new_page(); pg2.route("**/*", lambda r: r.fulfill(body=PAG.replace("</script>", """
+document.querySelector('input').onchange=e=>{const nome=e.target.files[0].name;const d=document.createElement('div');d.id='imp';d.setAttribute('role','dialog');d.innerHTML='<h2>Importar arquivo(s)</h2><label><input type=radio name=m value=doc checked> Documento</label><label><input type=radio name=m value=mod> Modelo</label><button id=cont>Continuar</button>';document.body.appendChild(d);
+ d.querySelector('#cont').onclick=()=>{window.__modo=d.querySelector('input:checked').value;d.remove();setTimeout(()=>{const x=document.createElement('div');x.id='sel';x.setAttribute('role','dialog');x.innerHTML='<h2>Seleção assistida</h2><span>'+nome+' · 30.2 MB · 389 páginas</span><button id=tudo>Importar tudo mesmo assim</button><button id=so>Importar selecionados</button>';document.body.appendChild(x);
+  x.querySelector('#tudo').onclick=()=>{window.__tudo=true;};
+  x.querySelector('#so').onclick=()=>{window.__selecionados=true;x.remove();setTimeout(()=>{document.getElementById('docs').textContent=nome;},500);};},4000);};};
+</script>"""), content_type="text/html; charset=utf-8"))
+    pg2.goto("http://www.minutaia.com.br/x", wait_until='commit'); pg2.wait_for_selector('body'); pg2.add_script_tag(content=agente)
+    pg2.evaluate("__projudiIA.anexar('7000367-50-OCR.pdf', %r)" % b64)
+    assert pg2.evaluate("window.__selecionados") is True and not pg2.evaluate("window.__tudo"), "clicou em Importar selecionados (e NÃO em Importar tudo mesmo assim)"
+    assert pg2.evaluate("window.__modo") == "documento" or pg2.evaluate("window.__modo") == "doc", "manteve Documento"
+    assert "7000367-50-OCR" in pg2.inner_text("#docs") and pg2.locator("#sel").count() == 0 and pg2.locator("#imp").count() == 0, "terminou com o arquivo listado e sem telas abertas"
     print("OK"); b.close()

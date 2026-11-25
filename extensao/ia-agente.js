@@ -107,14 +107,40 @@
     for (let e = t, i = 0; e && i < 8; e = e.parentElement, i++) { const b = [...e.querySelectorAll("button")].find((x) => /^\s*continuar\s*$/i.test(x.textContent || "") && visivel(x)); if (b) return { botao: b, raiz: e }; }
     return null;
   };
-  async function tratarImportacao() {
+  // Minuta IA, documento grande: abre "Seleção assistida" (faixas recomendadas já marcadas, "Importar tudo mesmo assim" / "Importar selecionados"). Deixa a seleção como está e clica em "Importar selecionados".
+  const selecaoAssistida = () => {
+    const t = [...document.querySelectorAll("h1,h2,h3,h4,div,span,p")].filter((e) => !e.children.length && /^\s*Sele[cç][aã]o assistida\b/i.test(e.textContent || "") && visivel(e)).pop(); if (!t) return null;
+    for (let e = t, i = 0; e && i < 14; e = e.parentElement, i++) { const bt = [...e.querySelectorAll("button")].find((x) => /^\s*importar selecionados\s*$/i.test(x.textContent || "") && visivel(x)); if (bt) return { botao: bt, raiz: e }; }
+    return null;
+  };
+  /** Trata, em qualquer ordem, as telas que a Minuta IA abre ao receber o arquivo: "Importar arquivo(s)" (Documento → Continuar), "Seleção assistida" (→ Importar selecionados) e "nenhum contexto adicionado" (→ Voltar).
+   *  Termina quando fica `silencio` ms sem nenhuma tela (a Seleção assistida demora a abrir em documento grande). Devolve o que tratou. */
+  async function resolverTelasMinuta({ silencio = 2000, ate = 60000 } = {}) {
+    const t0 = Date.now(), feitas = []; let ultimaTela = Date.now();
+    while (Date.now() - t0 < ate && Date.now() - ultimaTela < silencio) {
+      const sel = selecaoAssistida();
+      if (sel) {
+        await esperarPor(() => !desabilitado(sel.botao), 20000, 300);
+        sel.botao.click(); feitas.push("selecao");
+        await esperarPor(() => !selecaoAssistida(), 240000, 500); await dorme(800); ultimaTela = Date.now(); continue;
+      }
+      const imp = dialogoImportar();
+      if (imp) {
+        const radios = [...imp.raiz.querySelectorAll("input[type='radio'], [role='radio']")];
+        const marcado = (r) => r.checked === true || r.getAttribute("aria-checked") === "true" || r.getAttribute("data-state") === "checked";
+        if (radios.length && !radios.some(marcado)) radios[0].click();      // o primeiro é "Documento" (contexto)
+        await dorme(400); imp.botao.click(); feitas.push("importar");
+        await esperarPor(() => !dialogoImportar(), 10000, 300); await dorme(800); ultimaTela = Date.now(); continue;
+      }
+      const av = avisoSemContexto();
+      if (av) { av.click(); feitas.push("contexto"); await dorme(1200); ultimaTela = Date.now(); continue; }
+      await dorme(300);
+    }
+    return feitas;
+  }
+  async function tratarImportacao() {      // (compatível) só o diálogo "Importar arquivo(s)"
     const d = await esperarPor(dialogoImportar, 8000, 250); if (!d) return false;
-    const radios = [...d.raiz.querySelectorAll("input[type='radio'], [role='radio']")];
-    const marcado = (r) => r.checked === true || r.getAttribute("aria-checked") === "true" || r.getAttribute("data-state") === "checked";
-    if (radios.length && !radios.some(marcado)) radios[0].click();      // o primeiro é "Documento" (contexto)
-    await dorme(400); d.botao.click();
-    await esperarPor(() => !dialogoImportar(), 10000, 300); await dorme(800);
-    return true;
+    return (await resolverTelasMinuta({ silencio: 12000, ate: 300000 })).length > 0;
   }
   async function anexar(nome, b64) {
     const arq = b64ParaArquivo(nome, b64), base = nome.replace(/\.pdf$/i, "");
@@ -147,14 +173,15 @@
     return null;
   };
   async function enviar() {
+    if (perfil().minuta) await resolverTelasMinuta({ silencio: 1500, ate: 300000 });      // tela da importação ainda aberta (ex.: Seleção assistida): resolve antes de enviar
     const b = await esperarPor(() => { const x = botaoEnviar(); return x && !desabilitado(x) ? x : null; }, 120000, 500);
     const antes = respostas().length, textoAntes = respostas().length ? textoDe(respostas()[respostas().length - 1]) : "";
     if (b) b.click(); else { const c = compositor(); if (!c) throw new Error("não achei o botão de enviar"); for (const t of ["keydown", "keypress", "keyup"]) c.dispatchEvent(new KeyboardEvent(t, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true })); }
-    // Minuta IA: se aparecer "Atenção: nenhum contexto adicionado!", clica em "Voltar" (o PDF já está anexado e o prompt já está no chat) e clica em Enviar de novo
+    // Minuta IA: depois de enviar podem aparecer "Atenção: nenhum contexto adicionado!" (→ Voltar), "Importar arquivo(s)" (→ Documento + Continuar) e "Seleção assistida" (→ Importar selecionados);
+    // trata o que aparecer (o PDF já está anexado e o prompt já está no chat) e clica em Enviar de novo
     if (perfil().minuta) {
       for (let tent = 0; tent < 3; tent++) {
-        const aviso = await esperarPor(avisoSemContexto, 3500, 250); if (!aviso) break;
-        aviso.click(); await dorme(1200);
+        const feitas = await resolverTelasMinuta({ silencio: 3500, ate: 300000 }); if (!feitas.length) break;
         const de = await esperarPor(() => { const x = botaoEnviar(); return x && !desabilitado(x) ? x : null; }, 15000, 300); if (!de) break;
         de.click();
       }
