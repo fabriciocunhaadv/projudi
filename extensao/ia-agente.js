@@ -101,12 +101,27 @@
 
   const partes = new Map();
   function b64ParaArquivo(nome, b64) { const bin = atob(b64); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new File([u], nome, { type: "application/pdf" }); }
+  // Minuta IA: ao anexar, abre "Importar arquivo(s) — Selecione como deseja tratar 1 arquivo" (Documento / Modelo). Mantém "Documento" (vai para o contexto) e clica em Continuar.
+  const dialogoImportar = () => {
+    const t = [...document.querySelectorAll("h1,h2,h3,h4,div,span,p")].filter((e) => !e.children.length && /^\s*Importar arquivo\(s\)\s*$/i.test(e.textContent || "") && visivel(e)).pop(); if (!t) return null;
+    for (let e = t, i = 0; e && i < 8; e = e.parentElement, i++) { const b = [...e.querySelectorAll("button")].find((x) => /^\s*continuar\s*$/i.test(x.textContent || "") && visivel(x)); if (b) return { botao: b, raiz: e }; }
+    return null;
+  };
+  async function tratarImportacao() {
+    const d = await esperarPor(dialogoImportar, 8000, 250); if (!d) return false;
+    const radios = [...d.raiz.querySelectorAll("input[type='radio'], [role='radio']")];
+    const marcado = (r) => r.checked === true || r.getAttribute("aria-checked") === "true" || r.getAttribute("data-state") === "checked";
+    if (radios.length && !radios.some(marcado)) radios[0].click();      // o primeiro é "Documento" (contexto)
+    await dorme(400); d.botao.click();
+    await esperarPor(() => !dialogoImportar(), 10000, 300); await dorme(800);
+    return true;
+  }
   async function anexar(nome, b64) {
     const arq = b64ParaArquivo(nome, b64), base = nome.replace(/\.pdf$/i, "");
     const apareceu = (ms) => esperarPor(() => { const t = document.body.innerText || ""; return t.includes(nome) || t.includes(base) || t.includes(base.slice(0, 20)); }, ms, 500);
     const novoDt = () => { const dt = new DataTransfer(); dt.items.add(arq); return dt; };
     const tentativas = [];
-    const porCampo = async (campo) => { campo.files = novoDt().files; campo.dispatchEvent(new Event("input", { bubbles: true })); campo.dispatchEvent(new Event("change", { bubbles: true })); };
+    const porCampo = async (campo) => { campo.files = novoDt().files; campo.dispatchEvent(new Event("input", { bubbles: true })); campo.dispatchEvent(new Event("change", { bubbles: true })); if (perfil().minuta) await tratarImportacao(); };
     // 1) campo de arquivo que já existe na página
     tentativas.push(["campo de arquivo", async () => { const c = campoArquivo(); if (!c) return false; await porCampo(c); return apareceu(10000); }]);
     // 2) colar o arquivo na caixa de mensagem (Gemini, ChatGPT e Claude aceitam)

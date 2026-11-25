@@ -7,7 +7,7 @@ PAG = """<html><body><div id=chat><textarea aria-label="Instruções para a minu
 <button aria-label="Enviar" id=s disabled>Enviar</button><input type=file aria-label="Selecionar arquivos do processo" style="display:none"><span id=docs></span></div>
 <script>const t=document.querySelector('textarea'),s=document.getElementById('s');
 t.addEventListener('input',()=>s.disabled=!t.value.trim());
-document.querySelector('input').onchange=e=>document.getElementById('docs').textContent='Documentos (1) '+e.target.files[0].name;
+document.querySelector('input').onchange=e=>{const nome=e.target.files[0].name;const d=document.createElement('div');d.id='imp';d.setAttribute('role','dialog');d.innerHTML='<h2>Importar arquivo(s)</h2><p>Selecione como deseja tratar 1 arquivo.</p><div>Arquivo: '+nome+'</div><label><input type=radio name=m id=r1 checked> Documento</label><label><input type=radio name=m id=r2> Modelo</label><button id=canc>Cancelar</button><button id=cont>Continuar</button>';document.body.appendChild(d);document.getElementById('cont').onclick=()=>{window.__modo=document.getElementById('r1').checked?'documento':'modelo';d.remove();document.getElementById('docs').textContent='Documentos (1) '+nome;};document.getElementById('canc').onclick=()=>d.remove();};
 s.onclick=()=>{window.__cliques=(window.__cliques||0)+1; if(window.__cliques===1){const d=document.createElement('div');d.id='dlg';d.setAttribute('role','dialog');d.innerHTML='<h2>Atenção: nenhum contexto adicionado!</h2><button id=cont>Continuar sem contexto</button><button id=volta>Voltar</button>';document.body.appendChild(d);document.getElementById('volta').onclick=()=>d.remove();document.getElementById('cont').onclick=()=>{window.__semContexto=true;d.remove();};return;}
  window.__enviado=t.value;document.getElementById('chat').remove();const ed=document.createElement('div');document.body.appendChild(ed);
  ed.innerHTML='<div role=textbox aria-label="Conteúdo da minuta" contenteditable=true></div><div data-tiptap-ai-chat-messages></div>';
@@ -23,7 +23,7 @@ with sync_playwright() as p:
     d = pg.evaluate("__projudiIA.diagnosticar()"); print(d)
     assert d["perfil"] == "minutaia" and d["pronto"] and "Selecionar arquivos" in (d["campoArquivo"] or ""), d
     pg.evaluate("__projudiIA.anexar('12345-OCR.pdf', %r)" % b64)
-    assert "12345-OCR" in pg.inner_text("#docs")
+    assert "12345-OCR" in pg.inner_text("#docs") and pg.evaluate("window.__modo") == "documento" and pg.locator("#imp").count() == 0, "clicou Continuar no diálogo Importar arquivo(s) com Documento marcado"
     pg.evaluate("__projudiIA.escrever('Você é assessor. Analise os autos e redija a decisão.')")
     pg.evaluate("__projudiIA.enviar()")
     r = pg.evaluate("__projudiIA.esperarResposta(60000, 1500)")
