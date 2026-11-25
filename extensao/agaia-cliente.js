@@ -1,5 +1,6 @@
 // Esteira → Agaia: abre o processo na tela de execução do Agaia (sem baixar PDF: o Agaia lê os movimentos direto do Projudi) e devolve a minuta.
 // Usa a aba do Agaia que o usuário já deixou aberta (só cria uma se não houver) e leva o resultado pelo storage, como o Studio.
+import { classificarPaginaDeErro, ehPaginaDeErroDoNavegador } from "./pagina-erro.js";
 export const AGAIA_URL = "https://simplesefacil.tjgo.jus.br/agaia/";
 const dorme = (ms) => new Promise((ok) => setTimeout(ok, ms));
 
@@ -24,8 +25,19 @@ function carregou(tabId, ms = 60000) {
     chrome.tabs.onUpdated.addListener(f);
   });
 }
+/** A aba do Agaia mostra uma página de ERRO (502/503/504 do Cloudflare, falha de rede)? Devolve a mensagem para a esteira ou "" se está normal. */
+export async function paginaDeErro(tabId) {
+  const aba = await chrome.tabs.get(tabId).catch(() => null);
+  if (!aba) return "";
+  if (ehPaginaDeErroDoNavegador(aba.url)) return "O navegador não conseguiu abrir o Agaia (sem conexão ou servidor fora do ar). Tente de novo em alguns minutos, ou rode no Studio ou em outra IA.";
+  try {
+    const [r] = await chrome.scripting.executeScript({ target: { tabId }, func: () => `${document.title || ""} ${(document.body && document.body.innerText) || ""}`.slice(0, 2500) });
+    return classificarPaginaDeErro(r?.result || "");
+  } catch { return ""; }
+}
 async function pronta(tabId, tentativas) {
   for (let i = 0; i < tentativas; i++) {
+    if (i % 5 === 4) { const e = await paginaDeErro(tabId); if (e) return { erroDaPagina: e }; }      // página de erro: não adianta esperar o script responder
     try { const r = await chrome.tabs.sendMessage(tabId, { acao: "agaia-ping" }); if (r?.ok) return r; } catch { /* a página ainda carrega */ }
     if (i === 3) { try { await chrome.scripting.executeScript({ target: { tabId }, files: ["prompt-similar.js", "agaia-exec.js"] }); } catch { /* sem permissão: segue esperando */ } }
     await dorme(1000);
@@ -63,8 +75,11 @@ export async function executarNoAgaia(item, { aoAndamento = () => {}, limiteMs =
   let aba = await abaDoAgaia();
   if (aba) await chrome.tabs.update(aba.id, { url, active: false });
   else aba = await chrome.tabs.create({ url, active: false });
-  await carregou(aba.id);
+  await carregou(aba.id, 30000);
+  const erroInicial = await paginaDeErro(aba.id);
+  if (erroInicial) return { ok: false, erro: erroInicial, indisponivel: true };
   const r0 = await pronta(aba.id, 60);
+  if (r0?.erroDaPagina) return { ok: false, erro: r0.erroDaPagina, indisponivel: true };
   if (!r0) return { ok: false, erro: "a aba do Agaia não respondeu (confira se você está logado no Agaia)" };
   const reqId = "a" + Date.now() + Math.random().toString(36).slice(2, 6);
   let r;
@@ -80,11 +95,13 @@ export async function executarNoAgaia(item, { aoAndamento = () => {}, limiteMs =
 /** Espera o resultado que a aba do Agaia grava no storage (sobrevive a recarregar a esteira, a rede ou o canal de mensagens). */
 export async function aguardarAgaia(reqId, tabId, { aoAndamento = () => {}, limiteMs = 25 * 60000, aindaValido = async () => true } = {}) {
   const chave = "agaia_res_" + reqId, chp = "agaia_prog_" + reqId;
-  const t0 = Date.now(); let ultimo = "";
+  const t0 = Date.now(); let ultimo = "", ultimaMudanca = Date.now(), ultimaOlhada = 0;
   for (;;) {
     const d = await chrome.storage.local.get([chave, chp]);
     if (d[chave]) { await chrome.storage.local.remove([chave, chp]); return d[chave]; }
-    if (d[chp]?.txt && d[chp].txt !== ultimo) { ultimo = d[chp].txt; aoAndamento(ultimo); }
+    if (d[chp]?.txt && d[chp].txt !== ultimo) { ultimo = d[chp].txt; ultimaMudanca = Date.now(); aoAndamento(ultimo); }
+    // andamento parado há 20 s (ex.: "abrindo o formulário"): a página pode ser um erro 502; olha a cada 10 s
+    if (Date.now() - ultimaMudanca > 20000 && Date.now() - ultimaOlhada > 10000) { ultimaOlhada = Date.now(); const e = await paginaDeErro(tabId); if (e) { await chrome.storage.local.remove([chave, chp]); return { ok: false, erro: e, indisponivel: true }; } }
     if (!(await aindaValido())) { await chrome.storage.local.remove([chave, chp]); return { ok: false, cancelado: true, erro: "cancelado" }; }
     const a2 = await chrome.tabs.get(tabId).catch(() => null);
     if (!a2) { const d2 = await chrome.storage.local.get(chave); if (d2[chave]) { await chrome.storage.local.remove([chave, chp]); return d2[chave]; } return { ok: false, erro: "a aba do Agaia foi fechada durante a execução" }; }

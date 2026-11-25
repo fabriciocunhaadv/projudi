@@ -56,6 +56,7 @@ function confirmou() {
 }
 </script></body></html>"""
 LOGIN = '<html><body><form><input type="password" name="senha"></form></body></html>'
+CLOUDFLARE_502 = '<html><head><title>simplesefacil.tjgo.jus.br | 502: Bad gateway</title></head><body><h1>Bad gateway</h1><span>Error code 502</span><p>Visit cloudflare.com for more information.</p><h2>What happened?</h2><p>The web server reported a bad gateway error.</p><h2>What can I do?</h2><p>Please try again in a few minutes.</p></body></html>'
 estado = {"cenarios": {}, "pedidos": []}
 
 class H(http.server.BaseHTTPRequestHandler):
@@ -63,7 +64,8 @@ class H(http.server.BaseHTTPRequestHandler):
         q = urllib.parse.urlparse(s.path); num = urllib.parse.parse_qs(q.query).get("numero_processo", [""])[0]
         estado["pedidos"].append(num)
         cen = estado["cenarios"].get(num, "ok")
-        s.send_response(200); s.send_header("Content-Type", "text/html; charset=utf-8"); s.end_headers()
+        s.send_response(502 if cen == "502" else 200); s.send_header("Content-Type", "text/html; charset=utf-8"); s.end_headers()
+        if cen == "502": s.wfile.write(CLOUDFLARE_502.encode()); return
         if cen == "login": s.wfile.write(LOGIN.encode()); return
         s.wfile.write((PAGINA % {"num": num, "cenario": cen, "minuta": json.dumps(MINUTA)}).encode())
     def log_message(*a): pass
@@ -102,6 +104,13 @@ def main():
         estado["cenarios"]["5285461.71.2025"] = "arquivado"
         r2 = ver.evaluate("async () => { const ag = await import('./agaia-cliente.js'); return await ag.executarNoAgaia({ processo: '5285461-71.2025.8.09.0166', prompt: 'Outros Área Judicial - Fabrício Juizado Especial Civel' }, { limiteMs: 60000 }); }")
         print("arquivado:", r2); assert not r2["ok"] and "arquivado" in r2["erro"].lower(), r2
+        # servidor do Agaia fora do ar (502 do Cloudflare): a extensão percebe logo, não fica esperando o formulário
+        import time as _t
+        estado["cenarios"]["5285472.82.2025"] = "502"; t0 = _t.time()
+        r502 = ver.evaluate("async () => { const ag = await import('./agaia-cliente.js'); return await ag.executarNoAgaia({ processo: '5285472-82.2025.8.09.0166', prompt: 'Outros Área Judicial - Fabrício Juizado Especial Civel' }, { limiteMs: 60000 }); }")
+        print("502:", r502, round(_t.time() - t0, 1), "s")
+        assert not r502["ok"] and r502.get("indisponivel") and "502" in r502["erro"] and "fora do ar" in r502["erro"], r502
+        assert _t.time() - t0 < 40, "demorou demais para perceber o erro 502"
         # verificação com conta: NÃO resolve
         estado["cenarios"]["5285462.72.2025"] = "captcha"
         r3 = ver.evaluate("async () => { const ag = await import('./agaia-cliente.js'); return await ag.executarNoAgaia({ processo: '5285462-72.2025.8.09.0166', prompt: 'Outros Área Judicial - Fabrício Juizado Especial Civel' }, { limiteMs: 60000 }); }")

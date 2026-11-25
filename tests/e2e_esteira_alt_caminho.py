@@ -41,7 +41,11 @@ window.addEventListener("projudi:pedir-prompt", () => { const p = JSON.parse(doc
     pg.evaluate("() => { const o = Object.defineProperty }")
     with ctx.expect_page() as nova:
         pg.select_option("tr:has(button[data-a=excluir][data-id=e]) select[data-a-ia]", "gemini")
-    nova.value.close(); pg.wait_for_timeout(500)
+    pg.bring_to_front()
+    # a tela da linha muda NA HORA (a lista continua com o foco, mas não pode segurar o redesenho): some o erro da Agaia e aparece o andamento
+    pg.wait_for_selector("tr:has(button[data-a=excluir][data-id=e]):has-text('Baixando o PDF')", timeout=5000)
+    assert pg.locator("tr:has(button[data-a=excluir][data-id=e]):has-text('Agaia: falhou')").count() == 0, "o erro antigo da Agaia continua na tela"
+    nova.value.close(); pg.wait_for_timeout(300)
     e = sw.evaluate("async () => (await chrome.storage.local.get('esteira_e')).esteira_e"); assert e["estado"] == "pausado" and "Gemini" in e["aviso"], e
     l = [x for x in lotes().values() if x["itens"][0]["itemId"] == "e"]; assert l and l[0]["opcoes"]["studio"]["modo"] == "ia" and l[0]["opcoes"]["studio"]["iaId"] == "gemini", l
     # 3) prompt escolhido pela pessoa (select da linha) vale sobre o automático

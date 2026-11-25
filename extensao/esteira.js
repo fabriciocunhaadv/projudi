@@ -78,7 +78,7 @@ async function analisarNoAgaia(it, valida) {
   if (!(await valida()) || r.cancelado) return;
   if (!r.ok) {
     if (r.sessao) { pausaAte = Date.now() + 3 * 60000; await atualizar(it.id, { estado: "aguardando", erro: "", agaiaPedido: null, aviso: "O Agaia pediu login: entre no Agaia; a fila retoma em 3 minutos." }); return; }
-    await atualizar(it.id, { estado: "erro", erro: "Agaia: " + r.erro, agaiaErro: r.erro, sigiloso: !!r.sigiloso || /segredo de justi/i.test(String(r.erro||"")), agaiaPedido: null, aviso: (r.sigiloso || /segredo de justi/i.test(String(r.erro||""))) ? "Segredo de justiça: use o botão “Rodar no Studio” (a extensão baixa o PDF, faz o OCR e analisa no Studio)." : "A esteira seguiu para o próximo processo." });
+    await atualizar(it.id, { estado: "erro", erro: "Agaia: " + r.erro, agaiaErro: r.erro, sigiloso: !!r.sigiloso || /segredo de justi/i.test(String(r.erro||"")), agaiaPedido: null, aviso: (r.sigiloso || /segredo de justi/i.test(String(r.erro||""))) ? "Segredo de justiça: use o botão “Rodar no Studio” (a extensão baixa o PDF, faz o OCR e analisa no Studio)." : r.indisponivel ? "O Agaia está fora do ar. Tente de novo mais tarde, ou continue pelos botões abaixo (Rodar no Studio ou em outra IA)." : "A esteira seguiu para o próximo processo." });
     return;
   }
   const texto = r.minutaTexto || "";
@@ -336,10 +336,10 @@ setInterval(processarComandos, 4000); try { chrome.storage.onChanged.addListener
 
 
 let redesenharDepois = false;
-async function desenhar() {
+async function desenhar(forcar = false) {
   // enquanto a pessoa escolhe numa lista (prompt), não redesenha a tabela: refazer o HTML fechava a lista sozinha; redesenha assim que ela sair do campo
   const ativo = document.activeElement;
-  if (ativo && ativo.tagName === "SELECT" && ativo.closest && ativo.closest("#linhas")) { redesenharDepois = true; return; }
+  if (!forcar && ativo && ativo.tagName === "SELECT" && ativo.closest && ativo.closest("#linhas")) { redesenharDepois = true; return; }
   void publicarResumo();
   const lista = await todos();
   $("linhas").innerHTML = lista.length ? lista.map((it, n) => {
@@ -372,7 +372,7 @@ async function desenhar() {
   $("status").textContent = dono ? "" : "Outra aba da esteira já está em execução; esta mostra apenas o andamento.";
 }
 
-$("linhas").addEventListener("change", async (ev) => { const pc = ev.target.closest("input[data-pauta]"); if (pc) { await atualizar(pc.dataset.pauta, { pautaSel: pc.checked }); desenhar(); return; } const s = ev.target.closest("select[data-a-sel]"); if (s) await atualizar(s.dataset.aSel, { promptEscolhido: s.value }); const pp = ev.target.closest("select[data-pp]"); if (pp) await atualizar(pp.dataset.pp, { promptAlt: pp.value }); const ia = ev.target.closest("select[data-a-ia]"); if (ia && ia.value) { const v = ia.value, id = ia.dataset.aIa; ia.value = ""; await rodarEm(id, v, document.querySelector(`select[data-pp="${id}"]`)?.value || ""); } });
+$("linhas").addEventListener("change", async (ev) => { const pc = ev.target.closest("input[data-pauta]"); if (pc) { await atualizar(pc.dataset.pauta, { pautaSel: pc.checked }); desenhar(); return; } const s = ev.target.closest("select[data-a-sel]"); if (s) await atualizar(s.dataset.aSel, { promptEscolhido: s.value }); const pp = ev.target.closest("select[data-pp]"); if (pp) await atualizar(pp.dataset.pp, { promptAlt: pp.value }); const ia = ev.target.closest("select[data-a-ia]"); if (ia && ia.value) { const v = ia.value, id = ia.dataset.aIa; ia.value = ""; ia.blur(); redesenharDepois = false; await rodarEm(id, v, document.querySelector(`select[data-pp="${id}"]`)?.value || ""); } });
 $("linhas").addEventListener("click", async (ev) => {
   const b = ev.target.closest("button[data-a]"); if (!b) return;
   const id = b.dataset.id, a = b.dataset.a;
@@ -472,7 +472,7 @@ async function rodarEm(id, destino, promptForcado) {
   const guardado = (it.modo === "ia" || it.modo === "analise") ? await lerPdf(it.id).catch(() => null) : null;
   if (guardado && guardado.length > 1000 && it.pdfNome) {
     await atualizar(id, { ...base, estado: "aguardando", aviso: `Seguindo no ${nome} com o prompt “${prompt}” (PDF já guardado).` });
-    desenhar(); passo(); return;
+    desenhar(true); passo(); return;
   }
   if (!it.url) { alert("Esta linha não guardou o endereço do processo no Projudi. Envie o processo de novo pelo Painel."); return; }
   const { automacao = {} } = await chrome.storage.sync.get("automacao");
@@ -483,7 +483,7 @@ async function rodarEm(id, destino, promptForcado) {
   await chrome.storage.local.set({ ["lote_" + lote]: { itens: [{ processo: it.processo, url: it.url, classificador: it.classificador || "", serventia: it.serventia || "", situacao: it.tipo || "", urlPre: it.urlPre || "", serventiaUrl: it.serventiaUrl || "", arquivoModelos: automacao[chaveServ]?.arquivoModelos || "", prompt, itemId: it.id, pasta }], pasta: "Projudi/" + hoje, opcoes: { atualizarBase: false, studio: { ativo: true, modo: base.modo, docs: false, iaId: base.iaId } } } });
   await atualizar(id, { estado: "pausado", sigiloso: false, erro: "", aviso: `Baixando o PDF e fazendo o OCR para rodar no ${nome} com o prompt “${prompt}”. Esta mesma linha segue sozinha quando o PDF ficar pronto.` });
   chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + lote) });
-  desenhar();
+  desenhar(true);
 }
 
 // Janelinha para escolher o prompt do Studio quando nenhum corresponde à serventia do processo. Devolve o prompt escolhido ou "" se o usuário cancelar.
