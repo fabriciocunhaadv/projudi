@@ -3,7 +3,7 @@
 (() => {
   if (window.__projudiStudioBase) return;
   window.__projudiStudioBase = true;
-  try { document.documentElement.dataset.assessorExtensao = chrome.runtime.getManifest().version; document.documentElement.dataset.assessorExtensaoRecursos = "pdf,sv,modelos,modelos-atualizar,minuta-lancada,minuta-serventia,refazer-parcial,inicie-web,agaia-prompt,pauta-studio,agaia-esteira,agaia-opcoes"; document.documentElement.dataset.assessorExtensaoId = chrome.runtime.id; } catch (e) { /* sem manifest */ }      // o app mostra a tarja “instale a extensão” só quando este aviso não existe
+  try { document.documentElement.dataset.assessorExtensao = chrome.runtime.getManifest().version; document.documentElement.dataset.assessorExtensaoRecursos = "pdf,sv,modelos,modelos-atualizar,minuta-lancada,minuta-serventia,refazer-parcial,inicie-web,agaia-prompt,pauta-studio,agaia-esteira,agaia-opcoes,seeu-web"; document.documentElement.dataset.assessorExtensaoId = chrome.runtime.id; } catch (e) { /* sem manifest */ }      // o app mostra a tarja “instale a extensão” só quando este aviso não existe
   // Perfil de quem está logado no Studio (o app publica em data-assessor-perfil): guardado para a página "Inicie aqui" mostrar a Lupa do Magistrado só para magistrado.
   // Só grava quando o app informa um perfil (não apaga ao sair da conta nem enquanto a página ainda carrega).
   try {

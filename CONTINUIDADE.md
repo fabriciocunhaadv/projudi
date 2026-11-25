@@ -402,3 +402,4 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 ## 5.3.2 — Minuta IA: aviso "nenhum contexto adicionado"
 - `ia-agente.js` (`enviar`): na Minuta IA, se aparecer "Atenção: nenhum contexto adicionado!", clica em **Voltar** (nunca em "Continuar sem contexto") e clica em Enviar de novo (até 3 vezes). Fluxo observado pelo usuário: PDF anexado + prompt no chat, o aviso bloqueava o envio. O site real é `minutaia.com.br` (sem www): permissões opcionais e `SITES_IA` cobrem as duas formas. Teste: `tests/e2e_minutaia.py`.
 - 5.3.1: exportação pelo botão "Processo" (não "Capa").
+- 5.3.3: o painel do SEEU (seeu.html) passa a ser aberto pelo Studio (tela “O que fazer hoje?”): manifest libera seeu.html em web_accessible_resources para o Studio e studio-base.js anuncia o recurso "seeu-web".
