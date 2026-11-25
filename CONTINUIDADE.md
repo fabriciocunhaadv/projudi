@@ -414,3 +414,6 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 - `resolverPrompt`: prompt escolhido na linha → o da linha → o cadastrado para a serventia (Painel/sugestão) → um com o nome da serventia; só vale o que o Studio TEM. Nenhum serve → janelinha com a lista do Studio da pessoa (`escolherPrompt`); se o Studio não responder, confia no prompt que a linha já tinha (não insiste: cada tentativa espera segundos) ou usa a lista do Painel como último recurso. Desistir não muda a linha.
 - Teste: `tests/e2e_esteira_alt_caminho.py` (Studio simulado numa aba; cobre botões, IA sem a que falhou, segredo de justiça sem IA externa, prompt da linha, lista do Studio e cancelar). Segredo de justiça nunca vai a IA externa.
 - Pacote: `publicacao/projudi-extensao-5.3.5.zip` (o usuário envia à loja).
+
+## SEEU — em ESPERA por pedido do usuário (25/11)
+O usuário testou o painel do SEEU no ambiente real (lista, exportação e envio) e **está funcionando**. **Não mexer em nada do SEEU até novas instruções dele.** Pendentes conhecidos, só quando ele pedir: trocar de serventia pelo painel; Jusbrasil (precisa de print ou "Diagnosticar tela da IA"). O lembrete "falta continuar o painel da SEEU" ao fim das respostas continua valendo.
