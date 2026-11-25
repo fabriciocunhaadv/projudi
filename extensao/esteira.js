@@ -5,7 +5,7 @@ import { lerMidia, guardarPdfDoVideo, lerPdfDoVideo, apagarGuardadosDoVideo, lim
 import { chaveDoProcesso } from "./midias-projudi.js";
 instalarSaude("esteira");
 import { analisarNoStudio, lerMinutaAtual, consultarGigantes, cadastrarNoStudio, lerPromptDoStudio, sentencaComVideoNoStudio } from "./studio-cliente.js";
-import { executarNaIa, SITES_IA } from "./ia-externa-cliente.js";
+import { executarNaIa, SITES_IA, temPermissao, pedirPermissao } from "./ia-externa-cliente.js";
 import { executarNoAgaia, retomarExecucao } from "./agaia-cliente.js";
 import { criarDocumento, abrirLadoALado, lerDocumento, tipoDaMinuta, nomeDoc } from "./docs-api.js";
 import { paragrafosDeHtml } from "./docs-core.js";
@@ -351,6 +351,15 @@ async function desenhar() {
     if (["pausado", "erro", "analisando"].includes(it.estado)) b.push(`<button data-a="repetir" data-id="${it.id}">${it.estado === "erro" ? "Tentar de novo" : "Analisar de novo"}</button>`);
     if (it.estado === "conferindo") { if (it.docUrl) b.push(`<a href="${esc(it.docUrl)}" target="_blank">Abrir Docs</a>`); b.push(`<button data-a="conferido" data-id="${it.id}">✔ Terminei a conferência — cadastrar no Projudi</button>`); }
     if (it.estado === "cadastrando") { b.push(`<button data-a="projudi" data-id="${it.id}">Abrir o processo</button>`, `<button data-a="concluir" data-id="${it.id}">✔ Lancei no Projudi — próximo processo</button>`); }
+    if (it.estado === "erro" && ["agaia", "agaiapdf", "ia"].includes(it.modo) && !it.sigiloso) {      // segredo de justiça já tem os botões próprios (Studio e Agaia com PDF)
+      const de = it.modo === "ia" ? (SITES_IA[it.iaId]?.nome || "IA externa") : "Agaia";
+      const outras = Object.entries(SITES_IA).filter(([k]) => !(it.modo === "ia" && it.iaId === k)).map(([k, v]) => `<option value="${k}">${esc(v.nome)}</option>`).join("");
+      const prompts = listaPrompts.map((x) => `<option value="${esc(x)}"${x === it.promptAlt ? " selected" : ""}>${esc(x)}</option>`).join("");
+      b.push(`<div data-testid="alt-caminho" style="margin-top:6px;padding:6px 8px;border:1px dashed #64748b;border-radius:8px"><b>Deu erro (${esc(de)})? Continue daqui:</b><br>`
+        + `<button data-a="rodar-studio" data-id="${it.id}" style="background:#0f766e;color:#fff;font-weight:700;padding:6px 10px;border:2px solid #115e59;border-radius:8px;cursor:pointer" title="A extensão baixa o PDF com OCR e a análise roda no Studio, na mesma linha">▶ Rodar no Studio</button> `
+        + `<select data-a-ia="${it.id}" title="Baixa o PDF com OCR e roda na IA escolhida (a extensão pede a autorização do site se faltar)"><option value="">🌐 Rodar em outra IA…</option>${outras}</select> `
+        + `<select data-pp="${it.id}" title="Prompts do seu cadastro no Studio. Em “automático”, vale o prompt da serventia; se não houver, a extensão pergunta."><option value="">Prompt: automático (cadastro do Studio)</option>${prompts}</select></div>`);
+    }
     if (it.estado === "erro" && it.promptOpcoes?.length) b.push(`<br><select data-a-sel="${it.id}" title="Prompts que existem no seu Studio"><option value="">— escolha o prompt —</option>${it.promptOpcoes.map((o) => `<option value="${esc(o)}"${o === it.promptEscolhido ? " selected" : ""}>${esc(o)}</option>`).join("")}</select> <button data-a="usarprompt" data-id="${it.id}">Usar este prompt e analisar</button>`);
     if (it.estado === "erro" && it.grande) b.push(`<button data-a="normal" data-id="${it.id}" title="Refaz este processo na análise normal do Studio (PDF/texto completo, sem o Módulo Turbo)">Usar a análise normal</button>`);
     if (it.modo === "mesa" && it.estado === "concluido") b.push(`<label title="Inclui esta audiência na pauta (formato do modelo do gabinete)"><input type="checkbox" data-pauta="${it.id}" ${it.pautaSel ? "checked" : ""}> incluir na pauta</label>`);
@@ -363,7 +372,7 @@ async function desenhar() {
   $("status").textContent = dono ? "" : "Outra aba da esteira já está em execução; esta mostra apenas o andamento.";
 }
 
-$("linhas").addEventListener("change", async (ev) => { const pc = ev.target.closest("input[data-pauta]"); if (pc) { await atualizar(pc.dataset.pauta, { pautaSel: pc.checked }); desenhar(); return; } const s = ev.target.closest("select[data-a-sel]"); if (s) await atualizar(s.dataset.aSel, { promptEscolhido: s.value }); });
+$("linhas").addEventListener("change", async (ev) => { const pc = ev.target.closest("input[data-pauta]"); if (pc) { await atualizar(pc.dataset.pauta, { pautaSel: pc.checked }); desenhar(); return; } const s = ev.target.closest("select[data-a-sel]"); if (s) await atualizar(s.dataset.aSel, { promptEscolhido: s.value }); const pp = ev.target.closest("select[data-pp]"); if (pp) await atualizar(pp.dataset.pp, { promptAlt: pp.value }); const ia = ev.target.closest("select[data-a-ia]"); if (ia && ia.value) { const v = ia.value, id = ia.dataset.aIa; ia.value = ""; await rodarEm(id, v, document.querySelector(`select[data-pp="${id}"]`)?.value || ""); } });
 $("linhas").addEventListener("click", async (ev) => {
   const b = ev.target.closest("button[data-a]"); if (!b) return;
   const id = b.dataset.id, a = b.dataset.a;
@@ -386,29 +395,8 @@ $("linhas").addEventListener("click", async (ev) => {
   if (a === "pular") { await fecharAbas((await todos()).find((x) => x.id === id)); await atualizar(id, { estado: "pulado" }); }
   if (a === "repetir") await atualizar(id, { estado: "aguardando", erro: "", rodada: 0 });
   if (a === "normal") await atualizar(id, { modo: "analise", estado: "aguardando", erro: "", grande: false, cotaVezes: 0, tentativas: 0, rodada: 0, aviso: "refeito na análise normal" });
-  if (a === "sigilo-studio") {
-    const it = (await todos()).find((x) => x.id === id); if (!it) return;
-    if (!it.url) { alert("Esta linha não guardou o endereço do processo no Projudi. Envie o processo de novo pelo Painel."); return; }
-    const { automacao = {} } = await chrome.storage.sync.get("automacao");
-    const chaveServ = Object.keys(automacao).find((x) => String(x).trim().toLowerCase() === String(it.serventia || "").trim().toLowerCase());
-    // 1º o prompt cadastrado para a serventia (Painel/sugestão); só vale se o Studio realmente o tem. 2º um prompt do Studio com o nome da serventia. 3º janelinha para o usuário escolher.
-    const candidatos = [...new Set([automacao[chaveServ]?.prompt, globalThis.Sugestoes ? Sugestoes.prompt(it.serventia) : "", it.serventia].map((x) => String(x || "").trim()).filter(Boolean))];
-    let prompt = "", opcoes = [];
-    for (const c of candidatos) { try { await lerPromptDoStudio(c); prompt = c; break; } catch (e) { if (Array.isArray(e.opcoes) && e.opcoes.length) opcoes = e.opcoes; } }
-    if (!prompt) {
-      if (!opcoes.length) { try { await lerPromptDoStudio(""); } catch (e) { opcoes = Array.isArray(e.opcoes) ? e.opcoes : []; } }
-      if (!opcoes.length) opcoes = [...new Set(Object.values(automacao).map((x) => x.prompt).filter(Boolean))];
-      prompt = await escolherPrompt(it, opcoes);
-      if (!prompt) return;      // o usuário desistiu
-    }
-    const hoje = new Date().toISOString().slice(0, 10), lote = String(Date.now());
-    const limpa = (x, d) => String(x || d).replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60);
-    const pasta = `Projudi/${hoje}/${limpa(it.serventia, "Segredo")}/${limpa(it.classificador, "Segredo de justiça")}`;
-    await chrome.storage.local.set({ ["lote_" + lote]: { itens: [{ processo: it.processo, url: it.url, classificador: it.classificador || "", serventia: it.serventia || "", situacao: it.tipo || "", urlPre: it.urlPre || "", serventiaUrl: it.serventiaUrl || "", arquivoModelos: automacao[chaveServ]?.arquivoModelos || "", prompt, itemId: it.id, pasta }], pasta: "Projudi/" + hoje, opcoes: { atualizarBase: false, studio: { ativo: true, modo: "analise", docs: false } } } });
-    await atualizar(id, { estado: "pausado", sigiloso: false, erro: "", aviso: `Segredo de justiça: baixando o PDF e fazendo o OCR para analisar no Studio com o prompt “${prompt}”. Esta mesma linha segue sozinha quando o PDF ficar pronto.` });
-    chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + lote) });
-    desenhar(); return;
-  }
+  if (a === "sigilo-studio") { await rodarEm(id, "studio", ""); return; }
+  if (a === "rodar-studio") { await rodarEm(id, "studio", document.querySelector(`select[data-pp="${id}"]`)?.value || ""); return; }
   if (a === "sigilo-agaia") {
     const it = (await todos()).find((x) => x.id === id); if (!it) return;
     if (!it.url) { alert("Esta linha não guardou o endereço do processo no Projudi. Envie o processo de novo pelo Painel."); return; }
@@ -447,6 +435,57 @@ function confirmarDeclaracoes(it) {
   });
 }
 
+// ---- Quando a Agaia (ou uma IA externa) falha: a própria linha oferece seguir pelo Studio ou por outra IA, sem voltar ao painel. ----
+let listaPrompts = [];      // prompts do cadastro da pessoa no Studio (preenchida por carregarPrompts)
+
+/** Prompt para o novo caminho. Ordem: o que a pessoa escolheu na linha → o que a linha já tinha → o cadastrado para a serventia → um com o nome da serventia.
+ *  Só vale o que o Studio realmente tem (a lista é a do cadastro da pessoa no Studio). Se nenhum servir, abre a lista do Studio para a pessoa escolher. Devolve "" se ela desistir. */
+async function resolverPrompt(it, forcado) {
+  const { automacao = {} } = await chrome.storage.sync.get("automacao");
+  const chaveServ = Object.keys(automacao).find((x) => String(x).trim().toLowerCase() === String(it.serventia || "").trim().toLowerCase());
+  const candidatos = [...new Set([forcado, it.prompt, automacao[chaveServ]?.prompt, globalThis.Sugestoes ? Sugestoes.prompt(it.serventia) : "", it.serventia].map((x) => String(x || "").trim()).filter(Boolean))];
+  let opcoes = [], inalcancavel = false;
+  for (const c of candidatos) {
+    try { await lerPromptDoStudio(c); return c; }
+    catch (e) { if (Array.isArray(e.opcoes) && e.opcoes.length) opcoes = e.opcoes; else { inalcancavel = true; break; } }      // sem resposta do Studio: não insiste (cada tentativa espera vários segundos)
+  }
+  const explicito = String(forcado || it.prompt || "").trim();
+  if (!opcoes.length && inalcancavel && explicito) return explicito;      // o Studio não respondeu: confia no que a linha já usava (a esteira confere de novo ao rodar)
+  if (!opcoes.length && !inalcancavel) { try { await lerPromptDoStudio(""); } catch (e) { opcoes = Array.isArray(e.opcoes) ? e.opcoes : []; } }
+  if (!opcoes.length) opcoes = listaPrompts.length ? listaPrompts : [...new Set(Object.values(automacao).map((x) => x.prompt).filter(Boolean))];
+  return await escolherPrompt(it, opcoes);
+}
+
+/** Leva esta linha para o Studio (destino "studio") ou para uma IA externa (destino = id da IA), mantendo a MESMA linha da esteira. */
+async function rodarEm(id, destino, promptForcado) {
+  const it = (await todos()).find((x) => x.id === id); if (!it) return;
+  const ia = destino !== "studio";
+  if (ia && !SITES_IA[destino]) return;
+  if (ia && it.sigiloso) { alert("Processo em segredo de justiça: ele não é enviado a IA externa. Use “Rodar no Studio”."); return; }
+  const nome = ia ? SITES_IA[destino].nome : "Studio";
+  // a autorização do navegador só pode ser pedida logo no clique: faz isso ANTES de qualquer janelinha
+  if (ia && !(await temPermissao(destino))) { const ok = await pedirPermissao(destino).catch(() => false); if (!ok) { alert(`Sem autorização para o ${nome}: a extensão não consegue usá-lo. Clique de novo e escolha “Permitir”.`); return; } }
+  const prompt = await resolverPrompt(it, promptForcado);
+  if (!prompt) return;      // desistiu
+  const base = { modo: ia ? "ia" : "analise", iaId: ia ? destino : "", prompt, promptOpcoes: null, promptEscolhido: "", sigiloso: false, erro: "", agaiaErro: "", agaiaPedido: null, tentativas: 0, rodada: 0 };
+  // PDF com OCR já guardado (linha que vinha de IA externa ou Studio): segue direto, sem baixar de novo
+  const guardado = (it.modo === "ia" || it.modo === "analise") ? await lerPdf(it.id).catch(() => null) : null;
+  if (guardado && guardado.length > 1000 && it.pdfNome) {
+    await atualizar(id, { ...base, estado: "aguardando", aviso: `Seguindo no ${nome} com o prompt “${prompt}” (PDF já guardado).` });
+    desenhar(); passo(); return;
+  }
+  if (!it.url) { alert("Esta linha não guardou o endereço do processo no Projudi. Envie o processo de novo pelo Painel."); return; }
+  const { automacao = {} } = await chrome.storage.sync.get("automacao");
+  const chaveServ = Object.keys(automacao).find((x) => String(x).trim().toLowerCase() === String(it.serventia || "").trim().toLowerCase());
+  const hoje = new Date().toISOString().slice(0, 10), lote = String(Date.now());
+  const limpa = (x, d) => String(x || d).replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60);
+  const pasta = `Projudi/${hoje}/${limpa(it.serventia, "Processo")}/${limpa(it.classificador, "Reenvio")}`;
+  await chrome.storage.local.set({ ["lote_" + lote]: { itens: [{ processo: it.processo, url: it.url, classificador: it.classificador || "", serventia: it.serventia || "", situacao: it.tipo || "", urlPre: it.urlPre || "", serventiaUrl: it.serventiaUrl || "", arquivoModelos: automacao[chaveServ]?.arquivoModelos || "", prompt, itemId: it.id, pasta }], pasta: "Projudi/" + hoje, opcoes: { atualizarBase: false, studio: { ativo: true, modo: base.modo, docs: false, iaId: base.iaId } } } });
+  await atualizar(id, { estado: "pausado", sigiloso: false, erro: "", aviso: `Baixando o PDF e fazendo o OCR para rodar no ${nome} com o prompt “${prompt}”. Esta mesma linha segue sozinha quando o PDF ficar pronto.` });
+  chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + lote) });
+  desenhar();
+}
+
 // Janelinha para escolher o prompt do Studio quando nenhum corresponde à serventia do processo. Devolve o prompt escolhido ou "" se o usuário cancelar.
 function escolherPrompt(it, opcoes) {
   return new Promise((ok) => {
@@ -465,7 +504,7 @@ async function carregarPrompts() {
   const sel = $("impPrompt"), msg = $("impPromptMsg"), atual = sel.value; msg.textContent = "carregando a lista do Studio…";
   let lista = [];
   try { await lerPromptDoStudio(""); } catch (e) { lista = Array.isArray(e.opcoes) ? e.opcoes : []; }
-  if (!lista.length) { const { automacao = {} } = await chrome.storage.sync.get("automacao"); lista = [...new Set(Object.values(automacao).map((a) => a.prompt).filter(Boolean))]; msg.textContent = "(lista do Painel: o Studio não respondeu)"; } else msg.textContent = `${lista.length} prompts`;
+  if (!lista.length) { const { automacao = {} } = await chrome.storage.sync.get("automacao"); lista = [...new Set(Object.values(automacao).map((a) => a.prompt).filter(Boolean))]; msg.textContent = "(lista do Painel: o Studio não respondeu)"; } else { msg.textContent = `${lista.length} prompts`; if (lista.join("|") !== listaPrompts.join("|")) { listaPrompts = lista; void desenhar(); } }
   sel.innerHTML = '<option value="">— o prompt cadastrado para a serventia do processo —</option>' + lista.map((x) => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
   if (atual && lista.includes(atual)) sel.value = atual; else if (lista.length === 1) sel.value = lista[0];
 }
