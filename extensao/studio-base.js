@@ -1194,6 +1194,7 @@
   const shLP = hostLP.attachShadow({ mode: "open" });
   shLP.innerHTML = `<style>
     .w{position:fixed;right:22px;bottom:96px;z-index:2147483645;display:none;flex-direction:column;align-items:flex-end;gap:6px;font:13px system-ui,sans-serif}
+    .w.i{position:static;right:auto;bottom:auto;z-index:auto;align-items:center;margin:4px auto 0}
     button{font:700 14px system-ui,sans-serif;padding:11px 18px;border:0;border-radius:999px;cursor:pointer;background:linear-gradient(135deg,#0b3d7a,#1565c0);color:#fff;box-shadow:0 4px 16px #0b3d7a88}
     button:hover{filter:brightness(1.12)} button:disabled{opacity:.7;cursor:wait}
     .r{position:relative;max-width:340px;background:#0b1f3a;color:#fff;padding:8px 30px 8px 11px;border-radius:8px;box-shadow:0 2px 10px #0006;display:none;line-height:1.35}
@@ -1214,7 +1215,11 @@
   const numeroLP = () => ((document.getElementById("tour-meta-parties-box")?.innerText) || (resultadoTurbo()?.innerText) || document.body.innerText.slice(0, 6000) || "").match(/\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/)?.[0] || "";
   async function atualizarLP() {
     try {
-      if (!hostLP.isConnected) document.documentElement.appendChild(hostLP);
+      // Minuta do resultado: o botão fica no FIM da minuta (no espaço reservado pelo Studio depois da assinatura), e só aparece quando a pessoa rola até lá.
+      // Sem esse espaço (Studio mais antigo) ou no resultado do Turbo, continua flutuante como antes.
+      const vaga = document.querySelector('[data-testid="slot-lancar-projudi"]');
+      if (vaga && !resultadoTurbo()) { if (hostLP.parentElement !== vaga) vaga.appendChild(hostLP); wLP.classList.add("i"); }
+      else { wLP.classList.remove("i"); if (hostLP.parentElement !== document.documentElement) document.documentElement.appendChild(hostLP); }
       wLP.style.display = (minutaDoPainel().length > 200 || resultadoTurbo()) ? "flex" : "none";
       posicionarLP();
     } catch (e) { /* extensão recarregada: esta cópia do script morreu */ }
@@ -1222,6 +1227,7 @@
   // Posição: encostado à ESQUERDA do botão “Editar com o chat Gemini” (chat fechado) ou do “Recolher” (chat aberto, no fluxo da página); acompanha a rolagem.
   // Sem nenhum dos dois na tela, vai para o canto, acima do selo “MySQL – Hostinger” do app (não cobre o chat nem esse selo).
   function posicionarLP() {
+    if (wLP.classList.contains("i")) { wLP.style.right = ""; wLP.style.bottom = ""; return; }      // no fim da minuta: está no fluxo da página
     const bts = [...document.querySelectorAll("button")];
     const ancora = bts.find((b) => /Editar com o chat/i.test(texto(b)) && visivel(b)) || bts.find((b) => b.getAttribute("data-testid") === "fechar-chat-gemini" && visivel(b));
     const r = ancora && ancora.getBoundingClientRect();
