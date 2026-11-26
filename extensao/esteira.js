@@ -5,7 +5,7 @@ import { lerMidia, guardarPdfDoVideo, lerPdfDoVideo, apagarGuardadosDoVideo, lim
 import { chaveDoProcesso } from "./midias-projudi.js";
 instalarSaude("esteira");
 import { analisarNoStudio, lerMinutaAtual, consultarGigantes, cadastrarNoStudio, lerPromptDoStudio, sentencaComVideoNoStudio } from "./studio-cliente.js";
-import { executarNaIa, SITES_IA, temPermissao, pedirPermissao } from "./ia-externa-cliente.js";
+import { executarNaIa, capturarDaAba, SITES_IA, temPermissao, pedirPermissao } from "./ia-externa-cliente.js";
 import { executarNoAgaia, retomarExecucao } from "./agaia-cliente.js";
 import { criarDocumento, abrirLadoALado, lerDocumento, tipoDaMinuta, nomeDoc } from "./docs-api.js";
 import { paragrafosDeHtml } from "./docs-core.js";
@@ -138,8 +138,12 @@ async function analisarNaIaExterna(it, valida) {
     await atualizar(it.id, { estado: "erro", erro: `${nomeIa}: ` + r.erro, aviso: "A esteira seguiu para o próximo processo.", tentativas: r.semRetry ? 9 : undefined });
     return;
   }
+  await concluirMinutaDaIa(it, nomeIa, r);
+}
+/** A minuta chegou da IA externa (pela esteira ou pelo botão "Buscar a minuta na aba"): guarda na linha e entrega ao Studio. */
+async function concluirMinutaDaIa(it, nomeIa, r) {
   const texto = r.minutaTexto;
-  await atualizar(it.id, { estado: "concluido", erro: "", minuta: texto, minutaHtml: r.minutaHtml || "", tipo: tipoDaMinuta(texto), cadastroPendente: true, aviso: `Minuta recebida de ${nomeIa}; entregando ao Studio…` });
+  await atualizar(it.id, { estado: "concluido", erro: "", capturando: false, minuta: texto, minutaHtml: r.minutaHtml || "", tipo: tipoDaMinuta(texto), cadastroPendente: true, aviso: `Minuta recebida de ${nomeIa}; entregando ao Studio…` });
   const c = await cadastrarAgaia(it, r);
   await atualizar(it.id, { cadastroPendente: !c.ok, aviso: c.ok ? `Minuta feita no ${nomeIa} e entregue ao Studio: ela é gravada no Histórico em segundo plano (selo 🤖 ${nomeIa}).` : `Minuta feita no ${nomeIa} e guardada aqui, mas ainda NÃO entregue ao Studio (${c.erro}). A esteira tenta de novo sozinha; enquanto isso use “Copiar minuta”.` });
 }
@@ -346,6 +350,7 @@ async function desenhar(forcar = false) {
     const b = [];
     if (it.estado === "aguardando") b.push(`<button data-a="pular" data-id="${it.id}">Pular</button>`);
     if (["aguardando", "pausado", "erro", "analisando"].includes(it.estado)) b.push(`<button data-a="usar" data-id="${it.id}" title="A extensão procura o número do processo no Histórico Local do Studio, carrega a minuta e a leva ao Google Docs, sem analisar de novo">Usar a minuta do Studio (busca no Histórico)</button>`);
+    if (it.estado === "erro" && it.modo === "ia" && SITES_IA[it.iaId]) b.push(`<button data-a="capturar-ia" data-id="${it.id}" ${it.capturando ? "disabled" : ""} style="background:#1d4ed8;color:#fff;font-weight:700;padding:6px 10px;border:2px solid #1e3a8a;border-radius:8px;cursor:pointer" title="A minuta pode estar pronta (ou ainda sendo escrita) na conversa aberta. A extensão olha essa conversa, espera a IA terminar e traz a minuta para o Studio, sem enviar nada de novo">${it.capturando ? "Procurando a minuta…" : "🔎 Buscar a minuta na aba do " + esc(SITES_IA[it.iaId].nome)}</button>`);
     if (it.sigiloso && it.estado === "erro") b.push(`<button data-a="sigilo-studio" data-id="${it.id}" style="background:#b45309;color:#fff;font-weight:700;padding:6px 10px;border:2px solid #78350f;border-radius:8px;cursor:pointer" title="O Agaia não roda processo em segredo de justiça. A extensão procura este processo na unidade, baixa o PDF, faz o OCR e extrai o texto, e a análise roda no Studio.">🔒 Segredo de justiça — Rodar no Studio</button>`);
     if (it.sigiloso && it.estado === "erro") b.push(`<button data-a="sigilo-agaia" data-id="${it.id}" style="background:#7c2d12;color:#fff;font-weight:700;padding:6px 10px;border:2px solid #431407;border-radius:8px;cursor:pointer" title="A extensão baixa o PDF deste processo no Projudi (sem OCR), volta ao Agaia, confirma as declarações que VOCÊ autorizar, anexa o PDF, executa e recolhe a minuta.">🔒 Segredo de justiça — Rodar no Agaia com PDF</button>`);
     if (["pausado", "erro", "analisando"].includes(it.estado)) b.push(`<button data-a="repetir" data-id="${it.id}">${it.estado === "erro" ? "Tentar de novo" : "Analisar de novo"}</button>`);
@@ -393,6 +398,14 @@ $("linhas").addEventListener("click", async (ev) => {
     await atualizar(id, { prompt: v, promptOpcoes: null, promptEscolhido: "", estado: "aguardando", erro: "", rodada: 0, tentativas: 0 });
   }
   if (a === "pular") { await fecharAbas((await todos()).find((x) => x.id === id)); await atualizar(id, { estado: "pulado" }); }
+  if (a === "capturar-ia") {
+    const it = (await todos()).find((x) => x.id === id); if (!it || it.modo !== "ia" || !SITES_IA[it.iaId] || it.capturando) return;
+    const nomeIa = SITES_IA[it.iaId].nome;
+    await atualizar(id, { capturando: true, aviso: `${nomeIa}: olhando a conversa aberta…` });
+    const r = await capturarDaAba(it.iaId, { aoAndamento: (t) => atualizar(id, { aviso: `${nomeIa}: ` + t }) });
+    if (!r.ok) { await atualizar(id, { capturando: false, erro: `${nomeIa}: ` + r.erro, aviso: "Nada foi enviado de novo. Quando a minuta estiver pronta na aba do " + nomeIa + ", clique outra vez em “Buscar a minuta”." }); return; }
+    await concluirMinutaDaIa(it, nomeIa, r); return;
+  }
   if (a === "repetir") await atualizar(id, { estado: "aguardando", erro: "", rodada: 0 });
   if (a === "normal") await atualizar(id, { modo: "analise", estado: "aguardando", erro: "", grande: false, cotaVezes: 0, tentativas: 0, rodada: 0, aviso: "refeito na análise normal" });
   if (a === "sigilo-studio") { await rodarEm(id, "studio", ""); return; }

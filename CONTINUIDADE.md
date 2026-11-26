@@ -429,3 +429,10 @@ O usuário testou o painel do SEEU no ambiente real (lista, exportação e envio
 
 ## Extensão 5.3.8 (26/11/2026): botão "Lançar no Projudi" no fim da minuta
 - `studio-base.js`: se o Studio tem o espaço `[data-testid="slot-lancar-projudi"]` (depois da assinatura) e não é o resultado do Turbo, o botão vai para dentro dele (posição estática, centralizado); sem o espaço, volta a ser flutuante. Teste novo: `tests/e2e_lancar_botao_no_fim.py` (e `e2e_lancar_botao_posicao.py` continua valendo para o modo flutuante). Pacote: `publicacao/projudi-extensao-5.3.8.zip` (o usuário envia à loja). Depende do Studio com o espaço (publicar o Studio junto).
+
+## Extensão 5.3.9 (26/11/2026): Claude lendo os autos com ferramentas + "Buscar a minuta na aba"
+- Problema real: o Claude abre com "Vou ler integralmente o PDF… Executando um comando" (lê 580 páginas com ferramentas, o texto fica parado e o botão de parar some); a esteira entendia esse anúncio como resposta final, dava erro "só veio um texto curto" e seguia, embora a minuta ficasse pronta na aba.
+- `ia-agente.js` (`esperarResposta`): texto que mostra trabalho em andamento ("Executando…", "executou N comandos") conta como "gerando"; texto curto de ANÚNCIO ("Vou…", "Estou lendo…") nos primeiros 20 min não vale como minuta. Variável nova `window.__projudiIAEnviadoEm` (a `__projudiIAEnviado` já guarda o TEXTO enviado; não reutilizar).
+- `ia-externa-cliente.js`: espera total 12 → 30 min; `capturarDaAba(id)` pega a minuta que já está (ou ainda está sendo escrita) na conversa aberta mais recente do site, sem reenviar nada.
+- `esteira.js`: botão "🔎 Buscar a minuta na aba do <IA>" nas linhas com erro da IA externa (`data-a="capturar-ia"`), `concluirMinutaDaIa` (comum à esteira e ao botão).
+- Testes: `tests/e2e_ia_claude_espera.py`, `tests/e2e_esteira_buscar_minuta_ia.py` (+ `e2e_ia_agente.py` e `e2e_esteira_alt_caminho.py` seguem passando). Pacote `publicacao/projudi-extensao-5.3.9.zip` (o usuário envia à loja).

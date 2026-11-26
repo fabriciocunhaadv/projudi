@@ -75,7 +75,33 @@ export async function executarNaIa(it, { id, bytes, promptTexto, aoAndamento = (
         if ((r.texto || "").trim().length < 400) return { ok: false, erro: `não consegui capturar a minuta do ${s.nome}: só veio um texto curto (“${(r.texto || "").slice(0, 80)}”). A minuta pode estar num painel lateral: rode “Diagnosticar tela da IA” e me envie o resultado.` };
         return { ok: true, minutaTexto: r.texto, minutaHtml: r.html || "" };
       } catch (e) {
-        if (!/tempo limite|Receiving end|message channel|não terminou de responder/i.test(e.message) || Date.now() - t0 > 12 * 60000) throw e;
+        if (!/tempo limite|Receiving end|message channel|não terminou de responder/i.test(e.message) || Date.now() - t0 > 30 * 60000) throw e;
+        aoAndamento(`${s.nome} ainda respondendo… (${Math.round((Date.now() - t0) / 60000)} min)`);
+      }
+    }
+  } catch (e) { return { ok: false, erro: String(e.message || e), semRetry: !!e.semRetry }; }
+}
+
+/** Pega a minuta que JÁ está (ou ainda está sendo escrita) na aba da IA, sem enviar nada de novo: escolhe a conversa aberta mais recente do site, espera ela terminar e devolve a última resposta. */
+export async function capturarDaAba(id, { aoAndamento = () => {}, aindaValido = async () => true } = {}) {
+  const s = SITES_IA[id];
+  try {
+    if (!(await temPermissao(id))) throw Object.assign(new Error(`falta autorizar a extensão a usar o ${s.nome}`), { semRetry: true });
+    const abas = (await chrome.tabs.query({ url: s.padrao })).sort((a, b) => (Number(b.lastAccessed) || 0) - (Number(a.lastAccessed) || 0));
+    const aba = abas.find((t) => /\/(chat|c|app|conversa)\//i.test(t.url || "")) || abas[0];
+    if (!aba) return { ok: false, erro: `não achei uma aba aberta do ${s.nome}. Abra a conversa da minuta nesta janela do Chrome e clique de novo.` };
+    aoAndamento(`olhando a conversa aberta no ${s.nome}…`);
+    await chrome.scripting.executeScript({ target: { tabId: aba.id }, files: ["ia-agente.js"] });
+    await dorme(500);
+    const t0 = Date.now();
+    for (;;) {
+      if (!(await aindaValido())) return { ok: false, cancelado: true };
+      try {
+        const r = await msg(aba, { acao: "ia-esperar", ms: 90000, estavelMs: 6000 });
+        if ((r.texto || "").trim().length < 400) return { ok: false, erro: `a conversa do ${s.nome} ainda não tem uma minuta completa (só “${(r.texto || "").slice(0, 80)}”). Espere a IA terminar e clique de novo.` };
+        return { ok: true, minutaTexto: r.texto, minutaHtml: r.html || "" };
+      } catch (e) {
+        if (!/tempo limite|Receiving end|message channel|não terminou de responder|não começou a responder/i.test(e.message) || Date.now() - t0 > 30 * 60000) throw e;
         aoAndamento(`${s.nome} ainda respondendo… (${Math.round((Date.now() - t0) / 60000)} min)`);
       }
     }

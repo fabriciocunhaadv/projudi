@@ -186,7 +186,7 @@
         de.click();
       }
     }
-    window.__projudiIAMarca = { antes, textoAntes };
+    window.__projudiIAMarca = { antes, textoAntes }; window.__projudiIAEnviadoEm = Date.now();
     return { ok: true, antes };
   }
 
@@ -255,11 +255,16 @@
       if (bloqueio()) throw new Error("a IA pediu verificação humana (captcha): resolva na aba dela");
       const rs = respostas(), ult = rs.length ? textoDe(rs[rs.length - 1]) : "";
       const novo = rs.length > marca.antes || (ult && ult !== marca.textoAntes);
-      const gerando = !!botaoParar();
+      // Claude/ChatGPT com ferramentas ("Leu um arquivo, executou 6 comandos", "Executando um…"): o texto fica parado enquanto a IA lê os autos e o botão de parar pode sumir.
+      // Texto que ainda indica trabalho em andamento, ou texto curto logo depois do envio, NÃO é a minuta: continua esperando (o chamador reabre a espera em fatias).
+      const emTrabalho = /(?:^|\n|\s)(?:Executando|Lendo|Analisando o|Processando)\b[^.\n]{0,60}$/i.test(ult.slice(-140)) || /\b(?:executou|executando) \d* ?comandos?\b/i.test(ult.slice(-200));
+      const gerando = !!botaoParar() || emTrabalho;
       if (gerando || novo) comecou = true;
       if (ult !== ultimo) { ultimo = ult; desde = Date.now(); }
       const barraDeAcoes = !gerando && !!perfil().concluido && todosVisiveis(perfil().concluido).length > 0;      // a própria tela avisa que terminou: não precisa esperar tanto
-      if (comecou && novo && !gerando && ult && Date.now() - desde >= (barraDeAcoes ? Math.min(estavelMs, 1500) : estavelMs)) {
+      const anuncio = /^\s*(?:vou|irei|vamos|primeiro,? |antes de|estou (?:lendo|analisando|abrindo)|let me|i(?:'ll| will))/i.test(ult);      // “Vou ler integralmente o PDF…”: a IA anunciando o que vai fazer
+      const curtoCedo = ult.length < 400 && anuncio && !barraDeAcoes && Date.now() - (window.__projudiIAEnviadoEm || t0) < 20 * 60000;      // texto curto de anúncio nos primeiros 20 min não é a minuta: continua esperando
+      if (comecou && novo && !gerando && ult && !curtoCedo && Date.now() - desde >= (barraDeAcoes ? Math.min(estavelMs, 1500) : estavelMs)) {
         const el = rs[rs.length - 1];
         const cl = conteudoLimpo(el); let texto = cl.texto, html = cl.html, origem = "chat";
         // IAs que entregam a peça num painel lateral (ex.: Jusbrasil “Criou Peça”): o chat só traz um aviso curto; a minuta está no painel
