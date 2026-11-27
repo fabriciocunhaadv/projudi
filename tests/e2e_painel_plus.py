@@ -69,11 +69,30 @@ with sync_playwright() as p:
     pg.click(f"[data-abrir='{A}']"); lp = pg.inner_text("[data-testid=plus-serventias]"); assert "6000000-01" in lp and "6000001-02" in lp and "pré-analisada" in lp and "Decisão" in lp, lp
     pg.click(f"[data-abrir='{A}']"); assert "6000000-01" not in pg.inner_text("[data-testid=plus-serventias]"), "dobra de novo"
     # 10) ferramentas: todos os atalhos da extensão num lugar só
-    tiles = pg.locator("[data-testid=plus-ferramentas] .tile"); assert tiles.count() == 10, tiles.count()
+    tiles = pg.locator("[data-testid=plus-ferramentas] .tile"); assert tiles.count() == 13, tiles.count()
     txt = pg.inner_text("[data-testid=plus-ferramentas]")
-    for nome in ["Mandar para análise", "Esteira de minutas", "Painel completo", "SEEU", "Pauta de audiências", "Sentenciar com vídeo", "PDF com OCR", "PDF para texto", "Ferramentas", "Abrir o Studio"]: assert nome in txt, nome
-    hrefs = [tiles.nth(i).get_attribute("href") for i in range(10)]; assert "sentenca-video.html" in hrefs and "pauta.html" in hrefs and "seeu.html" in hrefs and "ocr.html" in hrefs and "texto.html" in hrefs, hrefs
+    for nome in ["Mandar para análise", "Esteira de minutas", "Painel completo", "SEEU", "Pauta de audiências", "Sentenciar com vídeo", "PDF com OCR", "PDF para texto", "Ferramentas", "Abrir o Studio", "Processos do Projudi", "Minhas serventias", "Modelos do Projudi"]: assert nome in txt, nome
+    hrefs = [tiles.nth(i).get_attribute("href") for i in range(13)]; assert "sentenca-video.html" in hrefs and "pauta.html" in hrefs and "seeu.html" in hrefs and "ocr.html" in hrefs and "texto.html" in hrefs, hrefs
     pg.screenshot(path="/tmp/claude-0/work/mob/plus_ferr.png", full_page=True)
+    # 10b) o que veio do painel completo: urgentes/ocultar, classificadores, aba Processos, aba Minhas serventias, CSV
+    assert "urgentes" in pg.inner_text("[data-testid=plus-serventias]").lower() and pg.locator("[data-ocultar-serv]").count() == 2
+    pg.click("#detCls summary"); assert "Sentença" in pg.inner_text("[data-testid=plus-classificadores]") and "Decisão" in pg.inner_text("[data-testid=plus-classificadores]")
+    pg.click("[data-testid=plus-aba-procs]"); assert pg.is_visible("[data-testid=plus-procs]") and not pg.is_visible("[data-testid=plus-cartoes]")
+    pg.click("[data-testid=plus-p-expandir]"); tp = pg.inner_text("[data-testid=plus-p-conteudo]")
+    assert "6000000-01" in tp and "6000001-02" in tp and "Pré-analisadas" in tp and "Não analisadas" in tp, tp
+    pg.fill("[data-testid=plus-p-busca]", "6000001"); tp = pg.inner_text("[data-testid=plus-p-conteudo]"); assert "6000001-02" in tp and "6000000-01" not in tp
+    pg.fill("[data-testid=plus-p-busca]", ""); pg.select_option("[data-testid=plus-p-visao]", "fila"); assert "6000000-01" in pg.inner_text("[data-testid=plus-p-conteudo]")
+    with pg.expect_download() as dl: pg.click("[data-testid=plus-p-csv]")
+    csv = Path(dl.value.path()).read_text(encoding="utf-8-sig"); assert "6000000-01" in csv and "\"Serventia\";\"Perfil\"" in csv, csv[:200]
+    pg.click("[data-testid=plus-aba-config]"); assert pg.is_visible("[data-testid=plus-config]")
+    assert pg.locator("[data-c-ativa]").count() == 2 and pg.locator("[data-c-agaia]").count() == 2
+    pg.fill(f"[data-c-agaia='{A}']", "Meu prompt Agaia"); pg.fill(f"[data-c-prompt='{A}']", "Meu prompt Studio"); pg.click(f"[data-c-ativa='{A}']"); pg.wait_for_timeout(400)
+    aut = sw.evaluate("async () => (await chrome.storage.sync.get('automacao')).automacao")
+    assert aut[A]["promptAgaia"] == "Meu prompt Agaia" and aut[A]["prompt"] == "Meu prompt Studio" and aut[A]["ativa"] is True, aut
+    assert "1 de 2 ligadas" in pg.inner_text("#cfgInfo")
+    pg.click("[data-testid=plus-aba-geral]")
+    pg.click(f"[data-ocultar-serv='{A}']"); assert pg.locator("[data-ocultar-serv]").count() == 1 and "Ocultas (1)" in pg.inner_text("[data-testid=plus-ocultas]")
+    pg.click("[data-testid=plus-ocultas] summary"); pg.click(f"[data-reativar-serv='{A}']"); assert pg.locator("[data-ocultar-serv]").count() == 2
     # 11) aba "Mandar para análise": o passo a passo do Inicie aqui dentro do Painel Plus
     pg.click("[data-testid=plus-aba-analise]"); assert pg.is_visible("[data-testid=plus-analise]") and not pg.is_visible("[data-testid=plus-cartoes]")
     qd = pg.frame_locator("#quadro"); qd.locator("text=Passo 1 de 6").wait_for(timeout=10000)

@@ -292,7 +292,7 @@ Playwright Python (`/usr/bin/python3`, chromium `/opt/pw-browsers/chromium`, `--
 
 ## Legislação pelo Novo Portal (23/11) e LEMBRETE FIXO
 - O Novo Portal da Legislação (`https://portaldalegislacao.presidencia.gov.br/`, mesmos caminhos `ccivil_03/...`) já era a fonte principal, com o Planalto como reserva (`espelhoLegislacao.ts`, disjuntor de 3 falhas/10 min). Toda busca de artigo (inclusive a citação automática e "lei sem artigo") passa por `baixarLinhas`. Ajuste desta data: `trechoDoArtigo` agora ignora o **sumário** do portal novo ("Art 1º", "Art 2º"…) e pega a ocorrência com texto de verdade. Teste: `testes/teste_trecho_sumario.ts`.
-- **LEMBRETE (pedido do usuário): sempre lembrar o usuário de que falta continuar o painel da SEEU** (adiado). Ao final de cada resposta/etapa, lembrar disso.
+- ~~LEMBRETE de que falta continuar o painel da SEEU~~ — **CANCELADO pelo usuário em 27/11/2026**: não repetir mais esse lembrete no fim das respostas.
 - Extensão 5.0.11 já enviada à loja pelo usuário. Cadastro com gabinete publicado; citação automática conferida pelo usuário numa minuta real (deu certo).
 
 
@@ -443,7 +443,7 @@ O usuário testou o painel do SEEU no ambiente real (lista, exportação e envio
 - Os totais de conclusos dependem de o painel completo ter feito "Verificar agora" (a tela avisa quando não há dados).
 - Ações: "Abrir na esteira" e "Abrir o processo". Lançar em lote/assinatura ficam para uma 2ª etapa (ver mock-ups em `ideias/painel-plus/`).
 - Testes: `tests/e2e_painel_plus.py`; `tests/e2e_extensao.py` ajustado (lista de botões do menu inclui SEEU e Painel Plus).
-- Pedido do usuário pendente: LEMBRAR dele quando o limite semanal de uso reiniciar (aguardando ele dizer a data/hora).
+- Pedido do usuário (cancelado em 27/11/2026): lembrete sobre o limite semanal de uso. Não agendar nem perguntar mais.
 
 ## Extensão 5.4.1 (27/11/2026) — Painel Plus centralizado + "Sentenciar com vídeo" fora da pauta (aguardando envio à loja)
 - **Pauta de audiências**: removido o botão "Sentenciar com o vídeo" (a pauta só traz quem aguarda audiência; depois da audiência o processo sai dela). Fica só um aviso apontando o novo menu.
@@ -458,3 +458,8 @@ O usuário testou o painel do SEEU no ambiente real (lista, exportação e envio
 - Código: `agaia-cliente.js` (`urlSeeu`, `numeroSeeu`, opção `seeu`), `agaia-exec.js` (`formularioAgaia()` aceita `form_execucao_legacy`; `selectPrompt` cai em `#prompt_id`; no SEEU marca `#area_SEEU` e espera `area_id=3`; número sem formatação; sem caixa de concordância basta o PDF aparecer em `#lista_documentos` e o Executar liberar), `esteira.js`/`esteira.html` (importação e rótulos).
 - Testes: `tests/e2e_agaia_seeu.py` (página simulada com a estrutura do HTML real que o usuário mandou) e `tests/e2e_esteira_seeu_importar.py`. **Não testado no Agaia real**: seletores vêm do HTML enviado; se o Agaia mudar ids (`area_SEEU`, `numero_processo`, `prompt_id`, `tipo_pdf`, `inputPdfFile`, `executarIA`, `lista_documentos`), ajustar `agaia-exec.js`.
 - Auditoria "dados só no navegador" (Studio): prompts, teses, paradigmas, guia e unidades têm banco + cópia local; Histórico e auditorias estão no banco. Só no navegador: preferências de tela, chave `ai_studio_api_key` (Mutirão), conversa do agente lateral (últimas 20 mensagens) e a lista "Histórico do Turbo" do próprio módulo (a minuta do Turbo também é gravada no Histórico geral).
+
+## Extensão 5.4.3 (27/11/2026) — Painel Plus = painel completo reorganizado (aguardando envio à loja)
+- Pedido: o Painel Plus deve conter tudo do painel completo (que continua existindo), mais enxuto e organizado. Agora tem 4 abas: **Visão geral** (cartões, fila da esteira, por serventia com urgentes e "ocultar serventia/cargo", ocultas com reativar, por classificador, favoritas, últimos abertos, ferramentas), **Processos** (tabelas do Projudi ou fila única, filtro, ordem de trabalho, expandir tudo, Exportar CSV, Modelos do Projudi), **Minhas serventias** (automatizar + prompt do Studio + arquivo de modelos + prompt do Agaia; mesmos dados `automacao` do painel completo) e **Mandar para análise** (o Inicie aqui embutido: baixar PDFs, Lupa, Turbo, IA externa, Agaia, só PDF).
+- Não portado de propósito: a tabela longa "Baixar PDFs" do painel completo (o Inicie aqui embutido faz o mesmo caminho).
+- Teste: `tests/e2e_painel_plus.py` (cobre as 4 abas, ocultar/reativar, CSV, prompts).

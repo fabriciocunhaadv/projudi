@@ -36,17 +36,24 @@
   .tile small { color: var(--muted); font-weight: 400; font-size: 11.5px; }
   .seta { background: none !important; border: 0 !important; box-shadow: none !important; padding: 0 4px !important; cursor: pointer; color: var(--muted); }
   .procs { background: var(--bg); padding: 4px 8px; } .procs table { font-size: 12.5px; } .procs td, .procs th { padding: 6px 10px; }
+  .procs-det { margin: 8px 0; } .procs-det > summary { cursor: pointer; font-weight: 700; padding: 8px 4px; }
+  #pConteudo table.tp, #pConteudo .bloco { font-size: 13px; } #pConteudo details { margin: 6px 0; }
+  #cConteudo table input[type=text] { width: 100%; min-width: 190px; font: inherit; border: 1px solid var(--line-forte); background: var(--card); color: var(--fg); border-radius: 8px; padding: 6px 8px; }
+  .mini-btn { padding: 3px 8px !important; font-size: 11.5px; margin-right: 4px; }
   .vazio { padding: 18px 16px; color: var(--muted); }
   .aviso-dados { background: var(--aviso-suave); color: var(--aviso); border-radius: 10px; padding: 8px 12px; font-size: 12.5px; margin-bottom: 12px; }
   .ac button, .ac a.bt { padding: 4px 10px !important; font-size: 12px; margin: 0 4px 4px 0; }
   a.bt { display: inline-block; border: 1px solid var(--line-forte); border-radius: 10px; font-weight: 600; color: var(--fg); background: var(--card); text-decoration: none; }
 </style>
+<link rel="stylesheet" href="projudi-tabela.css">
 <link rel="stylesheet" href="tema.css">
 <body>
 <div class="plus">
   <header class="topo">
     <h1>Painel Plus</h1>
     <a href="#" id="tabGeral" class="aba on" data-testid="plus-aba-geral">Visão geral</a>
+    <a href="#" id="tabProcs" class="aba" data-testid="plus-aba-procs">Processos</a>
+    <a href="#" id="tabConfig" class="aba" data-testid="plus-aba-config">Minhas serventias</a>
     <a href="#" id="tabAnalise" class="aba" data-testid="plus-aba-analise">Mandar para análise</a>
     <span id="quando"></span>
   </header>
@@ -63,6 +70,8 @@
     <div>
       <div class="bloco"><h2>Fila de minutas <small id="filaInfo"></small></h2><div id="fila" data-testid="plus-fila"></div></div>
       <div class="bloco"><h2>Por serventia <small><label>ordenar: <select id="ordem" data-testid="plus-ordem" style="padding:3px 6px"><option value="conclusos">mais conclusos</option><option value="pre">mais pré-analisadas</option><option value="nome">nome</option></select></label></small></h2><div id="serventias" data-testid="plus-serventias"></div></div>
+      <div id="ocultasBloco" data-testid="plus-ocultas"></div>
+      <div class="bloco"><details id="detCls"><summary style="padding:12px 16px;cursor:pointer;font-weight:700;color:var(--brand)">Por classificador <small id="clsInfo"></small></summary><div id="classificadores" data-testid="plus-classificadores" style="overflow-x:auto"></div></details></div>
     </div>
     <div>
       <div class="bloco"><h2>🧰 Ferramentas da extensão</h2><div id="ferramentas" class="tiles" data-testid="plus-ferramentas"></div></div>
@@ -71,9 +80,22 @@
     </div>
   </div>
   </div>
+  <section id="procs" hidden data-testid="plus-procs">
+    <div class="barra"><input id="pBusca" type="search" placeholder="Filtrar por processo, classificador, usuário…" data-testid="plus-p-busca" aria-label="Filtrar processos">
+      <select id="pModo" data-testid="plus-p-modo" title="Ordem de trabalho"></select>
+      <select id="pVisao" data-testid="plus-p-visao"><option value="tabela">Tabelas do Projudi</option><option value="fila">Fila única (ordem de trabalho)</option></select>
+      <button id="pExpandir" data-testid="plus-p-expandir">Expandir tudo</button><button id="pCsv" data-testid="plus-p-csv">Exportar CSV</button>
+      <a href="modelos.html" target="_blank" class="bt" style="padding:6px 12px;border:1px solid var(--line-forte);border-radius:10px;font-weight:600">Modelos do Projudi</a></div>
+    <div id="pConteudo" data-testid="plus-p-conteudo"></div>
+  </section>
+  <section id="config" hidden data-testid="plus-config">
+    <div class="aviso-dados" style="background:var(--brand-suave);color:var(--brand)">Marque as serventias em que você trabalha e, se quiser, o nome do prompt de cada uma. O nome do prompt do <b>Agaia</b> precisa ser IGUAL ao cadastrado no Agaia (mesmas letras, acentos e espaços). Estes dados são os mesmos do painel completo e ficam guardados na sua conta do Chrome.</div>
+    <div class="bloco"><h2>Minhas serventias e prompts <small id="cfgInfo"></small></h2><div id="cConteudo" data-testid="plus-c-conteudo" style="overflow-x:auto"></div></div>
+    <p><button class="primary" id="cIr" data-testid="plus-c-ir">Mandar processos para análise →</button></p>
+  </section>
   <section id="analise" hidden data-testid="plus-analise"><iframe id="quadro" title="Mandar processos para análise (Inicie aqui)" style="width:100%;height:calc(100vh - 150px);min-height:620px;border:1px solid var(--line);border-radius:var(--radius);background:var(--card)"></iframe></section>
 </div>
-<script src="ordenar.js"></script>
+<script src="ordenar.js"></script><script src="render.js"></script><script src="sugestoes.js"></script>
 <script type="module" src="plus.js"></script>
 </body>
 </html>
