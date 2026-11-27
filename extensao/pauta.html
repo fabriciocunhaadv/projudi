@@ -53,7 +53,7 @@ td.h{font-size:12pt}.nome{font-weight:bold;text-transform:uppercase}
  <p class="sub">Marque, na pauta abaixo, os processos que interessam. Depois escolha uma ação.</p>
  <div class="acoes">
  <button class="pri" id="mesa" disabled title="Baixa o PDF de cada processo marcado, faz o OCR e entrega à Mesa de Audiência do Studio (nova audiência + PDF)">2. Enviar marcados à Mesa de Audiência</button>
- <span class="grupo"><select id="promptVideo" title="Deixe em “prompt da serventia” para usar o prompt cadastrado para cada serventia (Painel) ou a sugestão pelo nome. Escolhendo um prompt, ele vale para todos os marcados." style="max-width:260px"><option value="">— prompt da serventia —</option></select><button type="button" id="promptVideoRec" title="Recarregar a lista de prompts do Studio">↻</button> <button class="pri" id="video" disabled title="Para processos que tiveram audiência de instrução com vídeo: baixa o PDF e os vídeos de cada processo marcado e o Studio degrava a audiência e redige a sentença (um processo por vez)">Sentenciar com o vídeo da audiência</button></span>
+ <span class="sug nao-imprimir" style="color:var(--mut)">Para sentenciar com o vídeo da audiência, use <b>Sentenciar com vídeo</b> no menu da extensão (ele trabalha com os processos conclusos, não com a pauta).</span>
  <button class="pri" id="analisar" hidden style="display:none" disabled title="Consulta a Mesa de Audiência do Studio (Briefing, Roteiro, Deliberações, Sentença, Ata) de cada processo marcado e monta a pauta">3. Analisar processos marcados (consulta a Mesa)</button>
  <span class="grupo dir"><button id="imprimir">Imprimir / PDF</button><button id="copiar">Copiar texto</button></span>
  </div>

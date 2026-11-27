@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conclusões Projudi — Sentenciar com vídeo</title>
+<style>
+  body { padding: 0 !important; }
+  .sv { max-width: 1100px; margin: 0 auto; padding: 20px 28px 48px; }
+  .bloco { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--sombra); margin-bottom: 16px; overflow: hidden; }
+  .bloco > h2 { margin: 0 !important; padding: 12px 16px; background: var(--brand-suave); color: var(--brand); }
+  .corpo { padding: 14px 16px; }
+  .barra { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .barra select, .barra input[type=search] { font: inherit; border: 1px solid var(--line-forte); background: var(--card); color: var(--fg); border-radius: 10px; padding: 7px 10px; max-width: 320px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .etq { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+  .etq.av { background: var(--aviso-suave); color: var(--aviso); } .etq.az { background: var(--brand-suave); color: var(--brand); }
+  #msg { margin: 0 0 14px; padding: 10px 14px; border-radius: 12px; background: var(--brand-suave); border: 1px solid var(--line); font-size: 13.5px; }
+  #msg:empty { display: none; }
+  .vazio { padding: 18px 16px; color: var(--muted); }
+  .dica2 { background: var(--aviso-suave); color: var(--aviso); border-radius: 10px; padding: 8px 12px; font-size: 12.5px; margin-bottom: 12px; }
+</style>
+<link rel="stylesheet" href="tema.css">
+<body>
+<div class="sv">
+  <header class="topo"><h1>Sentenciar com vídeo</h1><a href="plus.html">Painel Plus</a><a href="esteira.html">Esteira de minutas</a><a href="pauta.html">Pauta de audiências</a></header>
+  <div id="msg"></div>
+  <div class="bloco"><h2>1. Escolha os processos conclusos para sentença</h2><div class="corpo">
+    <div class="dica2">Aqui entram os processos <b>conclusos</b> no seu Projudi (lidos pelo painel), mesmo que a audiência já tenha sido feita e saído da pauta. A extensão baixa o PDF e os vídeos/áudios da audiência que já foram juntados ao processo e o Studio degrava e redige a sentença.</div>
+    <div class="barra"><select id="serv" data-testid="sv-serventia"><option value="">Serventia: todas</option></select>
+      <input id="busca" type="search" placeholder="Filtrar por número do processo" data-testid="sv-busca">
+      <button id="todos">Marcar todos</button><button id="nenhum">Desmarcar todos</button>
+      <button id="atualizar" title="Lê o Projudi de novo para trazer os conclusos mais recentes">↻ Atualizar conclusos</button></div>
+  </div><div id="lista" data-testid="sv-lista"></div></div>
+  <div class="bloco"><h2>2. Sentenciar</h2><div class="corpo"><div class="barra">
+    <select id="promptVideo" data-testid="sv-prompt" title="Deixe em “prompt da serventia” para usar o prompt cadastrado para cada serventia (Painel) ou a sugestão pelo nome. Escolhendo um prompt, ele vale para todos os marcados."><option value="">— prompt da serventia —</option></select>
+    <button type="button" id="promptVideoRec" title="Recarregar a lista de prompts do Studio">↻</button>
+    <button class="primary" id="video" data-testid="sv-sentenciar" disabled title="Baixa o PDF e os vídeos de cada processo marcado e o Studio degrava a audiência e redige a sentença (um processo por vez)">Sentenciar com o vídeo da audiência</button>
+    <span id="qtd" class="dica"></span></div></div></div>
+</div>
+<script src="ordenar.js"></script><script src="sugestoes.js"></script>
+<script type="module" src="sentenca-video.js"></script>
+</body>
+</html>

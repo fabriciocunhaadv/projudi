@@ -444,3 +444,10 @@ O usuário testou o painel do SEEU no ambiente real (lista, exportação e envio
 - Ações: "Abrir na esteira" e "Abrir o processo". Lançar em lote/assinatura ficam para uma 2ª etapa (ver mock-ups em `ideias/painel-plus/`).
 - Testes: `tests/e2e_painel_plus.py`; `tests/e2e_extensao.py` ajustado (lista de botões do menu inclui SEEU e Painel Plus).
 - Pedido do usuário pendente: LEMBRAR dele quando o limite semanal de uso reiniciar (aguardando ele dizer a data/hora).
+
+## Extensão 5.4.1 (27/11/2026) — Painel Plus centralizado + "Sentenciar com vídeo" fora da pauta (aguardando envio à loja)
+- **Pauta de audiências**: removido o botão "Sentenciar com o vídeo" (a pauta só traz quem aguarda audiência; depois da audiência o processo sai dela). Fica só um aviso apontando o novo menu.
+- **Sentenciar com vídeo** (`sentenca-video.html/js`, botão novo no menu abaixo de "Pauta de audiências"): trabalha com os processos CONCLUSOS lidos pelo painel (`estado`), com filtro de serventia/número, escolha do prompt (campo vale para todos; senão prompt da serventia ou sugestão pelo nome) e o mesmo lote `modo: "video"` de antes (esteira baixa PDF + mídias já juntadas). Limite: só aparece quem está na lista de conclusos lida; processo fora dela exige "Atualizar conclusos".
+- **Painel Plus** agora é central: abas "Visão geral" e "Mandar para análise" (o passo a passo "Inicie aqui" embutido por iframe `iniciar.html?embutido=1`, mesmos dados e caminho; sem cabeçalho próprio), botão "Verificar o Projudi agora" (dispara a leitura sem abrir outra tela), serventias com processos dobráveis (como no painel completo), bloco "Ferramentas da extensão" (Mandar para análise, Esteira, Painel completo, SEEU, Pauta, Sentenciar com vídeo, PDF com OCR, PDF para texto, Ferramentas, Studio).
+- Testes: `tests/e2e_painel_plus.py`, `tests/e2e_pauta_prompt_serventia.py` (reescrito para a página nova), `tests/e2e_inicie_aqui.py` e `tests/e2e_extensao.py` (lista de botões do menu atualizada).
+- Possível 2ª etapa: reescrever o "Mandar para análise" nativo (sem iframe) com a mesma arquitetura do Plus; lote/assinatura; post-its.

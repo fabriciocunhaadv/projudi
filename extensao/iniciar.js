@@ -4,6 +4,7 @@ import { enfileirar } from "./esteira-banco.js";
 import { STUDIO_URL } from "./studio-cliente.js";
 
 const $ = (id) => document.getElementById(id);
+if (/[?&]embutido=1/.test(location.search)) document.body.classList.add("emb");      // dentro do Painel Plus: sem o cabeçalho próprio
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const curto = (s) => String(s || "").replace(/^.*?\s-\s(?=[^-]+\s-\s[A-Z]{2}$)/, "").replace(/\s-\s[A-Z]{2}$/, "");      // "Montes Claros de Goiás - Vara Cível - GO" → "Vara Cível"
 const cidade = (s) => { const p = String(s || "").split(/\s+-\s+/); return p.length > 2 ? p[0] : ""; };

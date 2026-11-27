@@ -89,8 +89,8 @@ function desenhar() {
         (crim ? celulaEd(celAutor(l)) + celulaEd(celPessoas(l))
               : celulaEd(`<span class="nome">${esc(nomeAutor(l))}</span>`) + celulaEd(`<span class="nome">${esc(nomeReu(l))}</span>`) + celulaEd(avisosCiveis(l))) + `</tr>`).join("") + `</tbody></table></div>`;
   }).join("");
-  document.querySelectorAll(".sel").forEach((c) => (c.onchange = () => { const k = c.closest("tr").dataset.k; pauta.find((l) => chave(l.processo) === k).marcado = c.checked; $("analisar").disabled = $("mesa").disabled = $("video").disabled = !pauta.some((l) => l.marcado); }));
-  $("analisar").disabled = $("mesa").disabled = $("video").disabled = !pauta.some((l) => l.marcado);
+  document.querySelectorAll(".sel").forEach((c) => (c.onchange = () => { const k = c.closest("tr").dataset.k; pauta.find((l) => chave(l.processo) === k).marcado = c.checked; $("analisar").disabled = $("mesa").disabled = !pauta.some((l) => l.marcado); }));
+  $("analisar").disabled = $("mesa").disabled = !pauta.some((l) => l.marcado);
 }
 
 $("gerar").onclick = async () => {
@@ -142,28 +142,4 @@ $("mesa").onclick = async () => {
   $("msg").textContent = `${marcados.length} processo(s) em download/OCR. Cada um entra na esteira e vira uma audiência NOVA na Mesa de Audiência do Studio (mantenha a aba do Assessor aberta e logada).`;
 };
 
-// Sentença com o vídeo da audiência: baixa o PDF E os vídeos/áudios de cada processo marcado e a esteira entrega ao Studio, que degrava e redige a sentença (salva no Histórico).
-async function carregarPromptsVideo() {
-  const sel = $("promptVideo"), guardado = (await chrome.storage.local.get("pauta_video_prompt")).pauta_video_prompt || "", atual = sel.value || guardado;
-  let lista = [];
-  try { const { lerPromptDoStudio } = await import("./studio-cliente.js"); await lerPromptDoStudio(""); } catch (e) { lista = Array.isArray(e.opcoes) ? e.opcoes : []; }
-  if (!lista.length) { const { automacao = {} } = await chrome.storage.sync.get("automacao"); lista = [...new Set(Object.values(automacao).map((a) => a.prompt).filter(Boolean))]; }
-  sel.innerHTML = '<option value="">— prompt da serventia —</option>' + lista.map((x) => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
-  if (atual && lista.includes(atual)) sel.value = atual;
-}
-$("promptVideoRec").onclick = () => void carregarPromptsVideo();
-void carregarPromptsVideo();
-$("video").onclick = async () => {
-  const marcados = pauta.filter((l) => l.marcado && l.url);
-  if (!marcados.length) { $("msg").textContent = "Marque ao menos um processo (com link na lista)."; return; }
-  const manual = $("promptVideo").value.trim(); await chrome.storage.local.set({ pauta_video_prompt: manual });
-  // prompt de cada processo: o campo (se preenchido) vale para todos; senão, o prompt da SERVENTIA (cadastrado no Painel) ou a sugestão pelo nome da serventia
-  const { automacao = {} } = await chrome.storage.sync.get("automacao");
-  const promptDe = (serv) => manual || automacao[serv]?.prompt || (globalThis.Sugestoes ? Sugestoes.prompt(serv) : "") || "";
-  const id = "pautavideo" + Date.now();
-  const itens = marcados.map((l) => ({ processo: l.processo, url: l.url, classificador: "pauta", serventia: l.serventiaNome || "", serventiaUrl: l.serventiaUrl || "", situacao: "", audData: l.data || "", audHora: l.hora || "", audPromovente: l.promovente || "", audPromovido: l.promovido || "", audTipo: $("tipo").value ? ($("tipo").selectedOptions[0]?.textContent || "") : "", prompt: promptDe(l.serventiaNome || "") }));
-  const usados = [...new Set(itens.map((i) => i.prompt || "(sem prompt: a esteira vai pedir a escolha)"))];
-  await chrome.storage.local.set({ ["lote_" + id]: { itens, pasta: "Projudi/Sentenças com vídeo", opcoes: { studio: { ativo: true, modo: "video", docs: false } } } });
-  chrome.tabs.create({ url: chrome.runtime.getURL("lote.html?lote=" + id), active: false });
-  $("msg").textContent = `${marcados.length} processo(s): baixando o PDF e os vídeos da audiência de cada um. Prompt(s) usado(s): ${usados.join(" | ")}. A esteira entrega ao Studio, que degrava e redige a sentença (mantenha a aba do Assessor aberta e logada; acompanhe na esteira).`;
-};
+

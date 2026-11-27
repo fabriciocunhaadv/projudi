@@ -29,6 +29,13 @@
   .linha:last-child { border-bottom: 0; } .linha .nome { flex: 1 1 200px; font-weight: 650; }
   .estrela { background: none !important; border: 0 !important; box-shadow: none !important; padding: 0 4px !important; font-size: 17px; color: var(--muted); cursor: pointer; }
   .estrela.on { color: #e5a400; }
+  .aba { cursor: pointer; } header a.aba.on { background: var(--brand) !important; color: var(--brand-fg) !important; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; padding: 12px; }
+  .tile { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--fg); text-decoration: none; font-weight: 650; font-size: 13px; cursor: pointer; }
+  .tile:hover { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-suave); text-decoration: none; }
+  .tile small { color: var(--muted); font-weight: 400; font-size: 11.5px; }
+  .seta { background: none !important; border: 0 !important; box-shadow: none !important; padding: 0 4px !important; cursor: pointer; color: var(--muted); }
+  .procs { background: var(--bg); padding: 4px 8px; } .procs table { font-size: 12.5px; } .procs td, .procs th { padding: 6px 10px; }
   .vazio { padding: 18px 16px; color: var(--muted); }
   .aviso-dados { background: var(--aviso-suave); color: var(--aviso); border-radius: 10px; padding: 8px 12px; font-size: 12.5px; margin-bottom: 12px; }
   .ac button, .ac a.bt { padding: 4px 10px !important; font-size: 12px; margin: 0 4px 4px 0; }
@@ -39,19 +46,18 @@
 <div class="plus">
   <header class="topo">
     <h1>Painel Plus</h1>
-    <a href="esteira.html" data-testid="plus-esteira">Esteira de minutas</a>
-    <a href="painel.html" data-testid="plus-painel">Painel completo</a>
-    <a href="pauta.html">Pauta de audiências</a>
-    <a href="ferramentas.html">Ferramentas</a>
+    <a href="#" id="tabGeral" class="aba on" data-testid="plus-aba-geral">Visão geral</a>
+    <a href="#" id="tabAnalise" class="aba" data-testid="plus-aba-analise">Mandar para análise</a>
     <span id="quando"></span>
   </header>
   <div class="barra">
     <select id="fServentia" data-testid="plus-f-serventia" title="Filtrar por serventia"><option value="">Serventia: todas</option></select>
     <select id="fTipo" data-testid="plus-f-modo" title="Filtrar a fila pelo tipo de trabalho"><option value="">Tipo de trabalho: todos</option></select>
     <input id="fBusca" type="search" placeholder="Buscar nº do processo" data-testid="plus-busca" aria-label="Buscar processo">
-    <button id="atualizar" class="primary" data-testid="plus-atualizar" title="Abre o painel completo, onde o Projudi é lido de novo">Atualizar dados do Projudi</button>
+    <button id="atualizar" class="primary" data-testid="plus-atualizar" title="Lê as listas do Projudi de novo (só leitura; o Projudi precisa estar logado em outra aba)">↻ Verificar o Projudi agora</button><span id="situacaoLeitura" class="dica" data-testid="plus-situacao"></span>
   </div>
   <div id="aviso" class="aviso-dados" hidden></div>
+  <div id="geral">
   <div class="cartoes" id="cartoes" data-testid="plus-cartoes"></div>
   <div class="grade">
     <div>
@@ -59,11 +65,15 @@
       <div class="bloco"><h2>Por serventia <small><label>ordenar: <select id="ordem" data-testid="plus-ordem" style="padding:3px 6px"><option value="conclusos">mais conclusos</option><option value="pre">mais pré-analisadas</option><option value="nome">nome</option></select></label></small></h2><div id="serventias" data-testid="plus-serventias"></div></div>
     </div>
     <div>
+      <div class="bloco"><h2>🧰 Ferramentas da extensão</h2><div id="ferramentas" class="tiles" data-testid="plus-ferramentas"></div></div>
       <div class="bloco"><h2>⭐ Favoritas</h2><div id="favoritas" data-testid="plus-favoritas"></div></div>
       <div class="bloco"><h2>🕘 Últimos processos abertos <small>por aqui</small></h2><div id="recentes" data-testid="plus-recentes"></div></div>
     </div>
   </div>
+  </div>
+  <section id="analise" hidden data-testid="plus-analise"><iframe id="quadro" title="Mandar processos para análise (Inicie aqui)" style="width:100%;height:calc(100vh - 150px);min-height:620px;border:1px solid var(--line);border-radius:var(--radius);background:var(--card)"></iframe></section>
 </div>
+<script src="ordenar.js"></script>
 <script type="module" src="plus.js"></script>
 </body>
 </html>

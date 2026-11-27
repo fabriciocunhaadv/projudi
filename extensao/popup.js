@@ -10,6 +10,7 @@ $("ferramentas").onclick = () => abrir("ferramentas.html");
 $("ocr").onclick = () => abrir("ocr.html");
 $("texto").onclick = () => abrir("texto.html");
 $("pauta").onclick = () => abrir("pauta.html");
+$("sentvideo").onclick = () => abrir("sentenca-video.html");
 
 function situacao(estado) {
   const caixa = $("situacao"); caixa.className = "situacao";

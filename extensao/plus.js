@@ -15,8 +15,31 @@ const CARTOES = [
   { id: "prontas", rotulo: "Prontas para lançar", cor: "var(--ok)", dica: "Minutas prontas, aguardando conferência ou lançamento no Projudi" },
   { id: "erro", rotulo: "Com erro na esteira", cor: "var(--erro)", dica: "Itens que pararam com erro: abra a esteira para tentar de novo" },
 ];
+const FERRAMENTAS = [
+  { t: "Mandar para análise", d: "Inicie aqui: escolher processos e enviar", aba: "analise" },
+  { t: "Esteira de minutas", d: "Conferir e lançar no Projudi", href: "esteira.html" },
+  { t: "Painel completo", d: "Todas as listas do Projudi", href: "painel.html" },
+  { t: "SEEU", d: "Painel independente do SEEU", href: "seeu.html" },
+  { t: "Pauta de audiências", d: "Ler e imprimir a pauta", href: "pauta.html" },
+  { t: "Sentenciar com vídeo", d: "Conclusos com mídia da audiência", href: "sentenca-video.html" },
+  { t: "PDF com OCR", d: "Tornar o PDF pesquisável", href: "ocr.html" },
+  { t: "PDF para texto", d: "Extrair o texto do PDF", href: "texto.html" },
+  { t: "Ferramentas", d: "Outras ferramentas da extensão", href: "ferramentas.html" },
+  { t: "Abrir o Studio", d: "Assessor Judicial", studio: true },
+];
+let abertas = new Set(), aba = "geral";
 let estado = null, itens = [], favoritas = [], recentes = [], ocultas = { servs: [], cargos: [] }, filtroCartao = "";
 
+function desenharFerramentas() {
+  $("ferramentas").innerHTML = FERRAMENTAS.map((f, i) => f.href || f.studio ? `<a class="tile" data-f="${i}" href="${f.studio ? "https://judicial-mysql.assessor.net.br/" : esc(f.href)}" target="_blank" data-testid="plus-tile-${i}">${esc(f.t)}<small>${esc(f.d)}</small></a>` : `<button class="tile" data-f="${i}" data-testid="plus-tile-${i}">${esc(f.t)}<small>${esc(f.d)}</small></button>`).join("");
+  $("ferramentas").querySelectorAll("button.tile").forEach((b) => (b.onclick = () => trocarAba(FERRAMENTAS[b.dataset.f].aba)));
+}
+function trocarAba(nome) {
+  aba = nome; $("geral").hidden = nome !== "geral"; $("analise").hidden = nome !== "analise";
+  $("tabGeral").classList.toggle("on", nome === "geral"); $("tabAnalise").classList.toggle("on", nome === "analise");
+  if (nome === "analise" && !$("quadro").getAttribute("src")) $("quadro").src = "iniciar.html?embutido=1";      // o passo a passo "Inicie aqui" aparece aqui dentro, com os mesmos dados e o mesmo caminho
+}
+$("tabGeral").onclick = (e) => { e.preventDefault(); trocarAba("geral"); }; $("tabAnalise").onclick = (e) => { e.preventDefault(); trocarAba("analise"); };
 const ler = async () => {
   estado = (await chrome.storage.local.get("estado")).estado || null;
   try { itens = await todosDaEsteira(); } catch { itens = []; }
@@ -61,10 +84,18 @@ function desenharServentias() {
   lista.sort((a, b) => ordem === "nome" ? a.s.serventia.localeCompare(b.s.serventia, "pt-BR") : ordem === "pre" ? b.pre - a.pre : (b.na + b.pre) - (a.na + a.pre));
   if (!lista.length) { $("serventias").innerHTML = `<div class="vazio">${estado ? "Sem serventias neste filtro." : "Ainda não há dados do Projudi. Clique em “Atualizar dados do Projudi” e depois em “Verificar agora”."}</div>`; return; }
   $("serventias").innerHTML = `<table><tr><th></th><th>Serventia</th><th>Conclusos</th><th>Pré</th><th>Não analisadas</th></tr>${lista.map(({ s, na, pre }) =>
-    `<tr><td><button class="estrela${favoritas.includes(s.serventia) ? " on" : ""}" data-fav="${esc(s.serventia)}" title="Favoritar" aria-label="Favoritar ${esc(s.serventia)}">${favoritas.includes(s.serventia) ? "★" : "☆"}</button></td><td><a href="${esc(link(s.url))}" target="_blank">${esc(s.serventia)}</a>${s.erro ? `<div class="dica" style="color:var(--erro)">${esc(s.erro)}</div>` : ""}</td><td>${na + pre}</td><td><span class="etq az">${pre}</span></td><td><span class="etq av">${na}</span></td></tr>`).join("")}</table>`;
+    `<tr><td style="white-space:nowrap"><button class="seta" data-abrir="${esc(s.serventia)}" title="Ver os processos" aria-label="Ver os processos de ${esc(s.serventia)}">${abertas.has(s.serventia) ? "▾" : "▸"}</button><button class="estrela${favoritas.includes(s.serventia) ? " on" : ""}" data-fav="${esc(s.serventia)}" title="Favoritar" aria-label="Favoritar ${esc(s.serventia)}">${favoritas.includes(s.serventia) ? "★" : "☆"}</button></td><td><a href="${esc(link(s.url))}" target="_blank">${esc(s.serventia)}</a>${s.erro ? `<div class="dica" style="color:var(--erro)">${esc(s.erro)}</div>` : ""}</td><td>${na + pre}</td><td><span class="etq az">${pre}</span></td><td><span class="etq av">${na}</span></td></tr>${abertas.has(s.serventia) ? `<tr><td colspan="5" class="procs">${listaProcessos(s)}</td></tr>` : ""}`).join("")}</table>`;
+  $("serventias").querySelectorAll("[data-abrir]").forEach((b) => (b.onclick = () => { const n = b.dataset.abrir; abertas.has(n) ? abertas.delete(n) : abertas.add(n); desenhar(); }));
   $("serventias").querySelectorAll("[data-fav]").forEach((b) => (b.onclick = async () => {
     const n = b.dataset.fav; favoritas = favoritas.includes(n) ? favoritas.filter((x) => x !== n) : [...favoritas, n];
     try { await chrome.storage.sync.set({ plus_favoritas: favoritas }); } catch { /* sem sync */ } desenhar(); }));
+}
+const diasDe = (p) => { const t = globalThis.Ordenar?.ms ? Ordenar.ms(p.dataInicio || p.dataPreAnalise) : NaN; return Number.isFinite(t) ? Math.max(0, Math.floor((Date.now() - t) / 86400000)) : null; };
+function listaProcessos(s) {      // o mesmo que o painel completo mostra por serventia, aqui dobrável
+  const linhas = ["preAnalisadas", "naoAnalisadas"].flatMap((tipo) => (s.processos?.[tipo] || []).map((p) => ({ ...p, tipo })));
+  if (!linhas.length) return '<div class="vazio">Nenhum processo listado nesta serventia.</div>';
+  linhas.sort((a, b) => (diasDe(b) ?? -1) - (diasDe(a) ?? -1));
+  return `<table><tr><th>Processo</th><th>Situação</th><th>Classificador</th><th>Dias</th></tr>${linhas.map((p) => `<tr><td>${link(p.url) ? `<a class="abrir-proc" data-proc="${esc(p.processo)}" data-url="${esc(link(p.url))}" href="${esc(link(p.url))}" target="_blank">${esc(p.processo)}</a>` : esc(p.processo)}</td><td><span class="etq ${p.tipo === "preAnalisadas" ? "az" : "av"}">${p.tipo === "preAnalisadas" ? "pré-analisada" : "não analisada"}</span></td><td>${esc(p.classificador || "")}</td><td>${diasDe(p) ?? ""}</td></tr>`).join("")}</table>`;
 }
 function desenharFavoritas() {
   const mapa = new Map(unicas().map((s) => [s.serventia, s])); const lista = favoritas.filter((n) => mapa.has(n));
@@ -85,19 +116,21 @@ function preencherFiltros() {
 function desenharAviso() {
   const q = estado?.quando ? new Date(estado.quando).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
   $("quando").textContent = q ? "Projudi lido em " + q : "";
+  const st = estado?.status; $("situacaoLeitura").textContent = st === "verificando" ? "⏳ Lendo o Projudi…" : st === "deslogado" ? "🔒 Projudi sem login" : st === "erro" ? "⚠ A última leitura deu erro" : "";
+  $("atualizar").disabled = st === "verificando";
   const a = $("aviso");
   if (!estado) { a.hidden = false; a.textContent = "Ainda não há dados do Projudi neste navegador. Clique em “Atualizar dados do Projudi”, entre no Projudi se pedir e use “Verificar agora”. A fila da esteira abaixo já funciona."; }
   else if (estado.status === "deslogado") { a.hidden = false; a.textContent = "O Projudi estava sem login na última leitura: os números de conclusos podem estar desatualizados."; }
   else a.hidden = true;
 }
-function desenhar() { desenharAviso(); preencherFiltros(); desenharCartoes(); desenharFila(); desenharServentias(); desenharFavoritas(); desenharRecentes(); ligarAbrir(); }
+function desenhar() { desenharFerramentas(); desenharAviso(); preencherFiltros(); desenharCartoes(); desenharFila(); desenharServentias(); desenharFavoritas(); desenharRecentes(); ligarAbrir(); }
 function ligarAbrir() {
   document.querySelectorAll(".abrir-proc").forEach((a) => (a.onclick = async () => {
     const serv = itens.find((i) => i.processo === a.dataset.proc)?.serventia || ""; const novos = [{ processo: a.dataset.proc, url: a.dataset.url, serventia: serv, em: Date.now() }, ...recentes.filter((r) => r.processo !== a.dataset.proc)].slice(0, 20);
     recentes = novos; await chrome.storage.local.set({ plus_recentes: novos }); desenharRecentes(); ligarAbrir(); }));
 }
 ["fServentia", "fTipo", "ordem"].forEach((id) => ($(id).onchange = desenhar)); $("fBusca").oninput = desenhar;
-$("atualizar").onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("painel.html") });
+$("atualizar").onclick = () => { try { chrome.runtime.sendMessage({ acao: "verificar" }); } catch { /* fora da extensão */ } $("situacaoLeitura").textContent = "⏳ Lendo o Projudi…"; };
 (async () => { await ler(); desenhar();
   chrome.storage.onChanged.addListener(async (c, area) => { if (area === "local" && (c.estado || c.esteira_ordem || Object.keys(c).some((k) => k.startsWith("esteira_")))) { await ler(); desenhar(); } });
 })();

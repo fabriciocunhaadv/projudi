@@ -31,7 +31,7 @@ with sync_playwright() as p:
     A, B = "Montes Claros de Goias - Juizado Especial Civel - GO", "Montes Claros de Goias - Vara Unica - GO"
     sw.evaluate("""async ([A, B]) => {
       await chrome.storage.local.set({ estado: { status: 'ok', quando: Date.now(), serventias: [
-        { serventia: A, perfil: 'Juiz', url: 'Usuario?PaginaAtual=7&a1=1', linhas: [{ naoAnalisadas: 20, preAnalisadas: 3 }], processos: { naoAnalisadas: [], preAnalisadas: [] } },
+        { serventia: A, perfil: 'Juiz', url: 'Usuario?PaginaAtual=7&a1=1', linhas: [{ naoAnalisadas: 20, preAnalisadas: 3 }], processos: { naoAnalisadas: [{ processo: '6000000-01', url: 'BuscaProcesso?Id_Processo=77', classificador: 'Sentença' }], preAnalisadas: [{ processo: '6000001-02', url: 'BuscaProcesso?Id_Processo=78', classificador: 'Decisão', dataPreAnalise: '01/11/2026 10:00:00' }] } },
         { serventia: B, perfil: 'Juiz', url: 'Usuario?PaginaAtual=7&a1=2', linhas: [{ naoAnalisadas: 90, preAnalisadas: 7 }], processos: { naoAnalisadas: [], preAnalisadas: [] } },
         { serventia: B, perfil: 'Outro perfil', url: 'Usuario?PaginaAtual=7&a1=3', linhas: [{ naoAnalisadas: 90, preAnalisadas: 7 }], processos: { naoAnalisadas: [], preAnalisadas: [] } } ] } });
       const it = (id, processo, serventia, estado, modo, extra = {}) => ({ id, processo, serventia, estado, modo, url: 'BuscaProcesso?Id_Processo=' + id, ...extra });
@@ -65,6 +65,26 @@ with sync_playwright() as p:
     sw.evaluate("async () => { const k = 'esteira_a2'; const x = (await chrome.storage.local.get(k))[k]; await chrome.storage.local.set({ [k]: { ...x, estado: 'conferindo' } }); }")
     espera(pg, "[data-testid=plus-cartao-prontas] b", "2")
     pg.screenshot(path="/tmp/claude-0/work/mob/plus_real.png", full_page=True)
+    # 9) processos de cada serventia (como no painel completo), dobráveis
+    pg.click(f"[data-abrir='{A}']"); lp = pg.inner_text("[data-testid=plus-serventias]"); assert "6000000-01" in lp and "6000001-02" in lp and "pré-analisada" in lp and "Decisão" in lp, lp
+    pg.click(f"[data-abrir='{A}']"); assert "6000000-01" not in pg.inner_text("[data-testid=plus-serventias]"), "dobra de novo"
+    # 10) ferramentas: todos os atalhos da extensão num lugar só
+    tiles = pg.locator("[data-testid=plus-ferramentas] .tile"); assert tiles.count() == 10, tiles.count()
+    txt = pg.inner_text("[data-testid=plus-ferramentas]")
+    for nome in ["Mandar para análise", "Esteira de minutas", "Painel completo", "SEEU", "Pauta de audiências", "Sentenciar com vídeo", "PDF com OCR", "PDF para texto", "Ferramentas", "Abrir o Studio"]: assert nome in txt, nome
+    hrefs = [tiles.nth(i).get_attribute("href") for i in range(10)]; assert "sentenca-video.html" in hrefs and "pauta.html" in hrefs and "seeu.html" in hrefs and "ocr.html" in hrefs and "texto.html" in hrefs, hrefs
+    pg.screenshot(path="/tmp/claude-0/work/mob/plus_ferr.png", full_page=True)
+    # 11) aba "Mandar para análise": o passo a passo do Inicie aqui dentro do Painel Plus
+    pg.click("[data-testid=plus-aba-analise]"); assert pg.is_visible("[data-testid=plus-analise]") and not pg.is_visible("[data-testid=plus-cartoes]")
+    qd = pg.frame_locator("#quadro"); qd.locator("text=Passo 1 de 6").wait_for(timeout=10000)
+    assert not qd.locator(".hd").is_visible(), "dentro do Plus o cabeçalho do Inicie aqui some"
+    assert "Verificar" in qd.locator("body").inner_text()
+    pg.screenshot(path="/tmp/claude-0/work/mob/plus_analise.png")
+    pg.click("[data-testid=plus-aba-geral]"); assert pg.is_visible("[data-testid=plus-cartoes]") and not pg.is_visible("[data-testid=plus-analise]")
+    pg.click("[data-testid=plus-tile-0]"); assert pg.is_visible("[data-testid=plus-analise]"), "o atalho Mandar para análise troca de aba"
+    pg.click("[data-testid=plus-aba-geral]")
+    # 12) Verificar agora: dispara a leitura (sem abrir outra tela)
+    n_abas = len(ctx.pages); pg.click("[data-testid=plus-atualizar]"); assert "Lendo" in pg.inner_text("[data-testid=plus-situacao]"); assert len(ctx.pages) == n_abas
     assert not erros, erros
     ctx.close()
 print("OK: Painel Plus")

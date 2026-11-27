@@ -26,7 +26,7 @@ with sync_playwright() as p:
     # ---- janelinha ----
     pg = abrir("popup.html")
     ids = pg.eval_on_selector_all(".menu button", "els => els.map(e => e.id)")
-    ok(ids[0] == "inicie" and ids[1] == "painel" and "esteira" in ids and ids[-3:] == ["ocr", "texto", "pauta"] and "ferramentas" in ids, f"ordem: Inicie aqui primeiro, painel completo, Esteira, e as outras opções continuam ({ids})")
+    ok(ids[0] == "inicie" and ids[1] == "plus" and ids[2] == "painel" and "esteira" in ids and ids[-4:] == ["ocr", "texto", "pauta", "sentvideo"] and "ferramentas" in ids, f"ordem: Inicie aqui primeiro, painel completo, Esteira, e as outras opções continuam ({ids})")
     ok("Inicie aqui" in pg.inner_text("#inicie") and "Passo a passo" in pg.inner_text("#inicie"), "o botão tem o texto combinado")
     cor = pg.locator("#inicie").evaluate("(e) => getComputedStyle(e).backgroundImage + '|' + getComputedStyle(e).color"); ok("rgb(22, 163, 74)" in cor, f"destacado em verde ({cor[:60]})")
     pg.screenshot(path="/tmp/claude-0/work/teste/popup_novo.png")
