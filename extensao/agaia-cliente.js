@@ -14,6 +14,10 @@ export function numeroAgaia(proc) {
 }
 export const urlDoProcesso = (numero) => AGAIA_URL + "prompts/moderno?numero_processo=" + encodeURIComponent(numero) + "&tipo_processo=judicial&acao_id=6&validado=True";      // o mesmo endereço que o Projudi usa para abrir o Agaia: sem os três últimos itens o formulário não abre
 
+/** SEEU: o Agaia tem uma tela própria (área “SEEU”) que pede o número do processo SEM formatação e o PDF; não há integração com o Projudi. */
+export const urlSeeu = AGAIA_URL + "prompts?back_url=/agaia/home/gestao_execucao&name_retorno=Gest%C3%A3o%20e%20Execu%C3%A7%C3%A3o%20de%20Processos";
+export const numeroSeeu = (proc) => { const d = String(proc || "").replace(/\D/g, ""); return d.length === 20 ? d : ""; };
+
 async function abaDoAgaia() {
   const abertas = await chrome.tabs.query({ url: AGAIA_URL + "*" }).catch(() => []);
   return abertas.find((t) => !t.pinned) || abertas[0] || null;
@@ -68,10 +72,11 @@ async function enviarPdfAoAgaia(tabId, bytes) {
   }
   return id;
 }
-export async function executarNoAgaia(item, { aoAndamento = () => {}, limiteMs = 25 * 60000, aindaValido = async () => true, aoIniciar = () => {}, pdf = null, aceiteSigilo = false } = {}) {
-  const numero = numeroAgaia(item.processo);
-  if (!numero) return { ok: false, erro: `o número ${item.processo} não tem o ano; o Agaia só abre o processo com o número completo (ex.: 5285460-70.2025.8.09.0166)` };
-  const url = urlDoProcesso(numero);
+export async function executarNoAgaia(item, { aoAndamento = () => {}, limiteMs = 25 * 60000, aindaValido = async () => true, aoIniciar = () => {}, pdf = null, aceiteSigilo = false, seeu = false } = {}) {
+  const numero = seeu ? numeroSeeu(item.processo) : numeroAgaia(item.processo);
+  if (!numero) return { ok: false, erro: seeu ? `o número ${item.processo} não tem os 20 dígitos do padrão CNJ; o Agaia (área SEEU) pede o número completo, sem formatação` : `o número ${item.processo} não tem o ano; o Agaia só abre o processo com o número completo (ex.: 5285460-70.2025.8.09.0166)` };
+  if (seeu && !pdf?.bytes) return { ok: false, erro: "o PDF do SEEU não está guardado: envie o arquivo de novo para a esteira" };
+  const url = seeu ? urlSeeu : urlDoProcesso(numero);
   let aba = await abaDoAgaia();
   if (aba) await chrome.tabs.update(aba.id, { url, active: false });
   else aba = await chrome.tabs.create({ url, active: false });
@@ -85,7 +90,7 @@ export async function executarNoAgaia(item, { aoAndamento = () => {}, limiteMs =
   let r;
   let arquivoId = "";
   if (pdf?.bytes) { try { aoAndamento("enviando o PDF do processo ao Agaia"); arquivoId = await enviarPdfAoAgaia(aba.id, pdf.bytes); } catch (e) { return { ok: false, erro: "não consegui entregar o PDF ao Agaia (" + e.message + ")" }; } }
-  try { r = await chrome.tabs.sendMessage(aba.id, { acao: "agaia-executar", reqId, numero, prompt: item.prompt || "", limiteMs, modoPdf: !!arquivoId, arquivoId, pdfNome: pdf?.nome || "processo.pdf", aceiteSigilo: !!aceiteSigilo }); }
+  try { r = await chrome.tabs.sendMessage(aba.id, { acao: "agaia-executar", reqId, numero, prompt: item.prompt || "", limiteMs, modoPdf: !!arquivoId, arquivoId, pdfNome: pdf?.nome || "processo.pdf", aceiteSigilo: !!aceiteSigilo, seeu: !!seeu }); }
   catch (e) { return { ok: false, erro: "o Agaia não recebeu o pedido (" + e.message + ")" }; }
   if (!r?.ok) return { ok: false, erro: r?.erro || "o Agaia não confirmou o pedido" };
   aoIniciar({ reqId, tabId: aba.id });

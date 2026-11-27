@@ -14,7 +14,8 @@
 
   // ---------- leitura da tela ----------
   const campoProcesso = () => [...document.querySelectorAll("input[type=text]")].find((i) => /Informe o n[uú]mero do processo/i.test(i.placeholder || ""));
-  const selectPrompt = () => [...document.querySelectorAll("select")].find((s) => [...s.options].some((o) => /selecione um prompt/i.test(o.text)));
+  const selectPrompt = () => [...document.querySelectorAll("select")].find((s) => [...s.options].some((o) => /selecione um prompt/i.test(o.text))) || document.getElementById("prompt_id");      // tela “legada” (área SEEU): lista sem a opção “Selecione um prompt”
+  const formularioAgaia = () => document.getElementById("form_execucao_moderno") || document.getElementById("form_execucao_legacy");
   const movimentos = () => [...document.querySelectorAll("input.check_movimento")];
   const resultado = () => document.getElementById("resultado_conteudo");
   const SEM_RESULTADO = /Aguardando Execu[cç][aã]o|Preencha os dados e execute/i;
@@ -92,10 +93,19 @@
     const falha = (erro, extra = {}) => ({ ok: false, erro, ...extra });
     try {
       prog("abrindo o formulário do Agaia");
-      const form = await esperar(() => document.getElementById("form_execucao_moderno") || naTelaDeLogin(), 45000);
+      const form = await esperar(() => formularioAgaia() || naTelaDeLogin(), 45000);
       if (naTelaDeLogin()) return falha("O Agaia pediu login (sessão expirada). Entre no Agaia e continue a fila.", { sessao: true });
       if (!form) return falha("O Agaia não abriu o formulário de execução" + (mensagens()[0] ? ": " + mensagens()[0] : "."));
       await dorme(1500);      // o aviso de segredo de justiça aparece logo depois de abrir
+      if (p.seeu) {      // área SEEU: marca a opção e espera o formulário ser trocado (a página troca as telas sozinha)
+        const area = document.getElementById("area_SEEU");
+        if (!area) return falha("não achei a opção SEEU na tela do Agaia");
+        prog("escolhendo a área SEEU");
+        if (!area.checked) area.click();
+        const trocou = await esperar(() => document.querySelector("#form_execucao_legacy input[name=area_id]")?.value === "3", 20000);
+        if (!trocou) return falha("o Agaia não trocou para a área SEEU");
+        await dorme(1200);
+      }
       sigiloTolerado = !!(p.modoPdf && p.aceiteSigilo);
       if (sigiloTolerado) { if ((await fecharAvisos()) === "captcha") return falha("O Agaia pediu uma verificação (conta na imagem), que precisa de uma pessoa.", { verificacao: true }); }
       else if (sigilo()) return falhaSigilo(sigilo());
@@ -106,7 +116,7 @@
       // opções extras, como o assessor usa
       marcar("consultar_juris_auto", true); marcar("incluir_contexto_ampliado_acuracia", true); marcar("reanalisar_juris_auto", false);
       const campo = campoProcesso();
-      if (campo && !campo.value && p.numero) { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(campo, p.numero); campo.dispatchEvent(new Event("input", { bubbles: true })); campo.dispatchEvent(new Event("change", { bubbles: true })); }
+      if (campo && (!campo.value || p.seeu) && p.numero) { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(campo, p.numero); campo.dispatchEvent(new Event("input", { bubbles: true })); campo.dispatchEvent(new Event("change", { bubbles: true })); }
       prog("escolhendo o prompt");
       const pr = escolherPrompt(p.prompt);
       if (pr.erro) return falha(pr.erro);
@@ -129,15 +139,18 @@
         let caixa = null; const tCx = Date.now();
         while (Date.now() - tCx < 15 * 60000) {
           caixa = caixaConcordo(); if (caixa) break;
+          if (p.seeu && Date.now() - tCx > 8000 && document.querySelector("#lista_documentos")?.children.length) { const eb = document.getElementById("executarIA"); if (eb && visivel(eb) && !eb.disabled) break; }      // SEEU: PDF já aparece na lista e o Executar está liberado
           if ((await fecharAvisos(3)) === "captcha") return falha("O Agaia pediu uma verificação (conta na imagem), que precisa de uma pessoa.", { verificacao: true });
           const msg = mensagens().find((t) => /erro|inv[aá]lid|n[aã]o foi poss[ií]vel|tamanho m[aá]ximo|n[aã]o suportad/i.test(t)); if (msg) return falha(msg);
           await dorme(1000);
         }
-        if (!caixa) return falha("o Agaia não terminou de extrair o texto do PDF");
-        if (!p.aceiteSigilo) return falha("o Agaia pede a sua concordância com o texto extraído (LGPD) e ela não foi autorizada na esteira");
-        if (!caixa.checked) caixa.click();
-        await dorme(600);
-        prog("caixa de concordância " + (caixa.checked ? "marcada" : "NÃO marcada") + (caixa.isConnected ? "" : " (elemento saiu da tela)"));
+        if (!caixa && !p.seeu) return falha("o Agaia não terminou de extrair o texto do PDF");
+        if (caixa) {      // no SEEU a caixa pode nem existir (basta adicionar o PDF e executar)
+          if (!p.aceiteSigilo) return falha("o Agaia pede a sua concordância com o texto extraído (LGPD) e ela não foi autorizada na esteira");
+          if (!caixa.checked) caixa.click();
+          await dorme(600);
+          prog("caixa de concordância " + (caixa.checked ? "marcada" : "NÃO marcada") + (caixa.isConnected ? "" : " (elemento saiu da tela)"));
+        }
       } else {
       // entrada: integração ao PROJUDI (lista os movimentos do processo)
       prog("lendo os movimentos do processo no Projudi");
@@ -219,7 +232,7 @@
       });
       return true;
     }
-    if (m?.acao === "agaia-ping") { responder({ ok: true, pronto: !!document.getElementById("form_execucao_moderno") }); return false; }
+    if (m?.acao === "agaia-ping") { responder({ ok: true, pronto: !!formularioAgaia() }); return false; }
     if (m?.acao === "agaia-executar") {
       if (window.__agaiaOcupado) { responder({ ok: false, erro: "a aba do Agaia já está executando outro processo" }); return false; }
       window.__agaiaOcupado = true;

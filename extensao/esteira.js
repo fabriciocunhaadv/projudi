@@ -67,9 +67,10 @@ async function cadastrarAgaia(it, r) {
 async function analisarNoAgaia(it, valida) {
   const andamento = (t) => atualizar(it.id, { aviso: "Agaia: " + t });
   const opcoes = { aoAndamento: andamento, aindaValido: valida };
-  if (it.modo === "agaiapdf") {      // processo em segredo de justiça: o PDF baixado do Projudi (sem OCR) é anexado no Agaia
+  if (it.modo === "agaiapdf" || it.modo === "agaiaseeu") {      // segredo de justiça: PDF do Projudi (sem OCR) / SEEU: PDF enviado pelo usuário; em ambos o PDF é anexado no Agaia
+    if (it.modo === "agaiaseeu") opcoes.seeu = true;
     const bytes = await lerPdf(it.id);
-    if (!bytes || bytes.length < 1000) { await atualizar(it.id, { estado: "erro", erro: "Agaia: o PDF deste processo não está guardado; use “Rodar no Agaia com PDF” de novo.", aviso: "A esteira seguiu para o próximo processo." }); return; }
+    if (!bytes || bytes.length < 1000) { await atualizar(it.id, { estado: "erro", erro: "Agaia: o PDF deste processo não está guardado; use “Rodar no Agaia com PDF” de novo (SEEU: envie o PDF outra vez pela importação).", aviso: "A esteira seguiu para o próximo processo." }); return; }
     opcoes.pdf = { bytes, nome: it.pdfNome || "processo.pdf" }; opcoes.aceiteSigilo = !!it.aceiteSigilo;
   }
   // a esteira recarregou ou o computador voltou no meio: se a execução anterior terminou (ou ainda roda) na aba do Agaia, aproveita em vez de rodar de novo
@@ -149,7 +150,7 @@ async function concluirMinutaDaIa(it, nomeIa, r) {
 }
 let ultimaTentativaCadastro = 0;
 async function cadastrosPendentes(lista) {      // o Studio estava fechado/ocupado quando a minuta chegou: tenta lançar de novo (no máximo a cada 60 s)
-  const pend = lista.filter((i) => (i.modo === "agaia" || i.modo === "agaiapdf" || i.modo === "ia") && i.estado === "concluido" && i.cadastroPendente && i.minuta);
+  const pend = lista.filter((i) => (i.modo === "agaia" || i.modo === "agaiapdf" || i.modo === "agaiaseeu" || i.modo === "ia") && i.estado === "concluido" && i.cadastroPendente && i.minuta);
   if (!pend.length || Date.now() - ultimaTentativaCadastro < 60000) return;
   ultimaTentativaCadastro = Date.now();
   for (const it of pend) {
@@ -165,7 +166,7 @@ async function analisar(it) {
   await atualizar(it.id, { estado: "analisando", erro: "", rodada });
   const valida = async () => (await todos()).find((x) => x.id === it.id)?.rodada === rodada;      // o usuário pode ter escolhido outro caminho no meio
   try {
-    if (it.modo === "agaia" || it.modo === "agaiapdf") return await analisarNoAgaia(it, valida);
+    if (it.modo === "agaia" || it.modo === "agaiapdf" || it.modo === "agaiaseeu") return await analisarNoAgaia(it, valida);
     if (it.modo === "ia") return await analisarNaIaExterna(it, valida);
     if (it.modo === "video") return await analisarComVideo(it, valida);
     const bytes = await lerPdf(it.id);
@@ -356,7 +357,7 @@ async function desenhar(forcar = false) {
     if (["pausado", "erro", "analisando"].includes(it.estado)) b.push(`<button data-a="repetir" data-id="${it.id}">${it.estado === "erro" ? "Tentar de novo" : "Analisar de novo"}</button>`);
     if (it.estado === "conferindo") { if (it.docUrl) b.push(`<a href="${esc(it.docUrl)}" target="_blank">Abrir Docs</a>`); b.push(`<button data-a="conferido" data-id="${it.id}">✔ Terminei a conferência — cadastrar no Projudi</button>`); }
     if (it.estado === "cadastrando") { b.push(`<button data-a="projudi" data-id="${it.id}">Abrir o processo</button>`, `<button data-a="concluir" data-id="${it.id}">✔ Lancei no Projudi — próximo processo</button>`); }
-    if (it.estado === "erro" && ["agaia", "agaiapdf", "ia"].includes(it.modo) && !it.sigiloso) {      // segredo de justiça já tem os botões próprios (Studio e Agaia com PDF)
+    if (it.estado === "erro" && ["agaia", "agaiapdf", "agaiaseeu", "ia"].includes(it.modo) && !it.sigiloso) {      // segredo de justiça já tem os botões próprios (Studio e Agaia com PDF)
       const de = it.modo === "ia" ? (SITES_IA[it.iaId]?.nome || "IA externa") : "Agaia";
       const outras = Object.entries(SITES_IA).filter(([k]) => !(it.modo === "ia" && it.iaId === k)).map(([k, v]) => `<option value="${k}">${esc(v.nome)}</option>`).join("");
       const prompts = listaPrompts.map((x) => `<option value="${esc(x)}"${x === it.promptAlt ? " selected" : ""}>${esc(x)}</option>`).join("");
@@ -370,7 +371,7 @@ async function desenhar(forcar = false) {
     if (it.modo === "mesa" && it.estado === "concluido") b.push(`<label title="Inclui esta audiência na pauta (formato do modelo do gabinete)"><input type="checkbox" data-pauta="${it.id}" ${it.pautaSel ? "checked" : ""}> incluir na pauta</label>`);
     if (it.estado === "concluido" && (it.minuta || "").length > 200) b.push(`<button data-a="copiar" data-id="${it.id}" title="Copia a minuta que a extensão recebeu do Studio (garantia caso ela não apareça no Histórico do app)">📋 Copiar minuta</button>`);
     b.push(`<button data-a="excluir" data-id="${it.id}" title="Tira este processo da fila e apaga o PDF guardado (não mexe no Projudi nem nos arquivos já baixados)">🗑 Excluir</button>`);
-    return `<tr><td>${n + 1}</td><td>${esc(it.processo)}<br><small>${esc(it.tipo || "")}</small></td><td class="e-${it.estado}">${esc((it.modo === "agaia" || it.modo === "agaiapdf") && it.estado === "analisando" ? (it.modo === "agaiapdf" ? "rodando no Agaia (com o PDF)…" : "rodando no Agaia…") : it.modo === "ia" && it.estado === "analisando" ? `rodando no ${SITES_IA[it.iaId]?.nome || "IA externa"}…` : it.modo === "ia" && it.estado === "concluido" ? `concluído (${SITES_IA[it.iaId]?.nome || "IA externa"})` : (it.modo === "agaia" || it.modo === "agaiapdf") && it.estado === "concluido" ? "concluído (Agaia)" : ROTULO[it.estado] || it.estado)}${it.erro ? "<br>" + esc(it.erro) : ""}${it.aviso ? `<br><small>${esc(it.aviso)}</small>` : ""}${it.injecao ? (it.injecao.estado === "vermelha" ? `<br><small class="inj-v">🚨 Prompt injection nos autos: ${esc(it.injecao.texto || "confira a tarja vermelha no app")}</small>` : `<br><small class="inj-ok">✅ Prompt injection: nada encontrado</small>`) : ""}</td><td>${b.join(" ")}</td></tr>`;
+    return `<tr><td>${n + 1}</td><td>${esc(it.processo)}<br><small>${esc(it.tipo || "")}</small></td><td class="e-${it.estado}">${esc((it.modo === "agaia" || it.modo === "agaiapdf" || it.modo === "agaiaseeu") && it.estado === "analisando" ? (it.modo === "agaiaseeu" ? "rodando no Agaia (SEEU, com o PDF)…" : it.modo === "agaiapdf" ? "rodando no Agaia (com o PDF)…" : "rodando no Agaia…") : it.modo === "ia" && it.estado === "analisando" ? `rodando no ${SITES_IA[it.iaId]?.nome || "IA externa"}…` : it.modo === "ia" && it.estado === "concluido" ? `concluído (${SITES_IA[it.iaId]?.nome || "IA externa"})` : (it.modo === "agaia" || it.modo === "agaiapdf") && it.estado === "concluido" ? "concluído (Agaia)" : ROTULO[it.estado] || it.estado)}${it.erro ? "<br>" + esc(it.erro) : ""}${it.aviso ? `<br><small>${esc(it.aviso)}</small>` : ""}${it.injecao ? (it.injecao.estado === "vermelha" ? `<br><small class="inj-v">🚨 Prompt injection nos autos: ${esc(it.injecao.texto || "confira a tarja vermelha no app")}</small>` : `<br><small class="inj-ok">✅ Prompt injection: nada encontrado</small>`) : ""}</td><td>${b.join(" ")}</td></tr>`;
   }).join("") : '<tr><td colspan="4">Fila vazia.</td></tr>';
   const conc = lista.filter((x) => x.modo === "mesa" && x.estado === "concluido"), marc = conc.filter((x) => x.pautaSel);
   $("pautaBarra").style.display = conc.length ? "" : "none"; $("pautaN").textContent = marc.length; $("pautaGerar").disabled = !marc.length;
@@ -521,6 +522,7 @@ async function carregarPrompts() {
   sel.innerHTML = '<option value="">— o prompt cadastrado para a serventia do processo —</option>' + lista.map((x) => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
   if (atual && lista.includes(atual)) sel.value = atual; else if (lista.length === 1) sel.value = lista[0];
 }
+$("impModo").onchange = () => { $("impSeeuAjuda").hidden = $("impModo").value !== "agaiaseeu"; };
 $("impPromptRecarregar").onclick = () => void carregarPrompts();
 void carregarPrompts();
 
@@ -536,6 +538,15 @@ $("impArq").onchange = async () => {
   };
   const msgs = []; let n = 0; const ja = new Set((await todos()).map((i) => i.processo));
   for (const f of arqs) {
+    if (modo === "agaiaseeu") {      // SEEU → Agaia: o PDF do SEEU (nome com o número CNJ completo) é anexado na área SEEU do Agaia; a minuta volta e é gravada no Histórico do Studio
+      const m = f.name.replace(/\.pdf$/i, "").match(/(\d{7})\D?(\d{2})\D?(\d{4})\D?(\d)\D?(\d{2})\D?(\d{4})/);
+      if (!m) { msgs.push(`${f.name}: o nome do arquivo precisa ter o número CNJ completo do processo do SEEU (20 dígitos)`); continue; }
+      const proc = `${m[1]}-${m[2]}.${m[3]}.${m[4]}.${m[5]}.${m[6]}`;
+      if (ja.has(proc)) { msgs.push(`${proc}: já está na fila`); continue; }
+      if (!promptDigitado) { msgs.push(`${proc}: escolha o prompt (campo ao lado): a esteira procura o parecido no Agaia`); continue; }
+      await enfileirar({ processo: proc, url: "", urlPre: "", prompt: promptDigitado, modo: "agaiaseeu", docs, pdfNome: f.name, pdf: f.name, serventia: "", serventiaUrl: "", sistema: "seeu", aceiteSigilo: !!$("impSeeuAceite")?.checked }, new Uint8Array(await f.arrayBuffer()));
+      ja.add(proc); n++; continue;
+    }
     const cnj = (f.name.match(/\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/) || [])[0], curto = (f.name.match(/(\d{3,7})[-.](\d{1,2})(?!\d)/) || []);
     const dig = cnj ? chaveProc(cnj) : curto[1] ? curto[1].padStart(7, "0") + curto[2].padStart(2, "0") : "";
     if (!dig) { msgs.push(`${f.name}: sem número de processo no nome`); continue; }
@@ -554,7 +565,7 @@ $("impArq").onchange = async () => {
     ja.add(proc); n++;
     if (modo === "lupa" && !minutaAssessor) msgs.push(`${proc}: entrou na fila, mas sem a minuta do assessor (${motivoMinuta})`);
   }
-  $("impMsg").textContent = (n ? `${n} processo(s) adicionados à fila (${{ analise: "Análise", lupa: "Lupa do Magistrado", turbo: "Análise Turbo", mesa: "Mesa de Audiência" }[modo]}). ` : "Nenhum arquivo novo. ") + msgs.join(" | ");
+  $("impMsg").textContent = (n ? `${n} processo(s) adicionados à fila (${{ analise: "Análise", lupa: "Lupa do Magistrado", turbo: "Análise Turbo", mesa: "Mesa de Audiência", agaiaseeu: "SEEU → Agaia" }[modo]}). ` : "Nenhum arquivo novo. ") + msgs.join(" | ");
   $("impArq").value = ""; passo();
 };
 $("limpar").onclick = async () => { await remover((await todos()).filter((i) => ["concluido", "pulado"].includes(i.estado)).map((i) => i.id)); desenhar(); };
