@@ -2,6 +2,7 @@
 const $ = (id) => document.getElementById(id);
 const abrir = (arq) => { chrome.tabs.create({ url: chrome.runtime.getURL(arq) }); window.close(); };
 $("inicie").onclick = () => abrir("iniciar.html");
+$("plus").onclick = () => abrir("plus.html");
 $("painel").onclick = () => abrir("painel.html");
 $("esteira").onclick = () => abrir("esteira.html");
 $("seeu").onclick = () => abrir("seeu.html");

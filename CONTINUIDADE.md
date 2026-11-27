@@ -437,11 +437,10 @@ O usuário testou o painel do SEEU no ambiente real (lista, exportação e envio
 - `esteira.js`: botão "🔎 Buscar a minuta na aba do <IA>" nas linhas com erro da IA externa (`data-a="capturar-ia"`), `concluirMinutaDaIa` (comum à esteira e ao botão).
 - Testes: `tests/e2e_ia_claude_espera.py`, `tests/e2e_esteira_buscar_minuta_ia.py` (+ `e2e_ia_agente.py` e `e2e_esteira_alt_caminho.py` seguem passando). Pacote `publicacao/projudi-extensao-5.3.9.zip` (o usuário envia à loja).
 
-## Ideia guardada: Painel Plus (27/11/2026) — NÃO iniciada, aguardando autorização do usuário
-- Referência: vídeo "PROJUDI+" do TJGO (só para organizar as informações; NÃO copiar marca/visual). Visual = o da própria extensão (`tema.css`).
-- Pedido: botão novo "Painel Plus" no menu da extensão (popup), para TODOS os usuários, mostrando só dados do próprio usuário (lidos no navegador dele e do Studio).
-- Mock-ups (dados fictícios) em `ideias/painel-plus/` (`plus.html`, `popup.html`, `painel_plus.png`, `botao_popup.png`).
-- Blocos: cartões-filtro (conclusos, analisados no Studio, prontas p/ lançar, sem análise, com erro na esteira), fila de minutas (Abrir no Studio/Lançar/Buscar minuta/Tentar de novo), por serventia (ordenar por conclusos), favoritas, últimos acessados, assinatura/lançamento em lote, atalhos.
-- A confirmar na prática: totais de conclusos/sem análise por serventia só se a extensão conseguir ler da tela do Projudi.
-- Ordem sugerida: 1) botão + tela com fila e cartões do que já existe; 2) serventias, favoritas, lote. Seria a versão 5.4.0 (novo pacote para a loja).
-- Pedido do usuário: LEMBRAR dele quando o limite semanal de uso reiniciar.
+## Painel Plus — FEITO na extensão 5.4.0 (27/11/2026), aguardando envio do pacote à loja pelo usuário
+- Botão "Painel Plus" no menu da extensão (popup) abre `plus.html` (`plus.js`). Visual = `tema.css`; modelo só inspirou a organização (vídeo PROJUDI+ do TJGO, sem copiar marca).
+- Mostra só dados do navegador do usuário: cartões-filtro (conclusos, pré-analisadas, na fila/analisando, prontas p/ lançar, com erro), fila de minutas (da esteira, erro primeiro), por serventia (do `estado` lido pelo painel completo, uma vez por unidade, ordenável), favoritas (`chrome.storage.sync` chave `plus_favoritas`), últimos processos abertos por ali (`plus_recentes`), filtros de serventia/tipo/busca. Atualiza sozinho quando a esteira/estado mudam.
+- Os totais de conclusos dependem de o painel completo ter feito "Verificar agora" (a tela avisa quando não há dados).
+- Ações: "Abrir na esteira" e "Abrir o processo". Lançar em lote/assinatura ficam para uma 2ª etapa (ver mock-ups em `ideias/painel-plus/`).
+- Testes: `tests/e2e_painel_plus.py`; `tests/e2e_extensao.py` ajustado (lista de botões do menu inclui SEEU e Painel Plus).
+- Pedido do usuário pendente: LEMBRAR dele quando o limite semanal de uso reiniciar (aguardando ele dizer a data/hora).

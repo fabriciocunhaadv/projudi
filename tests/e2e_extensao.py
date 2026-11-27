@@ -80,7 +80,7 @@ def main():
         pg = ctx.new_page(); pg.goto(f"chrome-extension://{ext_id}/popup.html"); pg.wait_for_timeout(500)
         txt = pg.inner_text("body"); print(txt[:300])
         botoes = [b.inner_text().strip() for b in pg.locator("button").all()]
-        assert [b.split("\n")[0].strip() for b in botoes] == ["▶ Inicie aqui", "Abrir painel completo", "Esteira de minutas", "Ferramentas", "PDF com OCR", "PDF para texto", "Pauta de audiências"], botoes      # 4.0.2: "Inicie aqui" em 1º e botão da Esteira; o resto igual
+        assert [b.split("\n")[0].strip() for b in botoes] == ["▶ Inicie aqui", "Painel Plus", "Abrir painel completo", "SEEU", "Esteira de minutas", "Ferramentas", "PDF com OCR", "PDF para texto", "Pauta de audiências"], botoes      # 4.0.2: "Inicie aqui" em 1º e botão da Esteira; o resto igual
         assert "Última atualização concluída" in txt and "Montes Claros" not in txt and "Fulano" not in txt and "1000002-22" not in txt, txt
         pn = ctx.new_page(); pn.goto(f"chrome-extension://{ext_id}/painel.html"); pn.wait_for_timeout(500)
         # tabelas do painel (como no Projudi): classificador, colunas, bolinhas de urgência e botões de copiar
