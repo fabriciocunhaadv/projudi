@@ -436,3 +436,12 @@ O usuário testou o painel do SEEU no ambiente real (lista, exportação e envio
 - `ia-externa-cliente.js`: espera total 12 → 30 min; `capturarDaAba(id)` pega a minuta que já está (ou ainda está sendo escrita) na conversa aberta mais recente do site, sem reenviar nada.
 - `esteira.js`: botão "🔎 Buscar a minuta na aba do <IA>" nas linhas com erro da IA externa (`data-a="capturar-ia"`), `concluirMinutaDaIa` (comum à esteira e ao botão).
 - Testes: `tests/e2e_ia_claude_espera.py`, `tests/e2e_esteira_buscar_minuta_ia.py` (+ `e2e_ia_agente.py` e `e2e_esteira_alt_caminho.py` seguem passando). Pacote `publicacao/projudi-extensao-5.3.9.zip` (o usuário envia à loja).
+
+## Ideia guardada: Painel Plus (27/11/2026) — NÃO iniciada, aguardando autorização do usuário
+- Referência: vídeo "PROJUDI+" do TJGO (só para organizar as informações; NÃO copiar marca/visual). Visual = o da própria extensão (`tema.css`).
+- Pedido: botão novo "Painel Plus" no menu da extensão (popup), para TODOS os usuários, mostrando só dados do próprio usuário (lidos no navegador dele e do Studio).
+- Mock-ups (dados fictícios) em `ideias/painel-plus/` (`plus.html`, `popup.html`, `painel_plus.png`, `botao_popup.png`).
+- Blocos: cartões-filtro (conclusos, analisados no Studio, prontas p/ lançar, sem análise, com erro na esteira), fila de minutas (Abrir no Studio/Lançar/Buscar minuta/Tentar de novo), por serventia (ordenar por conclusos), favoritas, últimos acessados, assinatura/lançamento em lote, atalhos.
+- A confirmar na prática: totais de conclusos/sem análise por serventia só se a extensão conseguir ler da tela do Projudi.
+- Ordem sugerida: 1) botão + tela com fila e cartões do que já existe; 2) serventias, favoritas, lote. Seria a versão 5.4.0 (novo pacote para a loja).
+- Pedido do usuário: LEMBRAR dele quando o limite semanal de uso reiniciar.

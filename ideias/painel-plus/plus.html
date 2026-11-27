@@ -1,0 +1,76 @@
+<!doctype html><meta charset="utf-8"><title>Painel Plus</title>
+<link rel="stylesheet" href="tema.css">
+<style>
+body{padding:0!important}
+.wrap{display:grid;grid-template-columns:210px 1fr;min-height:100vh}
+.lado{background:var(--card);border-right:1px solid var(--line);padding:18px 12px;display:flex;flex-direction:column;gap:4px}
+.lado h1{font-size:17px!important;margin:0 0 14px 4px}
+.lado a{display:flex;gap:8px;align-items:center;padding:9px 12px;border-radius:10px;color:var(--fg);font-weight:600;font-size:13px}
+.lado a.on{background:var(--brand-suave);color:var(--brand)}
+.lado small{margin:14px 6px 4px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:10px}
+.main{padding:20px 26px 40px}
+.top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.top .sp{margin-left:auto;color:var(--muted);font-size:12px}
+select,input{font:inherit;border:1px solid var(--line-forte);background:var(--card);color:var(--fg);border-radius:10px;padding:7px 10px}
+.cards{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px}
+.c{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--sombra);position:relative}
+.c b{font-size:30px;font-weight:750;letter-spacing:-.02em;display:block;line-height:1.1}
+.c span{color:var(--muted);font-size:12px}
+.c i{position:absolute;right:12px;top:12px;width:10px;height:10px;border-radius:50%}
+.c.sel{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-suave)}
+.sec{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--sombra);margin-bottom:16px;overflow:hidden}
+.sec>h2{margin:0!important;padding:12px 16px;background:var(--brand-suave);color:var(--brand);display:flex;justify-content:space-between}
+.sec>h2 small{color:var(--brand)!important;font-weight:600}
+.grid2{display:grid;grid-template-columns:1.25fr 1fr;gap:16px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding:8px 14px;border-bottom:1px solid var(--line)}
+td{padding:9px 14px;border-bottom:1px solid var(--line)}
+tr:last-child td{border:0}
+.etq{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:700;margin-right:4px}
+.etq.t1{background:var(--ok-suave);color:var(--ok)}.etq.t2{background:var(--aviso-suave);color:var(--aviso)}.etq.t3{background:var(--erro-suave);color:var(--erro)}.etq.t4{background:var(--brand-suave);color:var(--brand)}
+.fav{padding:11px 16px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.fav:last-child{border:0}.fav b{flex:1 1 220px}
+.ac button{padding:4px 10px!important;font-size:12px;margin-right:4px}
+.cinza{color:var(--muted);font-size:12px}
+.faixa{background:var(--aviso-suave);color:var(--aviso);border-radius:10px;padding:8px 12px;font-size:12px;margin-bottom:14px}
+</style>
+<div class="wrap">
+<nav class="lado"><h1>Painel Plus</h1>
+<a class="on">🏠 Visão geral</a><a>📋 Fila de minutas</a><a>✍️ Aguardando assinatura</a><a>⭐ Favoritas</a><a>🕘 Últimos acessados</a><a>📝 Post-its</a>
+<small>Atalhos</small><a>▶ Esteira de minutas</a><a>🔎 Pauta de audiências</a><a>🛠 Ferramentas</a></nav>
+<div class="main">
+<div class="top"><select><option>Unidade: Montes Claros</option></select><select><option>Serventia: todas</option></select><select><option>Tipo: todos</option></select><button class="primary">Atualizar</button><span class="sp">Atualizado às 08:46 · lido do Projudi e do Studio</span></div>
+<div class="faixa">Exemplo ilustrativo com dados fictícios. Os números reais virão do que a extensão lê no Projudi e do que o Studio já gravou.</div>
+<div class="cards">
+<div class="c sel"><i style="background:var(--brand)"></i><b>327</b><span>Conclusos</span></div>
+<div class="c"><i style="background:#8b5cf6"></i><b>71</b><span>Analisados no Studio</span></div>
+<div class="c"><i style="background:var(--ok)"></i><b>77</b><span>Minutas prontas p/ lançar</span></div>
+<div class="c"><i style="background:var(--aviso)"></i><b>179</b><span>Ainda sem análise</span></div>
+<div class="c"><i style="background:var(--erro)"></i><b>4</b><span>Com erro na esteira</span></div>
+</div>
+<div class="grid2">
+<div>
+<div class="sec"><h2>Fila de minutas <small>ordenar: prioridade ▾</small></h2>
+<table><tr><th>Processo</th><th>Ato</th><th>Situação</th><th>Ações</th></tr>
+<tr><td><b>5137277-85</b><div class="cinza">Medidas protetivas</div></td><td>Decisão</td><td><span class="etq t3">Alta</span><span class="etq t1">Pronta</span></td><td class="ac"><button>Abrir no Studio</button><button class="primary">Lançar</button></td></tr>
+<tr><td><b>5137079-86</b><div class="cinza">Pedido de prisão preventiva</div></td><td>Decisão</td><td><span class="etq t4">Normal</span><span class="etq t2">Conferindo</span></td><td class="ac"><button>Abrir no Studio</button><button class="primary">Lançar</button></td></tr>
+<tr><td><b>5106096-37</b><div class="cinza">Cumprimento de sentença</div></td><td>Despacho</td><td><span class="etq t4">Normal</span><span class="etq t1">Pronta</span></td><td class="ac"><button>Abrir no Studio</button><button class="primary">Lançar</button></td></tr>
+<tr><td><b>5424216-06</b><div class="cinza">Execução fiscal</div></td><td>Sentença</td><td><span class="etq t3">Erro</span></td><td class="ac"><button>🔎 Buscar minuta</button><button>Tentar de novo</button></td></tr>
+</table></div>
+<div class="sec"><h2>Por serventia <small>ordenar: mais conclusos ▾</small></h2>
+<table><tr><th>Serventia</th><th>Conclusos</th><th>Prontas</th><th>Sem análise</th></tr>
+<tr><td>1ª Vara Cível</td><td>3.329</td><td><span class="etq t1">38</span></td><td><span class="etq t2">23</span></td></tr>
+<tr><td>Juizado Especial Criminal</td><td>114</td><td><span class="etq t1">57</span></td><td><span class="etq t2">4</span></td></tr>
+<tr><td>Fazenda Pública</td><td>93</td><td><span class="etq t1">16</span></td><td><span class="etq t2">9</span></td></tr></table></div>
+</div>
+<div>
+<div class="sec"><h2>⭐ Favoritas</h2>
+<div class="fav"><b>Juizado Especial Criminal</b><span class="etq t4">3 pré</span><span class="etq t1">57 prontas</span></div>
+<div class="fav"><b>1ª Vara Cível</b><span class="etq t4">6 pré</span><span class="etq t2">23 sem análise</span></div>
+<div class="fav"><b>Fazenda Pública</b><span class="etq t1">16 prontas</span></div></div>
+<div class="sec"><h2>🕘 Últimos processos acessados</h2>
+<div class="fav"><b>5089083-93.2019</b><span class="cinza">Família</span></div>
+<div class="fav"><b>5001943-36.2015</b><span class="cinza">Família</span></div>
+<div class="fav"><b>5106096-37.2021</b><span class="cinza">Juizado Criminal</span></div></div>
+<div class="sec"><h2>✍️ Assinatura em lote</h2><div class="fav"><span>77 minutas prontas, 12 ainda não conferidas</span><button class="primary" style="margin-left:auto">Conferir e lançar todas</button></div></div>
+</div></div></div></div>
